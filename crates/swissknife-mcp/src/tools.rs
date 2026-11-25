@@ -28,6 +28,15 @@ pub struct WalletServer {
 
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+struct SaveContact {
+    /// Lightning Address to save in the selected wallet, for example billing@example.com.
+    ln_address: String,
+    /// An optional label of up to 100 printable characters. Omit to clear an existing label.
+    label: Option<String>,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct MerchantChallenge {
     /// Full WWW-Authenticate challenge from the merchant's HTTP 402 response.
     challenge: String,
@@ -225,6 +234,29 @@ impl WalletServer {
     )]
     async fn list_contacts(&self) -> CallToolResult {
         result(self.wallet.get("contacts").await.map(|v| json!({"contacts":v})))
+    }
+
+    #[tool(
+        description = "List the selected wallet's saved Lightning Addresses, labels and original save times.",
+        annotations(read_only_hint = true)
+    )]
+    async fn list_saved_contacts(&self) -> CallToolResult {
+        result(self.wallet.get("saved-contacts").await.map(|v| json!({"contacts":v})))
+    }
+
+    #[tool(
+        description = "Save a Lightning Address or replace its label in this wallet's address book. Requires manage_contacts permission. Does not initiate a payment.",
+        annotations(idempotent_hint = true)
+    )]
+    async fn add_contact(&self, Parameters(args): Parameters<SaveContact>) -> CallToolResult {
+        result(
+            self.wallet
+                .post(
+                    "saved-contacts",
+                    json!({"ln_address":args.ln_address,"label":args.label}),
+                )
+                .await,
+        )
     }
 
     #[tool(
