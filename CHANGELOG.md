@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- MCP clients can check the remaining uses of a cached L402 pass at a configured SwissKnife merchant.
+
 - Inspect LNURL-withdraw vouchers and redeem them into a selected wallet invoice through an operator-configured MCP bridge.
 
 - Look up an incoming invoice and its settled amount from a wallet-scoped MCP connection.

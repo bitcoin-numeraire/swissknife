@@ -5086,6 +5086,7 @@ dependencies = [
  "bitcoin",
  "hex",
  "l402-proto",
+ "libmacaroon",
  "lightning-invoice",
  "lnurl-rs",
  "reqwest 0.13.5",

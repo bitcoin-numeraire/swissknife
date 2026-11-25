@@ -16,6 +16,7 @@ tokio = { version = "1", features = ["net", "signal"] }
 bitcoin = "=0.32.102"
 l402-proto = { git = "https://github.com/lightninglabs/L402sdk", rev = "300e136e27237ce1720494e8627e3b21fd895243" }
 lnurl = { package = "lnurl-rs", version = "0.11.0", default-features = false }
+libmacaroon = { version = "0.4.0", default-features = false }
 lightning-invoice = { version = "0.34.2", features = ["std"] }
 reqwest = { version = "0.13.5", features = ["json"] }
 rmcp = { version = "3.11", features = ["transport-io", "transport-streamable-http-server"] }
