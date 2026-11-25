@@ -9,9 +9,13 @@ description = "Wallet-scoped SwissKnife Model Context Protocol server"
 
 [dependencies]
 anyhow = "1"
+axum = "0.8.9"
+hex = "0.4.3"
+subtle = "2.6"
+tokio = { version = "1", features = ["net", "signal"] }
 lightning-invoice = { version = "0.34.2", features = ["std"] }
 reqwest = { version = "0.13.5", features = ["json"] }
-rmcp = { version = "3.11", features = ["transport-io"] }
+rmcp = { version = "3.11", features = ["transport-io", "transport-streamable-http-server"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["serde"] }

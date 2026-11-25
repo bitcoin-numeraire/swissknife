@@ -13,7 +13,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Serve a single remote or local wallet over MCP stdio. Uses SWISSKNIFE_MCP_WALLET_KEY.
+    /// Serve a single remote or local wallet over MCP stdio or Streamable HTTP. Uses SWISSKNIFE_MCP_WALLET_KEY.
     Mcp {
         /// HTTPS origin of the SwissKnife API, or HTTP on loopback.
         #[arg(long)]
@@ -21,6 +21,12 @@ pub enum Command {
         /// Wallet UUID bound to the delegated credential.
         #[arg(long)]
         wallet: Uuid,
+        /// Serve /mcp on this loopback socket. Requires SWISSKNIFE_MCP_HTTP_TOKEN.
+        #[arg(long)]
+        http_listen: Option<std::net::SocketAddr>,
+        /// HTTPS origin of an optional TLS proxy that preserves the public Host header.
+        #[arg(long, requires = "http_listen")]
+        public_origin: Option<String>,
     },
     /// Enable an existing local login and issue a one-time password reset code.
     /// Uses the configured database without connecting to a Lightning provider.

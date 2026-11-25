@@ -31,8 +31,14 @@ async fn main() {
     #[cfg(debug_assertions)]
     dotenv().ok();
 
-    if let Some(Command::Mcp { server, wallet }) = cli.command {
-        if let Err(error) = swissknife_mcp::run(server, wallet).await {
+    if let Some(Command::Mcp {
+        server,
+        wallet,
+        http_listen,
+        public_origin,
+    }) = cli.command
+    {
+        if let Err(error) = swissknife_mcp::run(server, wallet, http_listen, public_origin.as_deref()).await {
             eprintln!("Wallet MCP failed: {error:#}");
             exit(1);
         }
