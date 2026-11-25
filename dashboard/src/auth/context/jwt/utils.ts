@@ -84,7 +84,7 @@ export async function setSession(accessToken: string) {
         }
       }
 
-      return Promise.reject(error);
+      return error;
     });
   } catch (error) {
     console.error('Error during set session:', error);
