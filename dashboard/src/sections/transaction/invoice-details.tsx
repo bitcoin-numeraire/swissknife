@@ -55,6 +55,7 @@ function ambossNodeUrl(pubkey?: string | null) {
 
 export function InvoiceDetails({ invoice, isAdmin }: Props) {
   const { t } = useTranslate();
+  const offerReceipt = invoice.offer_invoice;
   const bolt11 = invoice.ln_invoice?.bolt11;
   const methodLabel = getLedgerLabel(invoice.ledger, t);
   const isOnchain = invoice.ledger === 'Onchain';
@@ -221,6 +222,36 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                       )}
                     </Stack>
                   </Stack>
+                ) : offerReceipt ? (
+                  <Stack spacing={1}>
+                    <Typography variant="overline" color="text.secondary">
+                      BOLT12
+                    </Typography>
+                    <DetailRow
+                      label={t('transaction_details.payment_hash')}
+                      value={offerReceipt.payment_hash}
+                      copyValue={offerReceipt.payment_hash}
+                      mono
+                    />
+                    <DetailRow
+                      label={t('offers.offer_id')}
+                      value={offerReceipt.offer_id}
+                      copyValue={offerReceipt.offer_id}
+                      mono
+                    />
+                    {offerReceipt.payer_note && (
+                      <DetailRow
+                        label={t('send_money.recipient_note')}
+                        value={offerReceipt.payer_note}
+                      />
+                    )}
+                    <DetailRow
+                      label={t('send_money.request_type_bolt12_invoice')}
+                      value={offerReceipt.bolt12}
+                      copyValue={offerReceipt.bolt12}
+                      mono
+                    />
+                  </Stack>
                 ) : bolt11 ? (
                   <Stack spacing={2}>
                     <Box
@@ -273,7 +304,7 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                     value: invoice.timestamp || invoice.created_at,
                     state: 'done',
                   },
-                  ...(isOnchain
+                  ...(isOnchain || offerReceipt
                     ? []
                     : [
                         {
