@@ -143,7 +143,10 @@ where
         }
         .insert(self.db.connection())
         .await
-        .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        .map_err(|error| match error.sql_err() {
+            Some(sea_orm::SqlErr::UniqueConstraintViolation(_)) => DatabaseError::DuplicatePayment,
+            _ => DatabaseError::Insert(error.to_string()),
+        })?;
 
         Ok(model.into())
     }

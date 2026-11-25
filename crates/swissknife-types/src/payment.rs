@@ -137,6 +137,36 @@ pub enum PaymentStatus {
     Failed,
 }
 
+/// Accept an external Lightning payment for durable execution.
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+pub struct SubmitPaymentRequest {
+    pub idempotency_key: Uuid,
+    /// Required for administrative submission. The wallet-scoped route uses its path.
+    pub wallet_id: Option<Uuid>,
+    pub input: String,
+    pub amount_msat: Option<u64>,
+    pub comment: Option<String>,
+    /// An optional additional ceiling below the node's configured maximum.
+    pub maximum_fee_msat: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PaymentExecutionState {
+    Accepted,
+    Processing,
+    Settled,
+    Failed,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+pub struct PaymentSubmission {
+    pub payment: Payment,
+    pub state: PaymentExecutionState,
+    /// Authorized REST resource for this submission, relative to the SwissKnife server.
+    pub status_url: String,
+}
+
 /// Send Payment Request
 #[derive(Debug, Deserialize, Clone, ToSchema, Serialize)]
 pub struct SendPaymentRequest {

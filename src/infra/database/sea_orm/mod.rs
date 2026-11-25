@@ -1,5 +1,6 @@
 mod config;
 mod models;
+mod payment_command;
 mod repositories;
 mod store;
 mod types;

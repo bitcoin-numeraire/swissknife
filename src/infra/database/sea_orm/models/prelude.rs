@@ -14,4 +14,5 @@ pub use super::invoice::Entity as Invoice;
 pub use super::ln_address::Entity as LnAddress;
 pub use super::local_credential::Entity as LocalCredential;
 pub use super::payment::Entity as Payment;
+pub use super::payment_command::Entity as PaymentCommand;
 pub use super::wallet::Entity as Wallet;

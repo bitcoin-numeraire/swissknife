@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- External Lightning payments support idempotent background submission, a wallet-scoped status resource and resumable execution events.
+
 - The dashboard notification drawer shows unread payments across wallets, links to individual transactions and supports account-wide read and archive actions.
 - Account notifications list received, settled and failed payments with an unread count, pagination, read state and archiving.
 - Clients can update individual dashboard settings using `PATCH /v1/me/preferences`.

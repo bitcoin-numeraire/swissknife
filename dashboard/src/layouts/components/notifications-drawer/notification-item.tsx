@@ -33,6 +33,12 @@ export function NotificationItem({ item, wallet, busy, change, onClose }: Props)
   const { t, currentLang } = useTranslate();
   const { state } = useSettingsContext();
   const lang = currentLang.numberFormat.code;
+  if (
+    item.event_type === ClientEventType.PAYMENT_ACCEPTED ||
+    item.event_type === ClientEventType.PAYMENT_PROCESSING
+  ) {
+    return null;
+  }
   const title = {
     [ClientEventType.INVOICE_PAID]: 'notification_inbox.received',
     [ClientEventType.PAYMENT_SETTLED]: 'notification_inbox.sent',

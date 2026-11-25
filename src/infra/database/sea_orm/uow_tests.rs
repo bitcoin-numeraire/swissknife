@@ -1142,3 +1142,102 @@ async fn onchain_deposit_emits_pending_then_paid_once() {
     assert_eq!(events[1].resource_id, stored.id);
     assert_eq!(events[1].data["status"], "Settled");
 }
+
+#[tokio::test]
+async fn payment_commands_reserve_once_claim_once_and_retain_deleted_keys() {
+    use crate::domains::payment::{PaymentInstructions, SubmissionKey};
+    use sea_orm::PaginatorTrait;
+    use swissknife_types::SubmitPaymentRequest;
+
+    let conn = connect().await;
+    let wallet = seed_wallet(&conn, 100_000).await;
+    let uow = SeaOrmPaymentUnitOfWork::new(conn.clone());
+    let request = SubmitPaymentRequest {
+        idempotency_key: Uuid::new_v4(),
+        wallet_id: None,
+        input: "synthetic invoice".into(),
+        amount_msat: None,
+        comment: None,
+        maximum_fee_msat: Some(1_000),
+    };
+    let key = SubmissionKey::new(wallet, &request);
+    let instructions = PaymentInstructions::Lightning {
+        bolt11: "synthetic invoice".into(),
+        variable_amount_msat: None,
+        maximum_fee_msat: 1_000,
+    };
+    let payment = pending_payment(wallet, 30_000, 0);
+    let (a, b) = tokio::join!(
+        uow.submit(&key, payment.clone(), 31_000, instructions.clone()),
+        uow.submit(&key, payment, 31_000, instructions.clone())
+    );
+    let first = a.unwrap().payment;
+    assert_eq!(first.id, b.unwrap().payment.id);
+    assert_eq!(balance(&conn, wallet).await, (69_000, 31_000));
+
+    let (a, b) = tokio::join!(uow.claim(), uow.claim());
+    let claimed: Vec<_> = [a.unwrap(), b.unwrap()].into_iter().flatten().collect();
+    assert_eq!(claimed.len(), 1);
+    assert_eq!(claimed[0].payment.id, first.id);
+    let events = SeaOrmClientEventRepository::new(conn.clone())
+        .find_after(account_id(&conn, wallet).await, 0, 10)
+        .await
+        .unwrap();
+    assert_eq!(
+        events.iter().map(|e| e.event_type).collect::<Vec<_>>(),
+        vec![ClientEventType::PaymentAccepted, ClientEventType::PaymentProcessing]
+    );
+    assert_eq!(
+        super::models::account_notification::Entity::find()
+            .count(&conn)
+            .await
+            .unwrap(),
+        0
+    );
+
+    let after_restart = SeaOrmPaymentUnitOfWork::new(conn.clone());
+    assert!(after_restart.claim().await.unwrap().is_none());
+    assert!(after_restart.submitted(&key).await.unwrap().unwrap().dispatched);
+    let changed = SubmissionKey::new(
+        wallet,
+        &SubmitPaymentRequest {
+            comment: Some("different authorization".into()),
+            ..request.clone()
+        },
+    );
+    assert!(matches!(
+        uow.submitted(&changed).await,
+        Err(ApplicationError::Data(DataError::Conflict(_)))
+    ));
+    let rejected = SubmissionKey::new(
+        wallet,
+        &SubmitPaymentRequest {
+            idempotency_key: Uuid::new_v4(),
+            ..request
+        },
+    );
+    assert!(uow
+        .submit(&rejected, pending_payment(wallet, 90_000, 0), 90_000, instructions)
+        .await
+        .is_err());
+    assert!(uow.submitted(&rejected).await.unwrap().is_none());
+
+    uow.fail(Payment {
+        status: PaymentStatus::Failed,
+        ..first.clone()
+    })
+    .await
+    .unwrap();
+    assert_eq!(balance(&conn, wallet).await, (100_000, 0));
+    SeaOrmPaymentRepository::new(conn.clone())
+        .delete_many(crate::domains::payment::PaymentFilter {
+            ids: Some(vec![first.id]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(matches!(
+        uow.submitted(&key).await,
+        Err(ApplicationError::Data(DataError::Conflict(_)))
+    ));
+}

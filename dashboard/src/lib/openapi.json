@@ -7022,6 +7022,126 @@
         }
       }
     },
+    "/v1/me/wallets/{wallet_id}/payments/submissions": {
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Reserve wallet funds and accept an external Lightning payment.",
+        "operationId": "submit_wallet_payment",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "description": "Owned wallet",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentSubmission"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/wallets/{wallet_id}/payments/submissions/{id}": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Read the authoritative execution and settlement state for a wallet submission.",
+        "operationId": "get_wallet_payment_submission",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "description": "Owned wallet",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Payment ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentSubmission"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me/wallets/{wallet_id}/payments/{id}": {
       "get": {
         "tags": [
@@ -7678,6 +7798,108 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/payments/submissions": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Accept an external Lightning payment for background execution.",
+        "operationId": "submit_payment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Durable payment submission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentSubmission"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicting idempotency key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid payment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/payments/submissions/{id}": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Read the authoritative execution and settlement state for an administrative payment submission.",
+        "operationId": "get_payment_submission",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Payment ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentSubmission"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           }
@@ -9160,6 +9382,8 @@
         "enum": [
           "invoice.pending",
           "invoice.paid",
+          "payment.accepted",
+          "payment.processing",
           "payment.settled",
           "payment.failed"
         ]
@@ -9286,6 +9510,12 @@
           }
         }
       },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "internal_transfer_required"
+        ]
+      },
       "ErrorResponse": {
         "type": "object",
         "description": "Application error response",
@@ -9294,6 +9524,17 @@
           "reason"
         ],
         "properties": {
+          "code": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ErrorCode",
+                "description": "Optional machine-readable explanation for clients that can act on this error."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "reason": {
             "type": "string",
             "description": "Error reason",
@@ -10223,6 +10464,15 @@
           }
         }
       },
+      "PaymentExecutionState": {
+        "type": "string",
+        "enum": [
+          "accepted",
+          "processing",
+          "settled",
+          "failed"
+        ]
+      },
       "PaymentFeeEstimate": {
         "type": "object",
         "description": "Fee quote for a prospective outgoing payment.\n\n`estimated_fee_msat` is the route or transaction fee expected at quote time.\nIt can be absent when the Lightning node cannot find a graph route while the\nconfigured payment policy still permits an execution attempt. The maximum is\nthe hard cap passed to the Lightning provider (or the prepared on-chain fee).",
@@ -10283,6 +10533,26 @@
           "Settled",
           "Failed"
         ]
+      },
+      "PaymentSubmission": {
+        "type": "object",
+        "required": [
+          "payment",
+          "state",
+          "status_url"
+        ],
+        "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/Payment"
+          },
+          "state": {
+            "$ref": "#/components/schemas/PaymentExecutionState"
+          },
+          "status_url": {
+            "type": "string",
+            "description": "Authorized REST resource for this submission, relative to the SwissKnife server."
+          }
+        }
       },
       "Permission": {
         "type": "string",
@@ -10499,6 +10769,54 @@
             "type": "string",
             "description": "Owner username, normalized to lowercase. Use 3 to 64 ASCII letters,\ndigits, dots, underscores, or hyphens.",
             "example": "admin"
+          }
+        }
+      },
+      "SubmitPaymentRequest": {
+        "type": "object",
+        "description": "Accept an external Lightning payment for durable execution.",
+        "required": [
+          "idempotency_key",
+          "input"
+        ],
+        "properties": {
+          "amount_msat": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "input": {
+            "type": "string"
+          },
+          "maximum_fee_msat": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "An optional additional ceiling below the node's configured maximum.",
+            "minimum": 0
+          },
+          "wallet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Required for administrative submission. The wallet-scoped route uses its path."
           }
         }
       },
@@ -10838,6 +11156,17 @@
                 "reason"
               ],
               "properties": {
+                "code": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorCode",
+                      "description": "Optional machine-readable explanation for clients that can act on this error."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "reason": {
                   "type": "string",
                   "description": "Error reason",

@@ -416,6 +416,8 @@ export type ClientEventStreamQuery = {
 export const ClientEventType = {
   INVOICE_PENDING: 'invoice.pending',
   INVOICE_PAID: 'invoice.paid',
+  PAYMENT_ACCEPTED: 'payment.accepted',
+  PAYMENT_PROCESSING: 'payment.processing',
   PAYMENT_SETTLED: 'payment.settled',
   PAYMENT_FAILED: 'payment.failed',
 } as const;
@@ -506,10 +508,15 @@ export type CreateWalletRequest = {
   asset_id: string;
 };
 
+export const ErrorCode = { INTERNAL_TRANSFER_REQUIRED: 'internal_transfer_required' } as const;
+
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
+
 /**
  * Application error response
  */
 export type ErrorResponse = {
+  code?: ErrorCode | null;
   /**
    * Error reason
    */
@@ -1060,6 +1067,16 @@ export type Payment = {
   wallet_id: string;
 };
 
+export const PaymentExecutionState = {
+  ACCEPTED: 'accepted',
+  PROCESSING: 'processing',
+  SETTLED: 'settled',
+  FAILED: 'failed',
+} as const;
+
+export type PaymentExecutionState =
+  (typeof PaymentExecutionState)[keyof typeof PaymentExecutionState];
+
 /**
  * Fee quote for a prospective outgoing payment.
  *
@@ -1108,6 +1125,15 @@ export const PaymentStatus = {
  * Lifecycle status of a payment.
  */
 export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus];
+
+export type PaymentSubmission = {
+  payment: Payment;
+  state: PaymentExecutionState;
+  /**
+   * Authorized REST resource for this submission, relative to the SwissKnife server.
+   */
+  status_url: string;
+};
 
 /**
  * An API access scope granted to a JWT or API key.
@@ -1269,6 +1295,24 @@ export type SignUpRequest = {
    * digits, dots, underscores, or hyphens.
    */
   username: string;
+};
+
+/**
+ * Accept an external Lightning payment for durable execution.
+ */
+export type SubmitPaymentRequest = {
+  amount_msat?: number | null;
+  comment?: string | null;
+  idempotency_key: string;
+  input: string;
+  /**
+   * An optional additional ceiling below the node's configured maximum.
+   */
+  maximum_fee_msat?: number | null;
+  /**
+   * Required for administrative submission. The wallet-scoped route uses its path.
+   */
+  wallet_id?: string | null;
 };
 
 /**
@@ -4800,6 +4844,63 @@ export type EstimateWalletPaymentFeeResponses = {
 export type EstimateWalletPaymentFeeResponse =
   EstimateWalletPaymentFeeResponses[keyof EstimateWalletPaymentFeeResponses];
 
+export type SubmitWalletPaymentData = {
+  body: SubmitPaymentRequest;
+  path: {
+    /**
+     * Owned wallet
+     */
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/payments/submissions';
+};
+
+export type SubmitWalletPaymentErrors = {
+  404: ErrorResponse;
+  409: ErrorResponse;
+  422: ErrorResponse;
+};
+
+export type SubmitWalletPaymentError = SubmitWalletPaymentErrors[keyof SubmitWalletPaymentErrors];
+
+export type SubmitWalletPaymentResponses = {
+  202: PaymentSubmission;
+};
+
+export type SubmitWalletPaymentResponse =
+  SubmitWalletPaymentResponses[keyof SubmitWalletPaymentResponses];
+
+export type GetWalletPaymentSubmissionData = {
+  body?: never;
+  path: {
+    /**
+     * Owned wallet
+     */
+    wallet_id: string;
+    /**
+     * Payment ID
+     */
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/payments/submissions/{id}';
+};
+
+export type GetWalletPaymentSubmissionErrors = {
+  404: ErrorResponse;
+};
+
+export type GetWalletPaymentSubmissionError =
+  GetWalletPaymentSubmissionErrors[keyof GetWalletPaymentSubmissionErrors];
+
+export type GetWalletPaymentSubmissionResponses = {
+  200: PaymentSubmission;
+};
+
+export type GetWalletPaymentSubmissionResponse =
+  GetWalletPaymentSubmissionResponses[keyof GetWalletPaymentSubmissionResponses];
+
 export type GetWalletPaymentData = {
   body?: never;
   path: {
@@ -5074,6 +5175,65 @@ export type EstimatePaymentFeeResponses = {
 
 export type EstimatePaymentFeeResponse =
   EstimatePaymentFeeResponses[keyof EstimatePaymentFeeResponses];
+
+export type SubmitPaymentData = {
+  body: SubmitPaymentRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/payments/submissions';
+};
+
+export type SubmitPaymentErrors = {
+  /**
+   * Missing permission
+   */
+  403: ErrorResponse;
+  /**
+   * Conflicting idempotency key
+   */
+  409: ErrorResponse;
+  /**
+   * Invalid payment
+   */
+  422: ErrorResponse;
+};
+
+export type SubmitPaymentError = SubmitPaymentErrors[keyof SubmitPaymentErrors];
+
+export type SubmitPaymentResponses = {
+  /**
+   * Durable payment submission
+   */
+  202: PaymentSubmission;
+};
+
+export type SubmitPaymentResponse = SubmitPaymentResponses[keyof SubmitPaymentResponses];
+
+export type GetPaymentSubmissionData = {
+  body?: never;
+  path: {
+    /**
+     * Payment ID
+     */
+    id: string;
+  };
+  query?: never;
+  url: '/v1/payments/submissions/{id}';
+};
+
+export type GetPaymentSubmissionErrors = {
+  404: ErrorResponse;
+};
+
+export type GetPaymentSubmissionError =
+  GetPaymentSubmissionErrors[keyof GetPaymentSubmissionErrors];
+
+export type GetPaymentSubmissionResponses = {
+  200: PaymentSubmission;
+};
+
+export type GetPaymentSubmissionResponse =
+  GetPaymentSubmissionResponses[keyof GetPaymentSubmissionResponses];
 
 export type DeletePaymentData = {
   body?: never;

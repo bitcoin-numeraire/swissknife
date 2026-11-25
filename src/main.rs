@@ -81,6 +81,8 @@ async fn main() {
         exit(1);
     }
 
+    crate::infra::app::start_payment_workers(services.clone());
+
     // We start accepting external requests only when everything is synced and ready
     let app = Server::new(adapters.clone(), services.clone(), config.dashboard_dir.as_deref());
     if let Err(err) = app.start(&config.web.addr, shutdown_signal(adapters.clone())).await {

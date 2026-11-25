@@ -1,3 +1,4 @@
+mod payment_command;
 mod payment_handler;
 mod payment_input;
 mod payment_repository;
@@ -5,6 +6,7 @@ mod payment_service;
 mod payment_unit_of_work;
 mod payment_use_cases;
 
+pub use payment_command::*;
 pub use payment_handler::*;
 pub(crate) use payment_input::LnPaymentTarget;
 pub use payment_repository::*;

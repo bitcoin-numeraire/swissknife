@@ -19,8 +19,8 @@ use uuid::Uuid;
 use swissknife_types::{
     Account, AccountPreferences, ClientEvent, ClientEventStreamQuery, ClientEventType, CreateApiKeyRequest,
     CreateWalletRequest, ErrorResponse, NewBtcAddressRequest, NewInvoiceRequest, PatchAccountPreferencesRequest,
-    PaymentFeeEstimate, RegisterLnAddressRequest, SendPaymentRequest, UpdateAccountPreferencesRequest,
-    UpdateAccountRequest, UpdateLnAddressRequest,
+    PaymentFeeEstimate, PaymentSubmission, RegisterLnAddressRequest, SendPaymentRequest, SubmitPaymentRequest,
+    UpdateAccountPreferencesRequest, UpdateAccountRequest, UpdateLnAddressRequest,
 };
 
 use crate::{
@@ -73,6 +73,8 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         get_wallet_invoice,
         delete_expired_invoices,
         wallet_pay,
+        submit_wallet_payment,
+        get_wallet_payment_submission,
         estimate_wallet_payment_fee,
         list_wallet_payments,
         get_wallet_payment,
@@ -144,6 +146,11 @@ pub fn account_router() -> Router<Arc<AppServices>> {
         .route("/wallets/{wallet_id}/invoices/{id}", get(get_wallet_invoice))
         .route("/wallets/{wallet_id}/invoices", delete(delete_expired_invoices))
         .route("/wallets/{wallet_id}/payments", post(wallet_pay))
+        .route("/wallets/{wallet_id}/payments/submissions", post(submit_wallet_payment))
+        .route(
+            "/wallets/{wallet_id}/payments/submissions/{id}",
+            get(get_wallet_payment_submission),
+        )
         .route(
             "/wallets/{wallet_id}/payments/fee-estimate",
             post(estimate_wallet_payment_fee),
@@ -559,6 +566,52 @@ async fn list_wallet_btc_addresses(
 
     filter.wallet_id = Some(wallet_id);
     Ok(Json(services.bitcoin.list_addresses(filter).await?))
+}
+
+/// Reserve wallet funds and accept an external Lightning payment.
+#[utoipa::path(post, path = "/wallets/{wallet_id}/payments/submissions", context_path = CONTEXT_PATH, tag = "Me", request_body = SubmitPaymentRequest,
+    params(("wallet_id" = Uuid, Path, description = "Owned wallet")), responses((status = 202, body = PaymentSubmission), (status = 404, body = ErrorResponse), (status = 409, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
+async fn submit_wallet_payment(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(wallet_id): Path<Uuid>,
+    Json(request): Json<SubmitPaymentRequest>,
+) -> Result<
+    (
+        axum::http::StatusCode,
+        [(HeaderName, String); 1],
+        Json<PaymentSubmission>,
+    ),
+    ApplicationError,
+> {
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let base = format!("/v1/me/wallets/{wallet_id}/payments/submissions");
+    let submission = services
+        .payment
+        .submit_lightning(wallet_id, request)
+        .await?
+        .response(&base);
+    services.payment_command_available.notify_one();
+    Ok((
+        axum::http::StatusCode::ACCEPTED,
+        [(axum::http::header::LOCATION, submission.status_url.clone())],
+        Json(submission),
+    ))
+}
+
+/// Read the authoritative execution and settlement state for a wallet submission.
+#[utoipa::path(get, path = "/wallets/{wallet_id}/payments/submissions/{id}", context_path = CONTEXT_PATH, tag = "Me",
+    params(("wallet_id" = Uuid, Path, description = "Owned wallet"), ("id" = Uuid, Path, description = "Payment ID")), responses((status = 200, body = PaymentSubmission), (status = 404, body = ErrorResponse)))]
+async fn get_wallet_payment_submission(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((wallet_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<PaymentSubmission>, ApplicationError> {
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let base = format!("/v1/me/wallets/{wallet_id}/payments/submissions");
+    Ok(Json(
+        services.payment.submission(Some(wallet_id), id).await?.response(&base),
+    ))
 }
 
 /// Send a payment from a wallet.

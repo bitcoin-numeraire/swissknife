@@ -120,7 +120,12 @@ impl SeaOrmClientEventRepository<&DatabaseTransaction> {
         .await
         .map_err(|error| DatabaseError::Insert(error.to_string()))?;
         let source_event_id = match inserted {
-            sea_orm::TryInsertResult::Inserted(result) if event.event_type != ClientEventType::InvoicePending => {
+            sea_orm::TryInsertResult::Inserted(result)
+                if matches!(
+                    event.event_type,
+                    ClientEventType::InvoicePaid | ClientEventType::PaymentSettled | ClientEventType::PaymentFailed
+                ) =>
+            {
                 result.last_insert_id
             }
             _ => return Ok(()),

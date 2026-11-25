@@ -20,8 +20,10 @@ import type {
   GetInvoiceResponse,
   GetLocalLoginResponse,
   GetPaymentResponse,
+  GetPaymentSubmissionResponse,
   GetWalletInvoiceResponse,
   GetWalletPaymentResponse,
+  GetWalletPaymentSubmissionResponse,
   GetWalletResponse,
   ListAccountApiKeysResponse,
   ListAccountNotificationsResponse,
@@ -48,6 +50,8 @@ import type {
   ReplaceAccountPermissionsResponse,
   ResetLocalLoginResponse,
   StreamAccountEventsResponse,
+  SubmitPaymentResponse,
+  SubmitWalletPaymentResponse,
   UpdateAccountAddressResponse,
   UpdateAccountByIdResponse,
   UpdateAccountPreferencesResponse,
@@ -509,6 +513,25 @@ export const walletPayResponseTransformer = async (data: any): Promise<WalletPay
   return data;
 };
 
+const paymentSubmissionSchemaResponseTransformer = (data: any) => {
+  data.payment = paymentSchemaResponseTransformer(data.payment);
+  return data;
+};
+
+export const submitWalletPaymentResponseTransformer = async (
+  data: any
+): Promise<SubmitWalletPaymentResponse> => {
+  data = paymentSubmissionSchemaResponseTransformer(data);
+  return data;
+};
+
+export const getWalletPaymentSubmissionResponseTransformer = async (
+  data: any
+): Promise<GetWalletPaymentSubmissionResponse> => {
+  data = paymentSubmissionSchemaResponseTransformer(data);
+  return data;
+};
+
 export const getWalletPaymentResponseTransformer = async (
   data: any
 ): Promise<GetWalletPaymentResponse> => {
@@ -523,6 +546,20 @@ export const listPaymentsResponseTransformer = async (data: any): Promise<ListPa
 
 export const payResponseTransformer = async (data: any): Promise<PayResponse> => {
   data = paymentSchemaResponseTransformer(data);
+  return data;
+};
+
+export const submitPaymentResponseTransformer = async (
+  data: any
+): Promise<SubmitPaymentResponse> => {
+  data = paymentSubmissionSchemaResponseTransformer(data);
+  return data;
+};
+
+export const getPaymentSubmissionResponseTransformer = async (
+  data: any
+): Promise<GetPaymentSubmissionResponse> => {
+  data = paymentSubmissionSchemaResponseTransformer(data);
   return data;
 };
 

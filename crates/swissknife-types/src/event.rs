@@ -31,6 +31,12 @@ pub enum ClientEventType {
     #[serde(rename = "invoice.paid")]
     #[strum(serialize = "invoice.paid")]
     InvoicePaid,
+    #[serde(rename = "payment.accepted")]
+    #[strum(serialize = "payment.accepted")]
+    PaymentAccepted,
+    #[serde(rename = "payment.processing")]
+    #[strum(serialize = "payment.processing")]
+    PaymentProcessing,
     #[serde(rename = "payment.settled")]
     #[strum(serialize = "payment.settled")]
     PaymentSettled,

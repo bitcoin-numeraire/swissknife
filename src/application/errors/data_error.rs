@@ -2,6 +2,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DataError {
+    #[error("This destination requires an internal wallet transfer")]
+    InternalTransferRequired,
+
     #[error("Conflict: {0}")]
     Conflict(String),
 

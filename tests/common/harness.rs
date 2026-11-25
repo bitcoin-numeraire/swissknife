@@ -230,6 +230,12 @@ impl TestApp {
         }
     }
 
+    pub fn logs_contain(&self, message: &str) -> bool {
+        [&self.stdout_path, &self.stderr_path]
+            .iter()
+            .any(|path| fs::read_to_string(path).is_ok_and(|output| output.contains(message)))
+    }
+
     /// A fresh HTTP client bound to this instance.
     pub fn api(&self) -> ApiClient {
         ApiClient::new(self.base_url.clone())

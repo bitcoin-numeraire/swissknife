@@ -702,6 +702,127 @@ impl PaymentService {
 
 #[async_trait]
 impl PaymentsUseCases for PaymentService {
+    async fn submit_lightning(
+        &self,
+        wallet_id: Uuid,
+        request: swissknife_types::SubmitPaymentRequest,
+    ) -> Result<super::SubmittedPayment, ApplicationError> {
+        let key = super::SubmissionKey::new(wallet_id, &request);
+        if request.wallet_id.is_some_and(|id| id != wallet_id) {
+            return Err(DataError::Validation("Submission wallet differs from the path".into()).into());
+        }
+        if let Some(original) = self.store.payment_uow.submitted(&key).await? {
+            return Ok(original);
+        }
+        if self.is_internal_payment(&request.input) {
+            return Err(DataError::InternalTransferRequired.into());
+        }
+        let input = parse_payment_input(&request.input)
+            .await
+            .map_err(DataError::Validation)?;
+        let (invoice, address, action) = match input {
+            PaymentInput::Bolt11(invoice) => (invoice, None, None),
+            PaymentInput::LnUrlPay(data) => {
+                self.ensure_wallet_network(wallet_id, self.bitcoin_wallet.network())
+                    .await?;
+                let amount = Self::validate_amount(request.amount_msat)?;
+                let callback = validate_lnurl_pay(amount, &request.comment, &data)
+                    .await
+                    .map_err(|e| DataError::Validation(e.to_string()))?;
+                (
+                    parse_bolt11(&callback.pr).map_err(DataError::Validation)?,
+                    data.ln_address,
+                    callback.success_action,
+                )
+            }
+            PaymentInput::BitcoinAddress(_) => {
+                return Err(DataError::Validation("This submission requires a Lightning destination".into()).into())
+            }
+        };
+        self.ensure_wallet_network(wallet_id, self.bolt11_network(&invoice))
+            .await?;
+        if invoice
+            .bolt11
+            .parse::<Bolt11Invoice>()
+            .map_err(|_| DataError::Validation("Invalid BOLT11 invoice".into()))?
+            .expires_at()
+            .is_none_or(|expiry| expiry.as_secs() <= Utc::now().timestamp() as u64)
+        {
+            return Err(DataError::Validation("Invoice is expired".into()).into());
+        }
+        if let (Some(fixed), Some(requested)) = (invoice.amount_msat, request.amount_msat) {
+            if fixed != requested {
+                return Err(DataError::Validation("Submitted amount differs from the invoice".into()).into());
+            }
+        }
+        if self
+            .store
+            .invoice
+            .find_by_payment_hash(&invoice.payment_hash)
+            .await?
+            .is_some()
+        {
+            return Err(DataError::InternalTransferRequired.into());
+        }
+        let amount = Self::validate_amount(invoice.amount_msat.or(request.amount_msat))?;
+        let node_cap = self.ln_client.fee_limit_msat(amount);
+        let maximum_fee_msat = request.maximum_fee_msat.map_or(node_cap, |fee| fee.min(node_cap));
+        let reserve = Self::reserve_amount_msat(amount, maximum_fee_msat)?;
+        let instructions = super::PaymentInstructions::Lightning {
+            bolt11: invoice.bolt11,
+            variable_amount_msat: invoice.amount_msat.is_none().then_some(amount),
+            maximum_fee_msat,
+        };
+        let payment = Payment {
+            wallet_id,
+            amount_msat: amount,
+            status: PaymentStatus::Pending,
+            description: request.comment.or(invoice.description),
+            ledger: Ledger::Lightning,
+            lightning: Some(LnPayment {
+                payment_hash: invoice.payment_hash,
+                ln_address: address,
+                raw_success_action: action,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        self.store
+            .payment_uow
+            .submit(&key, payment, reserve, instructions)
+            .await
+    }
+
+    async fn submission(&self, wallet_id: Option<Uuid>, id: Uuid) -> Result<super::SubmittedPayment, ApplicationError> {
+        self.store
+            .payment_uow
+            .submission_by_id(wallet_id, id)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Payment submission not found".into()).into())
+    }
+
+    async fn execute_next(&self) -> Result<bool, ApplicationError> {
+        let Some(command) = self.store.payment_uow.claim().await? else {
+            return Ok(false);
+        };
+        let super::PaymentInstructions::Lightning {
+            bolt11,
+            variable_amount_msat,
+            maximum_fee_msat,
+        } = command.instructions;
+        let result = self
+            .ln_client
+            .pay(
+                bolt11,
+                variable_amount_msat,
+                maximum_fee_msat,
+                command.payment.id.to_string(),
+            )
+            .await;
+        self.handle_processed_payment(command.payment, result).await?;
+        Ok(true)
+    }
+
     async fn estimate_fee(
         &self,
         input: String,
