@@ -237,3 +237,138 @@ async fn a_paid_pack_survives_failure_restart_and_competing_replicas() {
     assert_eq!(paid(&changed).await.unwrap().status(), StatusCode::PAYMENT_REQUIRED);
     changed.stop();
 }
+
+#[tokio::test]
+async fn merchant_quotes_set_exact_invoice_amounts_and_paid_passes_survive_repricing() {
+    let setup = TestApp::isolated("merchant-quote", &[]).await;
+    let owner = setup
+        .create_account_with_wallet(setup.admin_token().await, "quoted-merchant")
+        .await;
+    let quotes = MockServer::start().await;
+    let upstream = MockServer::start().await;
+    let env = [
+        ("SWISSKNIFE_L402__ROOT_KEY", hex::encode([19u8; 32])),
+        (
+            "SWISSKNIFE_L402__ROUTES__REPORT__WALLET_ID",
+            owner.wallet.id.to_string(),
+        ),
+        (
+            "SWISSKNIFE_L402__ROUTES__REPORT__TARGET",
+            format!("{}/read", upstream.uri()),
+        ),
+        ("SWISSKNIFE_L402__ROUTES__REPORT__PRICE_SATS", "60".into()),
+        (
+            "SWISSKNIFE_L402__ROUTES__REPORT__QUOTE_URL",
+            format!("{}/report", quotes.uri()),
+        ),
+        ("SWISSKNIFE_L402__ROUTES__REPORT__ACCESS_SECONDS", "600".into()),
+    ];
+    let app = setup.restart("quoted", &env).await;
+    let http = Client::new();
+    let url = |app: &TestApp| format!("{}/l402/report?caller=private", app.base_url);
+    let request = |app: &TestApp| {
+        http.get(url(app))
+            .header(header::COOKIE, "private=test")
+            .header("Wallet-Key", "private-key")
+    };
+    for invalid in [
+        ResponseTemplate::new(200).set_body_string(r#"{"price_msat":0}"#),
+        ResponseTemplate::new(200).set_body_string(r#"{"price_msat":60001}"#),
+        ResponseTemplate::new(200).set_body_string(r#"{"price_msat":1.5}"#),
+        ResponseTemplate::new(302).insert_header("Location", format!("{}/redirected", upstream.uri())),
+        ResponseTemplate::new(200).set_body_string(" ".repeat(1100)),
+        ResponseTemplate::new(500),
+    ] {
+        quotes.reset().await;
+        Mock::given(method("GET"))
+            .and(path("/report"))
+            .respond_with(invalid)
+            .mount(&quotes)
+            .await;
+        let response = request(&app).send().await.unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(!response.headers().contains_key(header::WWW_AUTHENTICATE));
+        assert!(upstream.received_requests().await.unwrap().is_empty());
+    }
+    let mut original = None;
+    for price in [21_345u64, 60_000] {
+        quotes.reset().await;
+        Mock::given(method("GET"))
+            .and(path("/report"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"price_msat":price})))
+            .mount(&quotes)
+            .await;
+        let response = request(&app)
+            .header(header::AUTHORIZATION, "Bearer private")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::PAYMENT_REQUIRED);
+        let (macaroon, invoice) = response.headers()[header::WWW_AUTHENTICATE]
+            .to_str()
+            .unwrap()
+            .strip_prefix("L402 macaroon=\"")
+            .unwrap()
+            .strip_suffix('"')
+            .unwrap()
+            .split_once("\", invoice=\"")
+            .unwrap();
+        assert_eq!(
+            invoice
+                .parse::<lightning_invoice::Bolt11Invoice>()
+                .unwrap()
+                .amount_milli_satoshis(),
+            Some(price)
+        );
+        let requests = quotes.received_requests().await.unwrap();
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].url.query().is_none());
+        for credential in ["authorization", "cookie", "wallet-key"] {
+            assert!(requests[0].headers.get(credential).is_none());
+        }
+        if original.is_none() {
+            original = Some((macaroon.to_owned(), invoice.to_owned()));
+        }
+    }
+    let (macaroon, invoice) = original.unwrap();
+    let preimage = Counterparty::for_provider(&app.provider).pay_for_preimage(&invoice);
+    let proof = format!("L402 {macaroon}:{preimage}");
+    wait_until(
+        Duration::from_secs(40),
+        "original merchant quote is credited",
+        || async {
+            app.wallet_balance(app.admin_token().await, owner.wallet.id)
+                .await
+                .available_msat
+                == 21_345
+        },
+    )
+    .await;
+    let app = app.restart("quoted-redeem", &env).await;
+    quotes.reset().await;
+    Mock::given(method("GET"))
+        .and(path("/read"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("paid report"))
+        .mount(&upstream)
+        .await;
+    let response = request(&app)
+        .header(header::AUTHORIZATION, &proof)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.text().await.unwrap(), "paid report");
+    assert!(quotes.received_requests().await.unwrap().is_empty());
+    let mut changed = env;
+    changed[4].1 = format!("{}/new-policy", quotes.uri());
+    let app = app.restart("new-quote-policy", &changed).await;
+    let response = request(&app)
+        .header(header::AUTHORIZATION, &proof)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(quotes.received_requests().await.unwrap()[0].url.path(), "/new-policy");
+    assert_eq!(upstream.received_requests().await.unwrap().len(), 1);
+    app.stop();
+}

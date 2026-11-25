@@ -1,8 +1,10 @@
 mod config;
 mod merchant;
+mod pricing;
 
 pub use config::MerchantConfig;
 use merchant::{ChallengeLimit, Merchant};
+use pricing::Price;
 
 use std::{sync::Arc, time::Duration};
 
@@ -44,12 +46,13 @@ pub fn router(
         .map_err(|_| WebServerError::Merchant("could not create upstream client"))?;
 
     for (name, route) in &config.routes {
-        let (url, price_msat) = route.validate(name).map_err(WebServerError::Merchant)?;
+        let (url, price_msat, quote_url) = route.validate(name).map_err(WebServerError::Merchant)?;
         let terms = (name, route.wallet_id, url.as_str(), price_msat, route.access_seconds);
         // Retain the original scope for already-paid time passes.
-        let binding = match route.requests_per_payment {
-            Some(limit) => serde_json::to_vec(&(terms, limit)),
-            None => serde_json::to_vec(&terms),
+        let binding = match (&quote_url, route.requests_per_payment) {
+            (Some(quote), limit) => serde_json::to_vec(&("merchant-quote-v1", terms, quote.as_str(), limit)),
+            (None, Some(limit)) => serde_json::to_vec(&(terms, limit)),
+            (None, None) => serde_json::to_vec(&terms),
         }
         .map_err(|_| WebServerError::Merchant("could not bind L402 route scope"))?;
         let paid = Arc::new(PaidRoute {
@@ -60,7 +63,7 @@ pub fn router(
                 services: services.clone(),
                 name: name.clone(),
                 wallet_id: route.wallet_id,
-                price_msat,
+                price: Price::new(price_msat, quote_url, &client),
                 requests_per_payment: route.requests_per_payment,
                 invoice_seconds: (route.access_seconds / 2).min(120),
                 challenges: ChallengeLimit::new(route.challenges_per_minute),

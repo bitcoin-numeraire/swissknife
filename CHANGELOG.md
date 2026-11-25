@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Merchant routes can request a fresh Lightning price from a configured quote service for each new invoice. The operator sets the maximum price and existing paid passes retain their terms.
+
 - Operators can sell time passes, single requests, or request packs for a fixed HTTP resource. The selected wallet receives the Lightning payment. Successful responses share a durable allowance across serving instances.
 
 - Connect an MCP client to a single SwissKnife wallet over stdio to inspect balances, issue invoices, and submit and track approved Lightning payments.
