@@ -3,8 +3,8 @@ use async_trait::async_trait;
 use crate::{
     application::errors::BitcoinError,
     domains::bitcoin::{
-        BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction, OnchainSyncBatch,
-        OnchainSyncCursor,
+        BtcAddressType, BtcBroadcastTransaction, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction,
+        OnchainSyncBatch, OnchainSyncCursor,
     },
 };
 
@@ -19,14 +19,16 @@ pub trait BitcoinWallet: Sync + Send {
         feerate_sat_vb: Option<u32>,
     ) -> Result<BtcPreparedTransaction, BitcoinError>;
 
-    /// Signs and broadcasts the prepared transaction. Returns an optional txid
-    /// if the real txid is only known after broadcast.
-    ///
-    /// `FinalizeTransaction` errors guarantee that broadcast was not attempted.
-    /// Once submission may have occurred (including a combined sign-and-send RPC),
-    /// return `BroadcastTransaction`: an error or missing reply does not prove
-    /// that the transaction was not broadcast.
-    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError>;
+    /// Obtain the authoritative txid before publishing. This operation never broadcasts.
+    async fn finalize_transaction(
+        &self,
+        prepared: &BtcPreparedTransaction,
+    ) -> Result<BtcBroadcastTransaction, BitcoinError> {
+        Ok(BtcBroadcastTransaction::Prepared(prepared.txid.clone()))
+    }
+
+    /// A lost reply cannot establish whether the node published the transaction.
+    async fn broadcast_transaction(&self, transaction: &BtcBroadcastTransaction) -> Result<(), BitcoinError>;
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError>;
     async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError>;
     async fn synchronize(&self, cursor: Option<OnchainSyncCursor>) -> Result<OnchainSyncBatch, BitcoinError>;
