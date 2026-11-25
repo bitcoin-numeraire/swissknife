@@ -2,6 +2,7 @@ mod agent_key_repository;
 mod config;
 mod models;
 mod offer_repository;
+mod payment_approval;
 mod payment_command;
 mod repositories;
 mod spending_policy_repository;

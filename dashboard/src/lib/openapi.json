@@ -707,6 +707,159 @@
         ]
       }
     },
+    "/v1/accounts/{account_id}/payment-approvals": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "List pending, unexpired delegated payment requests for an account.",
+        "operationId": "list_payment_approvals",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentApproval"
+                  }
+                }
+              }
+            }
+          },
+          "403": {},
+          "404": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/accounts/{account_id}/payment-approvals/{id}": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Read the original destination, amount, fee ceiling and operator decision.",
+        "operationId": "get_payment_approval",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentApproval"
+                }
+              }
+            }
+          },
+          "403": {},
+          "404": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Approve one matching retry by the original credential or reject the request.",
+        "operationId": "decide_payment_approval",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecidePaymentApproval"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentApproval"
+                }
+              }
+            }
+          },
+          "403": {},
+          "404": {},
+          "409": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
     "/v1/accounts/{account_id}/spending-policy": {
       "get": {
         "tags": [
@@ -10560,6 +10713,23 @@
           }
         }
       },
+      "ApprovalDecision": {
+        "type": "string",
+        "enum": [
+          "approve",
+          "reject"
+        ]
+      },
+      "ApprovalState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected",
+          "consumed",
+          "expired"
+        ]
+      },
       "Asset": {
         "type": "object",
         "description": "A spendable asset on one protocol/network.",
@@ -11155,11 +11325,24 @@
           }
         }
       },
+      "DecidePaymentApproval": {
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/ApprovalDecision"
+          }
+        },
+        "additionalProperties": false
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
           "internal_transfer_required",
-          "payment_target_changed"
+          "payment_target_changed",
+          "payment_approval_required"
         ]
       },
       "ErrorResponse": {
@@ -12175,6 +12358,83 @@
           }
         }
       },
+      "PaymentApproval": {
+        "type": "object",
+        "description": "Immutable payment terms shown to the account operator. Amounts are exact millisatoshi strings.",
+        "required": [
+          "id",
+          "wallet_id",
+          "agent_key_id",
+          "idempotency_key",
+          "requested_input",
+          "ledger",
+          "destination",
+          "amount_msat",
+          "maximum_fee_msat",
+          "state",
+          "created_at",
+          "expires_at"
+        ],
+        "properties": {
+          "agent_key_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount_msat": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "decided_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "destination": {
+            "type": "string",
+            "description": "Lightning payment hash or the Bitcoin address to receive the funds."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ledger": {
+            "$ref": "#/components/schemas/Ledger"
+          },
+          "maximum_fee_msat": {
+            "type": "string"
+          },
+          "requested_input": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ApprovalState"
+          },
+          "wallet_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "PaymentExecutionState": {
         "type": "string",
         "enum": [
@@ -12527,6 +12787,13 @@
             ],
             "description": "Maximum charged to each delegated credential over a rolling hour, including fees.",
             "example": "500000"
+          },
+          "approval_above_msat": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Delegated payments above this fee-inclusive threshold require operator approval."
           },
           "daily_msat": {
             "type": [

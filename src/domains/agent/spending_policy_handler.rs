@@ -15,6 +15,9 @@ use uuid::Uuid;
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        list_payment_approvals,
+        get_payment_approval,
+        decide_payment_approval,
         get_agent_spending_hours,
         set_agent_spending_hours,
         clear_agent_spending_hours,
@@ -25,6 +28,10 @@ use uuid::Uuid;
         disable_account_spending_policy
     ),
     components(schemas(
+        swissknife_types::PaymentApproval,
+        swissknife_types::ApprovalState,
+        swissknife_types::ApprovalDecision,
+        swissknife_types::DecidePaymentApproval,
         AgentSpendingHours,
         SpendingLimits,
         SpendingPolicy,
@@ -37,6 +44,14 @@ pub struct SpendingPolicyHandler;
 
 pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
+        .route(
+            "/v1/accounts/{account_id}/payment-approvals",
+            get(list_payment_approvals),
+        )
+        .route(
+            "/v1/accounts/{account_id}/payment-approvals/{id}",
+            get(get_payment_approval).put(decide_payment_approval),
+        )
         .route(
             "/v1/accounts/{account_id}/agent-spending-hours",
             get(get_agent_spending_hours)
@@ -172,5 +187,43 @@ async fn export_account_spending_report(
             (header::CACHE_CONTROL, "private, no-store"),
         ],
         csv,
+    ))
+}
+
+/// List pending, unexpired delegated payment requests for an account.
+#[utoipa::path(get,path="/v1/accounts/{account_id}/payment-approvals",tag="Accounts",security(("jwt"=[]),("api_key"=[])),params(("account_id"=Uuid,Path)),responses((status=200,body=Vec<swissknife_types::PaymentApproval>),(status=403),(status=404)))]
+async fn list_payment_approvals(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(account): Path<Uuid>,
+) -> Result<Json<Vec<swissknife_types::PaymentApproval>>, ApplicationError> {
+    user.check_permission(Permission::ReadAccount)?;
+    services.account.get(account).await?;
+    Ok(Json(services.spending_policies.pending_approvals(account).await?))
+}
+/// Read the original destination, amount, fee ceiling and operator decision.
+#[utoipa::path(get,path="/v1/accounts/{account_id}/payment-approvals/{id}",tag="Accounts",security(("jwt"=[]),("api_key"=[])),params(("account_id"=Uuid,Path),("id"=Uuid,Path)),responses((status=200,body=swissknife_types::PaymentApproval),(status=403),(status=404)))]
+async fn get_payment_approval(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((account, id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<swissknife_types::PaymentApproval>, ApplicationError> {
+    user.check_permission(Permission::ReadAccount)?;
+    Ok(Json(services.spending_policies.approval(account, id).await?))
+}
+/// Approve one matching retry by the original credential or reject the request.
+#[utoipa::path(put,path="/v1/accounts/{account_id}/payment-approvals/{id}",tag="Accounts",security(("jwt"=[]),("api_key"=[])),params(("account_id"=Uuid,Path),("id"=Uuid,Path)),request_body=swissknife_types::DecidePaymentApproval,responses((status=200,body=swissknife_types::PaymentApproval),(status=403),(status=404),(status=409)))]
+async fn decide_payment_approval(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((account, id)): Path<(Uuid, Uuid)>,
+    Json(decision): Json<swissknife_types::DecidePaymentApproval>,
+) -> Result<Json<swissknife_types::PaymentApproval>, ApplicationError> {
+    user.check_permission(Permission::WriteAccount)?;
+    Ok(Json(
+        services
+            .spending_policies
+            .decide(account, id, user.account_id, decision.decision)
+            .await?,
     ))
 }

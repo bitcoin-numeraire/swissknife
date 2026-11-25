@@ -19,6 +19,7 @@ import {
   createLocalLoginResponseTransformer,
   createOfferResponseTransformer,
   createWalletOfferResponseTransformer,
+  decidePaymentApprovalResponseTransformer,
   disableOfferResponseTransformer,
   disableWalletOfferResponseTransformer,
   generateBtcAddressResponseTransformer,
@@ -35,6 +36,7 @@ import {
   getInvoiceResponseTransformer,
   getLocalLoginResponseTransformer,
   getOfferResponseTransformer,
+  getPaymentApprovalResponseTransformer,
   getPaymentResponseTransformer,
   getPaymentSubmissionResponseTransformer,
   getWalletInvoiceResponseTransformer,
@@ -53,6 +55,7 @@ import {
   listContactsResponseTransformer,
   listInvoicesResponseTransformer,
   listOffersResponseTransformer,
+  listPaymentApprovalsResponseTransformer,
   listPaymentsResponseTransformer,
   listResponseTransformer,
   listWalletBtcAddressesResponseTransformer,
@@ -117,6 +120,9 @@ import type {
   CreateWalletOfferData,
   CreateWalletOfferErrors,
   CreateWalletOfferResponses,
+  DecidePaymentApprovalData,
+  DecidePaymentApprovalErrors,
+  DecidePaymentApprovalResponses,
   DeleteAccountAddressData,
   DeleteAccountAddressErrors,
   DeleteAccountAddressResponses,
@@ -231,6 +237,9 @@ import type {
   GetOfferData,
   GetOfferErrors,
   GetOfferResponses,
+  GetPaymentApprovalData,
+  GetPaymentApprovalErrors,
+  GetPaymentApprovalResponses,
   GetPaymentData,
   GetPaymentErrors,
   GetPaymentResponses,
@@ -293,6 +302,9 @@ import type {
   ListOffersData,
   ListOffersErrors,
   ListOffersResponses,
+  ListPaymentApprovalsData,
+  ListPaymentApprovalsErrors,
+  ListPaymentApprovalsResponses,
   ListPaymentsData,
   ListPaymentsErrors,
   ListPaymentsResponses,
@@ -605,6 +617,70 @@ export const setAgentSpendingHours = <ThrowOnError extends boolean = false>(
       { name: 'Api-Key', type: 'apiKey' },
     ],
     url: '/v1/accounts/{account_id}/agent-spending-hours',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * List pending, unexpired delegated payment requests for an account.
+ */
+export const listPaymentApprovals = <ThrowOnError extends boolean = false>(
+  options: Options<ListPaymentApprovalsData, ThrowOnError>
+): RequestResult<ListPaymentApprovalsResponses, ListPaymentApprovalsErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListPaymentApprovalsResponses,
+    ListPaymentApprovalsErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listPaymentApprovalsResponseTransformer,
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/payment-approvals',
+    ...options,
+  });
+
+/**
+ * Read the original destination, amount, fee ceiling and operator decision.
+ */
+export const getPaymentApproval = <ThrowOnError extends boolean = false>(
+  options: Options<GetPaymentApprovalData, ThrowOnError>
+): RequestResult<GetPaymentApprovalResponses, GetPaymentApprovalErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetPaymentApprovalResponses,
+    GetPaymentApprovalErrors,
+    ThrowOnError
+  >({
+    responseTransformer: getPaymentApprovalResponseTransformer,
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/payment-approvals/{id}',
+    ...options,
+  });
+
+/**
+ * Approve one matching retry by the original credential or reject the request.
+ */
+export const decidePaymentApproval = <ThrowOnError extends boolean = false>(
+  options: Options<DecidePaymentApprovalData, ThrowOnError>
+): RequestResult<DecidePaymentApprovalResponses, DecidePaymentApprovalErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    DecidePaymentApprovalResponses,
+    DecidePaymentApprovalErrors,
+    ThrowOnError
+  >({
+    responseTransformer: decidePaymentApprovalResponseTransformer,
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/payment-approvals/{id}',
     ...options,
     headers: {
       'Content-Type': 'application/json',

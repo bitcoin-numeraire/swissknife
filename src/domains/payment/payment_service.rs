@@ -750,14 +750,24 @@ impl PaymentsUseCases for PaymentService {
         &self,
         wallet_id: Uuid,
         agent_key_id: Option<Uuid>,
-        request: swissknife_types::SubmitPaymentRequest,
+        mut request: swissknife_types::SubmitPaymentRequest,
     ) -> Result<super::SubmittedPayment, ApplicationError> {
         let key = super::SubmissionKey::new(wallet_id, &request, agent_key_id);
         if request.wallet_id.is_some_and(|id| id != wallet_id) {
             return Err(DataError::Validation("Submission wallet differs from the path".into()).into());
         }
+        let reviewed = self.store.spending_policies.reviewed(&key).await?;
         if let Some(original) = self.store.payment_uow.submitted(&key).await? {
             return Ok(original.check_original_backend(&self.bitcoin_wallet.withdrawal_backend()));
+        }
+        if let Some(terms) = &reviewed {
+            // Keep the original fingerprint, and revalidate the exact resource already reviewed.
+            // A retry must never ask an LNURL, offer, or DNS name for a replacement invoice.
+            request.input = terms.input.clone();
+            request.amount_msat = Some(terms.amount_msat);
+            request.maximum_fee_msat = Some(terms.maximum_fee_msat);
+            request.comment = terms.description.clone();
+            request.expected_offer_id = None;
         }
         if request.expected_offer_id.is_some()
             && !super::payment_input::strip_lightning_scheme(request.input.trim()).starts_with('₿')
@@ -783,7 +793,10 @@ impl PaymentsUseCases for PaymentService {
                         request.expected_offer_id.as_deref(),
                     )
                     .await?;
-                let payment = resolved.payment(wallet_id, request.comment);
+                let mut payment = resolved.payment(wallet_id, request.comment);
+                if let (Some(terms), Some(lightning)) = (&reviewed, &mut payment.lightning) {
+                    lightning.ln_address = terms.ln_address.clone();
+                }
                 return self
                     .enqueue_lightning_invoice(&key, payment, resolved.invoice, None, request.maximum_fee_msat)
                     .await;
@@ -840,8 +853,8 @@ impl PaymentsUseCases for PaymentService {
             ledger: Ledger::Lightning,
             lightning: Some(LnPayment {
                 payment_hash: invoice.payment_hash,
-                ln_address: address,
-                raw_success_action: action,
+                ln_address: reviewed.as_ref().and_then(|terms| terms.ln_address.clone()).or(address),
+                raw_success_action: reviewed.and_then(|terms| terms.success_action).or(action),
                 ..Default::default()
             }),
             ..Default::default()

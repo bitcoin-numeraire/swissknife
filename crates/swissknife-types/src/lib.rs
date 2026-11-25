@@ -8,6 +8,8 @@
 
 mod account;
 mod agent;
+mod payment_approval;
+pub use payment_approval::*;
 mod spending_policy;
 pub use spending_policy::*;
 mod api_key;

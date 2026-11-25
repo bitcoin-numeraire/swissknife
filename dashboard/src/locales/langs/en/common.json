@@ -1102,6 +1102,7 @@
     "reset_display_name_help": "Leave blank to keep your current display name. Your assigned username stays the same."
   },
   "spending_policy": {
+    "approval_above_msat": "Require approval above",
     "title": "Spending budget",
     "load_error": "Unable to load this budget.",
     "loading": "Loading budget…",

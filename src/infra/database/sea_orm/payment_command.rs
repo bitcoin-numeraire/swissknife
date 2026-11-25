@@ -128,6 +128,14 @@ pub(super) async fn submit(
             .await?
             .ok_or_else(|| DatabaseError::FindOne("Conflicting payment submission disappeared".into()).into());
     }
+    if let Admission::Internal(invoice) = &admission {
+        super::uow::lock_internal_wallets(&tx, payment.wallet_id, invoice.wallet_id).await?;
+    }
+    if let Some(awaiting) = super::payment_approval::gate(&tx, key, &payment, &admission).await? {
+        Entity::delete_by_id(id).exec(&tx).await.map_err(db_error)?;
+        tx.commit().await.map_err(db_error)?;
+        return Err(awaiting.into());
+    }
     let (payment, instructions) = match admission {
         Admission::External { reserve, instructions } => (
             reserve_in_transaction(&tx, payment, reserve, key.agent_key_id).await?,
