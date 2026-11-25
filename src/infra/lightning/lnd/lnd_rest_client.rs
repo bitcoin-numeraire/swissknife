@@ -68,6 +68,28 @@ const USER_AGENT: &str = "Numeraire Swissknife/1.0";
 
 impl LndRestClient {
     pub async fn new(config: LndRestClientConfig) -> Result<Self, LightningError> {
+        let client = Self::http_builder(&config)
+            .await?
+            .timeout(config.timeout)
+            .build()
+            .map_err(|e| LightningError::ParseConfig(format!("{e:?}")))?;
+
+        let mut lnd_client = Self {
+            client,
+            base_url: config.host.clone(),
+            fee_limit_msat: config.fee_limit_msat,
+            retry_for: config.payment_timeout.as_secs() as u32,
+            network: BtcNetwork::default(),
+            reorg_buffer_blocks: config.reorg_buffer_blocks,
+        };
+
+        let network = lnd_client.network().await?;
+        lnd_client.network = network;
+
+        Ok(lnd_client)
+    }
+
+    pub(super) async fn http_builder(config: &LndRestClientConfig) -> Result<reqwest::ClientBuilder, LightningError> {
         let macaroon = read_macaroon(&config.macaroon_path)
             .await
             .map_err(|e| LightningError::ParseConfig(e.to_string()))?;
@@ -81,7 +103,6 @@ impl LndRestClient {
         let mut client_builder = Client::builder()
             .user_agent(USER_AGENT)
             .connect_timeout(config.connect_timeout)
-            .timeout(config.timeout)
             .connection_verbose(config.connection_verbose)
             .default_headers(headers)
             .danger_accept_invalid_certs(config.accept_invalid_certs);
@@ -99,23 +120,7 @@ impl LndRestClient {
             client_builder = client_builder.tls_danger_accept_invalid_hostnames(config.accept_invalid_hostnames);
         }
 
-        let client = client_builder
-            .build()
-            .map_err(|e| LightningError::ParseConfig(format!("{e:?}")))?;
-
-        let mut lnd_client = Self {
-            client,
-            base_url: config.host.clone(),
-            fee_limit_msat: config.fee_limit_msat,
-            retry_for: config.payment_timeout.as_secs() as u32,
-            network: BtcNetwork::default(),
-            reorg_buffer_blocks: config.reorg_buffer_blocks,
-        };
-
-        let network = lnd_client.network().await?;
-        lnd_client.network = network;
-
-        Ok(lnd_client)
+        Ok(client_builder)
     }
 
     async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
