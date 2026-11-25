@@ -41,12 +41,14 @@ make itest-shutdown                # stop stack + delete runtime/artifacts
 `cargo test --features itest --test api` for the selected cell. A plain
 `cargo test` runs only unit tests (the suite is feature-gated).
 
+Tests within a provider job run one at a time. They share a Bitcoin chain,
+Lightning nodes and channel balances. Another test mining a block could confirm
+a withdrawal while its test is checking the mempool. Concurrent requests within
+one test still exercise races, and CI runs independent provider jobs in parallel.
+
 Use `make test-integration-fresh` before a local liquidity-sensitive run when
-the previous channel balances or chain state are unknown. The fresh target runs
-test cases serially to avoid unrelated SQLite writers contending for the same
-database; concurrency scenarios still issue simultaneous requests inside their
-test case. CI jobs start with a new runner and therefore already get fresh
-dependency volumes.
+the previous channel balances or chain state are unknown. CI jobs start with a
+new runner and fresh dependency volumes.
 
 ## Persistence (Unit-of-Work) tests
 
