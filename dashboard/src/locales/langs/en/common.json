@@ -1,4 +1,16 @@
 {
+  "merchant_revenue": {
+    "title": "Merchant revenue",
+    "from": "From (UTC)",
+    "through": "Through (UTC)",
+    "invalid_range": "Choose a date range of 1 to 366 days.",
+    "load_error": "Could not load merchant revenue.",
+    "route": "Route",
+    "count": "Settled invoices",
+    "received": "Received (msat)",
+    "fees": "Fees (msat)",
+    "empty": "No merchant invoices settled in this period."
+  },
   "notification_inbox": {
     "title": "Notifications",
     "open_one": "Notifications, {{count}} unread",

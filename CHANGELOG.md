@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- The wallet invoice screen shows settled merchant revenue and recorded fees by route for a selected date range.
+
 - Wallet owners can report settled L402 invoice counts, amounts received and incoming fees by merchant route for a UTC date range.
 
 - Merchant routes can request a fresh Lightning price from a configured quote service for each new invoice. The operator sets the maximum price and existing paid passes retain their terms.

@@ -1,4 +1,16 @@
 {
+  "merchant_revenue": {
+    "title": "Revenus marchands",
+    "from": "Du (UTC)",
+    "through": "Au (UTC)",
+    "invalid_range": "Choisissez une période de 1 à 366 jours.",
+    "load_error": "Impossible de charger les revenus marchands.",
+    "route": "Route",
+    "count": "Factures réglées",
+    "received": "Montant reçu (msat)",
+    "fees": "Frais (msat)",
+    "empty": "Aucune facture marchande réglée sur cette période."
+  },
   "notification_inbox": {
     "title": "Notifications",
     "open_one": "Notifications, {{count}} non lue",

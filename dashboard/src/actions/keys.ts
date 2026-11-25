@@ -13,6 +13,8 @@ export const endpointKeys = {
   },
   accountWallet: {
     get: (walletId: string) => ['accountWallet', walletId] as const,
+    merchantRevenue: (walletId: string, from: string, through: string) =>
+      ['walletMerchantRevenue', walletId, from, through] as const,
     balance: (walletId: string) => ['accountWalletBalance', walletId] as const,
     btcAddresses: { list: 'accountWalletBtcAddresses' },
     payments: {
