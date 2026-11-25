@@ -945,6 +945,21 @@ export type NostrNip05Response = {
 };
 
 /**
+ * A non-reserving single-recipient estimate from the Bitcoin wallet.
+ */
+export type OnchainFeePreview = {
+  /**
+   * Satoshis per 1,000 weight units.
+   */
+  fee_rate_sat_per_kw: number;
+  fee_sat: number;
+  /**
+   * LND confirmation target. CLN uses its normal fee policy.
+   */
+  target_blocks?: number | null;
+};
+
+/**
  * Direction of result ordering for list endpoints.
  */
 export const OrderDirection = { ASC: 'Asc', DESC: 'Desc' } as const;
@@ -1013,7 +1028,8 @@ export type Payment = {
  * `estimated_fee_msat` is the route or transaction fee expected at quote time.
  * It can be absent when the Lightning node cannot find a graph route while the
  * configured payment policy still permits an execution attempt. The maximum is
- * the hard cap passed to the Lightning provider (or the prepared on-chain fee).
+ * the hard cap passed to Lightning. For on-chain previews the legacy maximum
+ * fields mirror the estimate and do not authorize a later fee.
  */
 export type PaymentFeeEstimate = {
   /**
@@ -1033,13 +1049,14 @@ export type PaymentFeeEstimate = {
    */
   ledger: Ledger;
   /**
-   * Lightning execution cap or current prepared on-chain fee, in millisatoshis.
+   * Execution cap for Lightning. For on-chain previews, a compatibility alias of the estimated fee.
    */
   maximum_fee_msat: number;
   /**
-   * Amount plus the Lightning cap or current on-chain fee, in millisatoshis.
+   * Amount plus the Lightning cap or estimated miner fee, in millisatoshis.
    */
   maximum_total_msat: number;
+  onchain?: OnchainFeePreview | null;
 };
 
 /**
@@ -4584,6 +4601,10 @@ export type EstimateWalletPaymentFeeErrors = {
    * Internal Server Error
    */
   500: ErrorResponse;
+  /**
+   * Provider cannot estimate the on-chain miner fee
+   */
+  503: ErrorResponse;
 };
 
 export type EstimateWalletPaymentFeeError =
@@ -4860,6 +4881,10 @@ export type EstimatePaymentFeeErrors = {
    * Internal Server Error
    */
   500: ErrorResponse;
+  /**
+   * Provider cannot estimate the on-chain miner fee
+   */
+  503: ErrorResponse;
 };
 
 export type EstimatePaymentFeeError = EstimatePaymentFeeErrors[keyof EstimatePaymentFeeErrors];

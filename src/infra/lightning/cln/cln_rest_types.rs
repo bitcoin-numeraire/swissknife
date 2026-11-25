@@ -354,3 +354,10 @@ mod tests {
         );
     }
 }
+
+#[derive(Debug, Deserialize)]
+pub struct FundPsbtPreview {
+    pub feerate_per_kw: u32,
+    pub estimated_final_weight: u32,
+    pub excess_msat: u64,
+}

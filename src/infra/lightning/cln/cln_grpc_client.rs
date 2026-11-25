@@ -381,6 +381,40 @@ impl BitcoinWallet for ClnGrpcClient {
             .ok_or_else(|| BitcoinError::Address("No address returned by CLN".to_string()))
     }
 
+    async fn estimate_transaction_fee(
+        &self,
+        address: String,
+        amount_sat: u64,
+    ) -> Result<swissknife_types::OnchainFeePreview, BitcoinError> {
+        let startweight = super::onchain_fee::start_weight(&address)?;
+        let msat = amount_sat
+            .checked_mul(1000)
+            .ok_or_else(|| BitcoinError::FeeEstimate("Amount exceeds the storage range".into()))?;
+        let response = self
+            .client
+            .clone()
+            .fund_psbt(cln::FundpsbtRequest {
+                satoshi: Some(cln::AmountOrAll {
+                    value: Some(cln::amount_or_all::Value::Amount(Amount { msat })),
+                }),
+                feerate: Some(Feerate {
+                    style: Some(feerate::Style::Normal(true)),
+                }),
+                startweight,
+                reserve: Some(0),
+                minconf: Some(1),
+                excess_as_change: Some(false),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| BitcoinError::FeeEstimate(e.message().to_owned()))?
+            .into_inner();
+        let excess = response
+            .excess_msat
+            .ok_or_else(|| BitcoinError::FeeEstimate("Missing CLN funding excess".into()))?;
+        super::onchain_fee::preview(response.feerate_per_kw, response.estimated_final_weight, excess.msat)
+    }
+
     async fn prepare_transaction(
         &self,
         address: String,

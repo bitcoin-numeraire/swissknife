@@ -12,6 +12,12 @@ use crate::{
 #[async_trait]
 pub trait BitcoinWallet: Sync + Send {
     async fn new_address(&self, address_type: BtcAddressType) -> Result<String, BitcoinError>;
+    /// Estimates a single-recipient transaction without leasing inputs or signing.
+    async fn estimate_transaction_fee(
+        &self,
+        address: String,
+        amount_sat: u64,
+    ) -> Result<swissknife_types::OnchainFeePreview, BitcoinError>;
     async fn prepare_transaction(
         &self,
         address: String,

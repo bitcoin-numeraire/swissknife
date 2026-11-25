@@ -487,6 +487,21 @@ impl BitcoinWallet for LndRestClient {
         Ok(response.address)
     }
 
+    async fn estimate_transaction_fee(
+        &self,
+        address: String,
+        amount_sat: u64,
+    ) -> Result<swissknife_types::OnchainFeePreview, BitcoinError> {
+        // grpc-gateway accepts protobuf map keys in bracket notation.
+        let response: OnchainFeeResponse = self
+            .get_request(&format!(
+                "v1/transactions/fee?AddrToAmount[{address}]={amount_sat}&target_conf=1&min_confs=1"
+            ))
+            .await
+            .map_err(|e| BitcoinError::FeeEstimate(e.to_string()))?;
+        super::onchain_fee_preview(response.fee_sat, response.sat_per_vbyte)
+    }
+
     async fn prepare_transaction(
         &self,
         address: String,

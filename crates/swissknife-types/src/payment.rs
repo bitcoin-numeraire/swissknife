@@ -153,12 +153,24 @@ pub struct SendPaymentRequest {
     pub comment: Option<String>,
 }
 
+/// A non-reserving single-recipient estimate from the Bitcoin wallet.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+pub struct OnchainFeePreview {
+    pub fee_sat: u64,
+    /// Satoshis per 1,000 weight units.
+    pub fee_rate_sat_per_kw: u64,
+    /// LND confirmation target. CLN uses its normal fee policy.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_blocks: Option<u32>,
+}
+
 /// Fee quote for a prospective outgoing payment.
 ///
 /// `estimated_fee_msat` is the route or transaction fee expected at quote time.
 /// It can be absent when the Lightning node cannot find a graph route while the
 /// configured payment policy still permits an execution attempt. The maximum is
-/// the hard cap passed to the Lightning provider (or the prepared on-chain fee).
+/// the hard cap passed to Lightning. For on-chain previews the legacy maximum
+/// fields mirror the estimate and do not authorize a later fee.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 pub struct PaymentFeeEstimate {
     /// Ledger selected for this payment input.
@@ -171,15 +183,19 @@ pub struct PaymentFeeEstimate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub estimated_fee_msat: Option<u64>,
 
-    /// Lightning execution cap or current prepared on-chain fee, in millisatoshis.
+    /// Execution cap for Lightning. For on-chain previews, a compatibility alias of the estimated fee.
     pub maximum_fee_msat: u64,
 
     /// Expected amount plus fee, in millisatoshis.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub estimated_total_msat: Option<u64>,
 
-    /// Amount plus the Lightning cap or current on-chain fee, in millisatoshis.
+    /// Amount plus the Lightning cap or estimated miner fee, in millisatoshis.
     pub maximum_total_msat: u64,
+
+    /// Provider assumptions for an on-chain preview. Recomputed when sending.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub onchain: Option<OnchainFeePreview>,
 }
 
 /// Payment query filter.

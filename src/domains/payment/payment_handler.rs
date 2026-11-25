@@ -74,6 +74,7 @@ pub fn router() -> Router<Arc<AppServices>> {
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
         (status = 422, description = "Unprocessable Entity", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 503, description = "Provider cannot estimate the on-chain miner fee", body = ErrorResponse),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
     )
 )]
@@ -282,6 +283,7 @@ mod tests {
 
     fn fee_estimate() -> PaymentFeeEstimate {
         PaymentFeeEstimate {
+            onchain: None,
             ledger: crate::application::composition::Ledger::Lightning,
             amount_msat: 1_000,
             estimated_fee_msat: Some(10),

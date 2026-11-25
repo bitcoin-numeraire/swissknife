@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-17
-- Issues: #248, #294, #300
+- Issues: #248, #294, #300, #379
 
 ## Context
 
@@ -34,7 +34,7 @@ If a provider estimate is already above the hard maximum, SwissKnife rejects the
 
 ### On-chain and internal payments
 
-For on-chain payments, the quote endpoint prepares a transaction with the configured wallet, reports its fee, then immediately releases the temporary input lease. The send path prepares the transaction again and reserves its then-current exact fee. The quote is therefore presented as an estimate, not a guarantee across time.
+For on-chain payments, LND simulates coin selection through `EstimateFee`. Core Lightning uses `fundpsbt` with `reserve=0`, the recipient’s serialized output weight, and its normal fee policy. SwissKnife calculates the cost of a standard change output only when the remaining inputs support it. The preview requires the correct asset and network, permits an empty SwissKnife wallet, and creates no payment or input lease. The send path separately prepares the real transaction and reserves its actual fee.
 
 Internal transfers return zero for both values.
 

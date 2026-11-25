@@ -142,6 +142,13 @@ impl IntoResponse for LightningError {
 impl IntoResponse for BitcoinError {
     fn into_response(self) -> Response {
         let (error_message, status) = match self {
+            BitcoinError::FeeEstimate(_) => {
+                warn!("{}", self);
+                (
+                    "The provider could not estimate the on-chain fee.".to_owned(),
+                    StatusCode::SERVICE_UNAVAILABLE,
+                )
+            }
             BitcoinError::AddressType(_) => {
                 warn!("{}", self);
                 (self.to_string(), StatusCode::UNPROCESSABLE_ENTITY)

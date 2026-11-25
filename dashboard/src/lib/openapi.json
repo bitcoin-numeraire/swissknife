@@ -6788,6 +6788,16 @@
                 "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
               }
             }
+          },
+          "503": {
+            "description": "Provider cannot estimate the on-chain miner fee",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -7448,6 +7458,16 @@
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          },
+          "503": {
+            "description": "Provider cannot estimate the on-chain miner fee",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           }
@@ -9727,6 +9747,36 @@
           }
         }
       },
+      "OnchainFeePreview": {
+        "type": "object",
+        "description": "A non-reserving single-recipient estimate from the Bitcoin wallet.",
+        "required": [
+          "fee_sat",
+          "fee_rate_sat_per_kw"
+        ],
+        "properties": {
+          "fee_rate_sat_per_kw": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Satoshis per 1,000 weight units.",
+            "minimum": 0
+          },
+          "fee_sat": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "target_blocks": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "LND confirmation target. CLN uses its normal fee policy.",
+            "minimum": 0
+          }
+        }
+      },
       "OrderDirection": {
         "type": "string",
         "description": "Direction of result ordering for list endpoints.",
@@ -9853,7 +9903,7 @@
       },
       "PaymentFeeEstimate": {
         "type": "object",
-        "description": "Fee quote for a prospective outgoing payment.\n\n`estimated_fee_msat` is the route or transaction fee expected at quote time.\nIt can be absent when the Lightning node cannot find a graph route while the\nconfigured payment policy still permits an execution attempt. The maximum is\nthe hard cap passed to the Lightning provider (or the prepared on-chain fee).",
+        "description": "Fee quote for a prospective outgoing payment.\n\n`estimated_fee_msat` is the route or transaction fee expected at quote time.\nIt can be absent when the Lightning node cannot find a graph route while the\nconfigured payment policy still permits an execution attempt. The maximum is\nthe hard cap passed to Lightning. For on-chain previews the legacy maximum\nfields mirror the estimate and do not authorize a later fee.",
         "required": [
           "ledger",
           "amount_msat",
@@ -9892,14 +9942,25 @@
           "maximum_fee_msat": {
             "type": "integer",
             "format": "int64",
-            "description": "Lightning execution cap or current prepared on-chain fee, in millisatoshis.",
+            "description": "Execution cap for Lightning. For on-chain previews, a compatibility alias of the estimated fee.",
             "minimum": 0
           },
           "maximum_total_msat": {
             "type": "integer",
             "format": "int64",
-            "description": "Amount plus the Lightning cap or current on-chain fee, in millisatoshis.",
+            "description": "Amount plus the Lightning cap or estimated miner fee, in millisatoshis.",
             "minimum": 0
+          },
+          "onchain": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OnchainFeePreview",
+                "description": "Provider assumptions for an on-chain preview. Recomputed when sending."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },

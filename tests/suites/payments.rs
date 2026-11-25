@@ -99,7 +99,7 @@ mod fee_estimate {
     }
 
     #[tokio::test]
-    async fn rejects_an_onchain_quote_when_the_wallet_cannot_cover_the_amount() {
+    async fn previews_an_external_payment_from_an_unfunded_wallet() {
         let app = app().await;
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "quote-unfunded").await;
@@ -117,8 +117,11 @@ mod fee_estimate {
             )
             .await;
 
-        assert_error(&res, StatusCode::UNPROCESSABLE_ENTITY);
-        assert!(res.body["reason"].as_str().unwrap().contains("Insufficient funds"));
+        assert_status(&res, StatusCode::OK);
+        let quote = res.parse::<PaymentFeeEstimate>();
+        let preview = quote.onchain.unwrap();
+        assert!(preview.fee_sat > 0 && preview.fee_rate_sat_per_kw > 0);
+        assert_eq!(quote.estimated_fee_msat, Some(preview.fee_sat * 1000));
 
         let balance = app
             .api()
@@ -137,11 +140,10 @@ mod fee_estimate {
     }
 
     #[tokio::test]
-    async fn prepares_and_releases_a_real_onchain_quote_without_creating_a_payment() {
+    async fn concurrent_onchain_previews_do_not_create_payments() {
         let app = app().await;
         let token = app.admin_token().await;
         let wallet = app.create_wallet(token, "quote-onchain").await;
-        app.fund_onchain(token, wallet.id, 100_000).await;
         let address = chain::new_address().await;
         let amount_msat = 50_000_000;
         let request = SendPaymentRequest {
@@ -160,18 +162,37 @@ mod fee_estimate {
         assert_eq!(first.ledger, Ledger::Onchain);
         assert_eq!(first.amount_msat, amount_msat);
         let fee_msat = first.estimated_fee_msat.expect("on-chain quote has a fee");
-        assert!(fee_msat > 0, "a real prepared transaction has a non-zero fee");
+        assert!(fee_msat > 0, "a funded provider can estimate the miner fee");
         assert_eq!(first.maximum_fee_msat, fee_msat);
         assert_eq!(first.estimated_total_msat, Some(amount_msat + fee_msat));
         assert_eq!(first.maximum_total_msat, amount_msat + fee_msat);
 
-        // A second quote proves the first prepared transaction was released.
-        let second = app
-            .api()
-            .post("/v1/payments/fee-estimate", Auth::Bearer(token), request)
-            .await;
+        let client = app.api();
+        let (second, third) = tokio::join!(
+            client.post("/v1/payments/fee-estimate", Auth::Bearer(token), request.clone()),
+            client.post("/v1/payments/fee-estimate", Auth::Bearer(token), request.clone())
+        );
         assert_status(&second, StatusCode::OK);
+        assert_status(&third, StatusCode::OK);
+        let fractional = SendPaymentRequest {
+            amount_msat: Some(1500),
+            ..request.clone()
+        };
+        for path in ["/v1/payments/fee-estimate", "/v1/payments"] {
+            let rejected = client.post(path, Auth::Bearer(token), fractional.clone()).await;
+            assert_error(&rejected, StatusCode::UNPROCESSABLE_ENTITY);
+            assert!(rejected.body["reason"].as_str().unwrap().contains("whole satoshis"));
+        }
 
+        let impossible = SendPaymentRequest {
+            amount_msat: Some(2_100_000_000_000_000_000),
+            ..request
+        };
+        let unavailable = client
+            .post("/v1/payments/fee-estimate", Auth::Bearer(token), impossible)
+            .await;
+        assert_error(&unavailable, StatusCode::SERVICE_UNAVAILABLE);
+        assert!(unavailable.body["reason"].as_str().unwrap().contains("provider"));
         let payments = app
             .api()
             .get(&format!("/v1/payments?wallet_id={}", wallet.id), Auth::Bearer(token))

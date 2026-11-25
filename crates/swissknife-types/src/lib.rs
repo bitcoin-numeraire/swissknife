@@ -47,8 +47,8 @@ pub use lnurl::{
 pub use network::BtcNetwork;
 pub use nostr::{NostrNIP05QueryParams, NostrNIP05Response};
 pub use payment::{
-    BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate, PaymentFilter, PaymentStatus,
-    SendPaymentRequest,
+    BtcPayment, InternalPayment, LnPayment, OnchainFeePreview, Payment, PaymentFeeEstimate, PaymentFilter,
+    PaymentStatus, SendPaymentRequest,
 };
 pub use permission::Permission;
 pub use query::OrderDirection;

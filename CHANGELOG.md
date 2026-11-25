@@ -8,6 +8,10 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Changed
+
+- On-chain fee previews use provider coin selection without leasing inputs or requiring an existing wallet balance. The response includes the provider fee rate, and the dashboard identifies the estimate as provisional.
+
 ## [0.3.5] - 2026-11-21
 
 ### Fixed

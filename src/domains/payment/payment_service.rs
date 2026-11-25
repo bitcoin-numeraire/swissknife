@@ -95,6 +95,7 @@ impl PaymentService {
         let maximum_total_msat = Self::reserve_amount_msat(amount_msat, maximum_fee_msat)?;
 
         Ok(PaymentFeeEstimate {
+            onchain: None,
             ledger,
             amount_msat,
             estimated_fee_msat,
@@ -196,6 +197,17 @@ impl PaymentService {
             }
             None => Err(DataError::NotFound("Recipient not found.".to_string()).into()),
         }
+    }
+
+    fn onchain_amount_sat(amount_msat: Option<u64>) -> Result<Option<u64>, ApplicationError> {
+        amount_msat
+            .map(|amount| {
+                if !amount.is_multiple_of(1000) {
+                    return Err(DataError::Validation("Bitcoin outputs require whole satoshis.".into()).into());
+                }
+                Ok(amount / 1000)
+            })
+            .transpose()
     }
 
     async fn ensure_onchain_balance(&self, wallet_id: Uuid, amount_msat: u64) -> Result<(), ApplicationError> {
@@ -744,7 +756,7 @@ impl PaymentsUseCases for PaymentService {
             PaymentInput::BitcoinAddress(data) => {
                 let amount_sat = data
                     .amount_sat
-                    .or_else(|| amount_msat.map(|amount| amount / 1000))
+                    .or(Self::onchain_amount_sat(amount_msat)?)
                     .filter(|amount| *amount > 0)
                     .ok_or_else(|| {
                         DataError::Validation("Amount must be defined for on-chain transactions.".to_string())
@@ -763,18 +775,17 @@ impl PaymentsUseCases for PaymentService {
                     return Self::fee_estimate(Ledger::Internal, amount_msat, Some(0), 0);
                 }
 
-                self.ensure_onchain_balance(wallet_id, amount_msat).await?;
-                let prepared = self
+                let preview = self
                     .bitcoin_wallet
-                    .prepare_transaction(data.address, amount_sat, None)
+                    .estimate_transaction_fee(data.address, amount_sat)
                     .await?;
-                self.bitcoin_wallet.release_prepared_transaction(&prepared).await?;
-                let fee_msat = prepared
+                let fee_msat = preview
                     .fee_sat
                     .checked_mul(1000)
-                    .ok_or_else(|| DataError::Validation("On-chain fee overflows".to_string()))?;
-
-                Self::fee_estimate(Ledger::Onchain, amount_msat, Some(fee_msat), fee_msat)
+                    .ok_or_else(|| DataError::Validation("On-chain fee overflows".into()))?;
+                let mut estimate = Self::fee_estimate(Ledger::Onchain, amount_msat, Some(fee_msat), fee_msat)?;
+                estimate.onchain = Some(preview);
+                Ok(estimate)
             }
             PaymentInput::Bolt11(invoice) => {
                 let amount = invoice
@@ -856,7 +867,7 @@ impl PaymentsUseCases for PaymentService {
 
             match input_type {
                 PaymentInput::BitcoinAddress(address) => {
-                    let amount_sat = amount_msat.map(|amount| amount / 1000);
+                    let amount_sat = Self::onchain_amount_sat(amount_msat)?;
                     self.send_bitcoin(address, amount_sat, comment, wallet_id).await
                 }
                 PaymentInput::Bolt11(invoice) => self.send_bolt11(invoice, amount_msat, comment, wallet_id).await,
@@ -1416,56 +1427,6 @@ mod tests {
     mod estimate_fee_request {
         use super::*;
 
-        mod when_the_wallet_cannot_cover_the_principal {
-            use super::*;
-
-            #[tokio::test]
-            async fn rejects_before_preparing_an_onchain_quote() {
-                let wallet_id = Uuid::new_v4();
-                let mut store = MockAppStoreBuilder::new();
-                store
-                    .wallet
-                    .expect_find()
-                    .withf(move |id| *id == wallet_id)
-                    .times(1)
-                    .returning(move |_| {
-                        Ok(Some(wallet_with_asset(
-                            wallet_id,
-                            native_btc_asset(BtcNetwork::Bitcoin),
-                        )))
-                    });
-                store
-                    .wallet
-                    .expect_get_balance()
-                    .withf(move |id| *id == wallet_id)
-                    .times(1)
-                    .returning(|_| Ok(Default::default()));
-                store
-                    .btc_address
-                    .expect_find_by_address()
-                    .times(1)
-                    .returning(|_| Ok(None));
-                let mut bitcoin_wallet = MockBitcoinWallet::new();
-                bitcoin_wallet.expect_prepare_transaction().never();
-                bitcoin_wallet.expect_release_prepared_transaction().never();
-                let service = service(store, MockLnClient::new(), bitcoin_wallet, MockEventUseCases::new());
-
-                let result = service
-                    .estimate_fee(
-                        "1BoatSLRHtKNngkdXEeobR76b53LETtpyT".to_string(),
-                        Some(1_000_000),
-                        None,
-                        wallet_id,
-                    )
-                    .await;
-
-                assert!(matches!(
-                    result,
-                    Err(ApplicationError::Data(DataError::InsufficientFunds(_)))
-                ));
-            }
-        }
-
         mod when_a_hash_matches_but_the_issued_invoice_differs {
             use super::*;
 
@@ -1502,15 +1463,10 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn prepares_and_releases_an_onchain_quote() {
+        async fn previews_without_reading_the_balance_or_reserving_inputs() {
             let wallet_id = Uuid::new_v4();
             let mut store = MockAppStoreBuilder::new();
-            store.wallet.expect_get_balance().times(1).returning(|_| {
-                Ok(crate::domains::wallet::Balance {
-                    available_msat: 1_000_000,
-                    ..Default::default()
-                })
-            });
+            store.wallet.expect_get_balance().never();
             store.wallet.expect_find().times(1).returning(move |_| {
                 Ok(Some(wallet_with_asset(
                     wallet_id,
@@ -1524,19 +1480,19 @@ mod tests {
                 .returning(|_| Ok(None));
 
             let mut bitcoin_wallet = MockBitcoinWallet::new();
+            bitcoin_wallet.expect_prepare_transaction().never();
+            bitcoin_wallet.expect_release_prepared_transaction().never();
             bitcoin_wallet
-                .expect_prepare_transaction()
-                .withf(|address, amount_sat, fee_rate| {
-                    address == "1BoatSLRHtKNngkdXEeobR76b53LETtpyT" && *amount_sat == 1_000 && fee_rate.is_none()
-                })
-                .times(1)
-                .returning(|_, _, _| Ok(prepared_tx()));
-            bitcoin_wallet
-                .expect_release_prepared_transaction()
-                .withf(|prepared| prepared.txid == "txid")
-                .times(1)
-                .returning(|_| Ok(()));
-
+                .expect_estimate_transaction_fee()
+                .withf(|address, amount| address == "1BoatSLRHtKNngkdXEeobR76b53LETtpyT" && *amount == 1_000)
+                .once()
+                .returning(|_, _| {
+                    Ok(swissknife_types::OnchainFeePreview {
+                        fee_sat: 10,
+                        fee_rate_sat_per_kw: 250,
+                        target_blocks: Some(1),
+                    })
+                });
             let service = service(store, MockLnClient::new(), bitcoin_wallet, MockEventUseCases::new());
             let estimate = service
                 .estimate_fee(
