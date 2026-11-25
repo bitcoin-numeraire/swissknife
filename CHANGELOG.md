@@ -10,9 +10,9 @@ release notes when a tag is published.
 
 ### Added
 
-- Authorized operators can post an opening credit or top up a wallet in its own asset units. Every credit records its operator, reason, and settled adjustment activity.
+- Operators can review and confirm an opening credit during setup or add credit from a wallet’s administration page.
 
-### Added
+- Authorized operators can post an opening credit or top up a wallet in its own asset units. Every credit records its operator, reason, and settled adjustment activity.
 
 - Administrative transaction lists include wallet labels and asset details according to the reader’s permissions.
 

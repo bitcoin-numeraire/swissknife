@@ -49,6 +49,7 @@ const PERSONAS: MockOAuth2Persona[] = [
       Permission.WRITE_ACCOUNT,
       Permission.READ_WALLET,
       Permission.WRITE_WALLET,
+      Permission.CREDIT_WALLET,
       Permission.READ_LN_ADDRESS,
       Permission.WRITE_LN_ADDRESS,
       Permission.READ_TRANSACTION,

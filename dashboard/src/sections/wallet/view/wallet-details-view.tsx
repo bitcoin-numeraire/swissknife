@@ -60,6 +60,8 @@ import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
 import { hasAllPermissions } from 'src/auth/permissions';
 
+import { WalletCreditDialog } from '../wallet-credit-dialog';
+
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -275,6 +277,7 @@ export function WalletDetailsView({ id }: Props) {
   const { t } = useTranslate();
   const router = useRouter();
   const { user } = useAuthContext();
+  const newCredit = useBoolean();
   const newPayment = useBoolean();
   const newInvoice = useBoolean();
   const newLnAddress = useBoolean();
@@ -338,6 +341,18 @@ export function WalletDetailsView({ id }: Props) {
               ]}
               action={
                 <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                  <RoleBasedGuard permissions={[Permission.CREDIT_WALLET]}>
+                    <Button color="inherit" variant="outlined" onClick={newCredit.onTrue}>
+                      {t('wallet_credit.add')}
+                    </Button>
+                    {newCredit.value && wallet && (
+                      <WalletCreditDialog
+                        wallets={[wallet]}
+                        purpose="top_up"
+                        onClose={newCredit.onFalse}
+                      />
+                    )}
+                  </RoleBasedGuard>
                   <RoleBasedGuard permissions={[Permission.READ_TRANSACTION]}>
                     <WalletStatementDownload key={wallet!.id} walletId={wallet!.id} admin />
                   </RoleBasedGuard>

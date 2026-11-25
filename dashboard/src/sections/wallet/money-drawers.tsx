@@ -250,6 +250,7 @@ export function receivePaymentSuccessAfterClientEvent(
   const ledger =
     eventLedger === Ledger.LIGHTNING ||
     eventLedger === Ledger.INTERNAL ||
+    eventLedger === Ledger.ADJUSTMENT ||
     eventLedger === Ledger.ONCHAIN
       ? eventLedger
       : (invoice?.ledger ?? (matchesBitcoinAddress ? Ledger.ONCHAIN : undefined));

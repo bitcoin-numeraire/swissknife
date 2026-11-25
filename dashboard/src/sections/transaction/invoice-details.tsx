@@ -26,6 +26,7 @@ import { useTranslate } from 'src/locales';
 import { Iconify } from 'src/components/iconify';
 import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
+import { AssetUnits } from 'src/components/bitcoin/asset-units';
 
 import { TransactionType } from 'src/types/transaction';
 
@@ -56,7 +57,10 @@ function ambossNodeUrl(pubkey?: string | null) {
 export function InvoiceDetails({ invoice, isAdmin }: Props) {
   const { t } = useTranslate();
   const bolt11 = invoice.ln_invoice?.bolt11;
-  const methodLabel = getLedgerLabel(invoice.ledger, t);
+  const methodLabel = getLedgerLabel(invoice.ledger, t, invoice.credit_purpose);
+  const creditValue = invoice.credit_amount_units ? (
+    <AssetUnits units={invoice.credit_amount_units} />
+  ) : undefined;
   const isOnchain = invoice.ledger === 'Onchain';
   const bitcoinAddress = invoice.bitcoin_output?.address;
   const bitcoinOutpoint = invoice.bitcoin_output?.outpoint;
@@ -92,20 +96,26 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                 <Stack spacing={1.25}>
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                     <TransactionDirectionIcon direction="in" />
-                    <StatusBadges status={invoice.status} ledger={invoice.ledger} />
+                    <StatusBadges
+                      status={invoice.status}
+                      ledger={invoice.ledger}
+                      creditPurpose={invoice.credit_purpose}
+                    />
                   </Stack>
 
                   <Stack spacing={0.5}>
                     <Typography variant="overline" color="text.secondary">
-                      {isOnchain
-                        ? t('transaction_details.onchain')
-                        : t('invoice_details.request_memo')}
+                      {creditValue
+                        ? methodLabel
+                        : isOnchain
+                          ? t('transaction_details.onchain')
+                          : t('invoice_details.request_memo')}
                     </Typography>
                     <Typography variant="h4">
                       {invoice.description || t('transaction_details.incoming_invoice')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {isOnchain
+                      {creditValue || isOnchain
                         ? methodLabel
                         : isAdmin
                           ? t('transaction_details.wallet_account')
@@ -116,11 +126,13 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
 
                 <Stack spacing={0.5}>
                   <Typography variant="caption" color="text.secondary">
-                    {isOnchain
+                    {isOnchain || creditValue
                       ? t('invoice_details.amount_received')
                       : t('invoice_details.amount_requested')}
                   </Typography>
-                  {isOpenAmount && !isOnchain ? (
+                  {creditValue ? (
+                    <Typography variant="h3">{creditValue}</Typography>
+                  ) : isOpenAmount && !isOnchain ? (
                     <Typography variant="h3" sx={{ fontWeight: 400 }}>
                       {t('wallet_view.open_amount')}
                     </Typography>
@@ -138,6 +150,7 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                     <MetricTile
                       title={t('invoice_details.amount_received')}
                       amountMSats={receivedAmount}
+                      value={creditValue}
                       helper={
                         invoice.status === 'Settled'
                           ? t('transaction_details.settled')
@@ -155,7 +168,10 @@ export function InvoiceDetails({ invoice, isAdmin }: Props) {
                     <MetricTile
                       title={t('transaction_details.total')}
                       amountMSats={totalAmount}
-                      value={totalAmount === undefined ? t('wallet_view.open_amount') : undefined}
+                      value={
+                        creditValue ??
+                        (totalAmount === undefined ? t('wallet_view.open_amount') : undefined)
+                      }
                     />
                   </Grid>
                 </Grid>

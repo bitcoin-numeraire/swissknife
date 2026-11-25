@@ -69,6 +69,7 @@ import { ErrorView } from 'src/components/error/error-view';
 import { EmptyContent } from 'src/components/empty-content';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
+import { AssetUnits } from 'src/components/bitcoin/asset-units';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { CleanTransactionsButton } from 'src/components/transactions';
 import { DeleteSelectedTransactionsButton } from 'src/components/transactions/delete-selected-transactions-button';
@@ -235,7 +236,10 @@ function isNeedsAction(tx: ActivityRow) {
 }
 
 function canDeleteRow(tx: ActivityRow, scope: ActivityScope) {
-  return scope === 'admin' || tx.status === 'Failed' || tx.status === 'Expired';
+  return (
+    tx.ledger !== 'Adjustment' &&
+    (scope === 'admin' || tx.status === 'Failed' || tx.status === 'Expired')
+  );
 }
 
 function txMatchesStatus(tx: ActivityRow, status: ActivityLens) {
@@ -1006,7 +1010,7 @@ function ActivityTableRow({
   const paymentAddress =
     payment?.bitcoin?.address || payment?.internal?.btc_address || payment?.internal?.ln_address;
   const explorerUrl = txExplorerUrl(payment?.bitcoin?.txid || txidFromOutpoint(invoiceOutpoint));
-  const methodLabel = getLedgerLabel(row.ledger, t);
+  const methodLabel = getLedgerLabel(row.ledger, t, invoice?.credit_purpose);
   const isOpenAmount = isOpenAmountRequest(row);
 
   return (
@@ -1144,7 +1148,11 @@ function ActivityTableRow({
               <Typography variant="body2" color="inherit">
                 {row.direction === 'in' ? '+' : '-'}
               </Typography>
-              <SatsWithIcon amountMSats={row.amount_total_msat} variant="body2" color="inherit" />
+              {invoice?.credit_amount_units ? (
+                <AssetUnits units={invoice.credit_amount_units} variant="body2" color="inherit" />
+              ) : (
+                <SatsWithIcon amountMSats={row.amount_total_msat} variant="body2" color="inherit" />
+              )}
             </Stack>
           )}
         </TableCell>

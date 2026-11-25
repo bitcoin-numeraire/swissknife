@@ -30,6 +30,7 @@ import { CopyMenuItem } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
+import { AssetUnits } from 'src/components/bitcoin/asset-units';
 
 import { TransactionType } from 'src/types/transaction';
 
@@ -70,7 +71,11 @@ export function TransactionTableRow({
   const isDeleting = useBoolean();
   const isPayment = transactionType === TransactionType.PAYMENT;
   const amountColor = isPayment ? 'warning.main' : 'success.main';
-  const methodLabel = getLedgerLabel(ledger, t);
+  const methodLabel = getLedgerLabel(
+    ledger,
+    t,
+    'credit_purpose' in row ? row.credit_purpose : undefined
+  );
 
   const avatarLetter = (text?: string | null) =>
     (text || description || ledger).charAt(0).toUpperCase();
@@ -94,7 +99,8 @@ export function TransactionTableRow({
       : undefined;
   const explorerUrl =
     transactionType === TransactionType.PAYMENT ? txExplorerUrl(payment.bitcoin?.txid) : undefined;
-  const canDelete = isAdmin || status === 'Expired' || status === 'Failed';
+  const canDelete =
+    ledger !== 'Adjustment' && (isAdmin || status === 'Expired' || status === 'Failed');
 
   return (
     <>
@@ -197,11 +203,15 @@ export function TransactionTableRow({
             <Typography component="span" variant="body2" sx={{ color: amountColor }}>
               {isPayment ? '-' : '+'}
             </Typography>
-            <SatsWithIcon
-              component="span"
-              amountMSats={amount_msat || 0}
-              sx={{ color: amountColor }}
-            />
+            {invoice.credit_amount_units ? (
+              <AssetUnits units={invoice.credit_amount_units} color={amountColor} />
+            ) : (
+              <SatsWithIcon
+                component="span"
+                amountMSats={amount_msat || 0}
+                sx={{ color: amountColor }}
+              />
+            )}
           </Stack>
         </TableCell>
 
