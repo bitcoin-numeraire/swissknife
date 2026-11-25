@@ -1093,5 +1093,27 @@
     "display_name": "Nom affiché (facultatif)",
     "display_name_help": "Le nom utilisé pour vous accueillir. Vous pourrez le modifier dans les paramètres.",
     "reset_display_name_help": "Laissez vide pour conserver votre nom actuel. Votre identifiant de connexion reste inchangé."
+  },
+  "spending_policy": {
+    "title": "Budget de dépenses",
+    "load_error": "Impossible de charger le budget.",
+    "loading": "Chargement du budget…",
+    "periods": "Frais et réservations en cours compris. Les périodes commencent à minuit UTC. La semaine commence le lundi.",
+    "per_payment_msat": "Par paiement",
+    "unlimited": "Illimité",
+    "daily_msat": "Aujourd’hui",
+    "weekly_msat": "Cette semaine",
+    "monthly_msat": "Ce mois-ci",
+    "sats": "{{value}} sats",
+    "uncapped_usage": "{{used}} sats utilisés · illimité",
+    "usage": "{{used}} sur {{cap}} sats",
+    "inactive": "Ce compte n’a aucune limite de dépenses active.",
+    "edit": "Modifier les limites",
+    "create": "Définir des limites",
+    "disable": "Désactiver le budget",
+    "input_help": "Saisissez les limites en sats avec au plus trois décimales. Laissez le champ vide pour autoriser les dépenses sans limite sur cette période. Zéro bloque les dépenses.",
+    "cancel": "Annuler",
+    "save": "Enregistrer les limites",
+    "disable_help": "Les paiements sortants seront autorisés sans ces limites. Les dépenses déjà comptabilisées seront conservées."
   }
 }
