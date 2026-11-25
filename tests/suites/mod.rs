@@ -26,4 +26,5 @@ mod well_known;
 mod bip353;
 mod bolt12;
 mod notifications;
+mod spending_policy;
 mod withdrawal_submissions;

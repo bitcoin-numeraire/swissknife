@@ -8,6 +8,8 @@
 
 mod account;
 mod agent;
+mod spending_policy;
+pub use spending_policy::*;
 mod api_key;
 pub use agent::*;
 mod auth;

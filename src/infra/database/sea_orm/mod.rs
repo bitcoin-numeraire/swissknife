@@ -4,6 +4,7 @@ mod models;
 mod offer_repository;
 mod payment_command;
 mod repositories;
+mod spending_policy_repository;
 mod store;
 mod types;
 mod uow;

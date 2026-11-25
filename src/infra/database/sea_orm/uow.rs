@@ -42,7 +42,9 @@ pub(super) async fn reserve_in_transaction(
     }
     payment.reserved_amount = reserve_amount_msat;
 
-    Ok(SeaOrmPaymentRepository::new(txn).insert(payment).await?)
+    let payment = SeaOrmPaymentRepository::new(txn).insert(payment).await?;
+    super::spending_policy_repository::admit(txn, &payment, reserve_amount_msat).await?;
+    Ok(payment)
 }
 
 pub(super) async fn settle_internal_in_transaction(
@@ -77,6 +79,7 @@ pub(super) async fn settle_internal_in_transaction(
         invoice
     };
 
+    super::spending_policy_repository::admit(txn, &payment, debit_msat).await?;
     let event_repo = SeaOrmClientEventRepository::new(txn);
     event_repo.append_event(NewClientEvent::payment(&payment)).await?;
     event_repo.append_event(NewClientEvent::invoice_paid(&invoice)).await?;
@@ -110,6 +113,7 @@ pub(super) async fn fail_in_transaction(
     }
     payment.reserved_amount = 0;
 
+    super::spending_policy_repository::adjust(txn, payment.id, 0).await?;
     let payment = payment_repo.update(payment).await?;
 
     SeaOrmClientEventRepository::new(txn)
@@ -270,6 +274,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         // a payment that was prematurely marked failed.
         payment.error = None;
 
+        super::spending_policy_repository::adjust(&txn, payment.id, actual_msat).await?;
         let payment = payment_repo.update(payment).await?;
 
         SeaOrmClientEventRepository::new(&txn)

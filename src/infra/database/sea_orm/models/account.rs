@@ -28,6 +28,8 @@ pub enum Relation {
     LnAddress,
     #[sea_orm(has_one = "super::local_credential::Entity")]
     LocalCredential,
+    #[sea_orm(has_one = "super::spending_policy::Entity")]
+    SpendingPolicy,
     #[sea_orm(has_many = "super::wallet::Entity")]
     Wallet,
 }
@@ -65,6 +67,12 @@ impl Related<super::ln_address::Entity> for Entity {
 impl Related<super::local_credential::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::LocalCredential.def()
+    }
+}
+
+impl Related<super::spending_policy::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::SpendingPolicy.def()
     }
 }
 

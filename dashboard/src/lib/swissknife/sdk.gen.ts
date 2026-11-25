@@ -159,6 +159,9 @@ import type {
   DeleteWalletsData,
   DeleteWalletsErrors,
   DeleteWalletsResponses,
+  DisableAccountSpendingPolicyData,
+  DisableAccountSpendingPolicyErrors,
+  DisableAccountSpendingPolicyResponses,
   DisableOfferData,
   DisableOfferErrors,
   DisableOfferResponses,
@@ -192,6 +195,9 @@ import type {
   GetAccountPreferencesErrors,
   GetAccountPreferencesResponses,
   GetAccountResponses,
+  GetAccountSpendingPolicyData,
+  GetAccountSpendingPolicyErrors,
+  GetAccountSpendingPolicyResponses,
   GetAccountWalletData,
   GetAccountWalletErrors,
   GetAccountWalletResponses,
@@ -329,6 +335,9 @@ import type {
   ReplaceAccountPermissionsData,
   ReplaceAccountPermissionsErrors,
   ReplaceAccountPermissionsResponses,
+  ReplaceAccountSpendingPolicyData,
+  ReplaceAccountSpendingPolicyErrors,
+  ReplaceAccountSpendingPolicyResponses,
   ResetLocalLoginData,
   ResetLocalLoginErrors,
   ResetLocalLoginResponses,
@@ -520,6 +529,75 @@ export const createAccount = <ThrowOnError extends boolean = false>(
     responseTransformer: createAccountResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/accounts',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Disable enforcement while retaining consumption already admitted under the policy.
+ */
+export const disableAccountSpendingPolicy = <ThrowOnError extends boolean = false>(
+  options: Options<DisableAccountSpendingPolicyData, ThrowOnError>
+): RequestResult<
+  DisableAccountSpendingPolicyResponses,
+  DisableAccountSpendingPolicyErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DisableAccountSpendingPolicyResponses,
+    DisableAccountSpendingPolicyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/spending-policy',
+    ...options,
+  });
+
+/**
+ * Read the active spending limits and current calendar-period usage.
+ */
+export const getAccountSpendingPolicy = <ThrowOnError extends boolean = false>(
+  options: Options<GetAccountSpendingPolicyData, ThrowOnError>
+): RequestResult<GetAccountSpendingPolicyResponses, GetAccountSpendingPolicyErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetAccountSpendingPolicyResponses,
+    GetAccountSpendingPolicyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/spending-policy',
+    ...options,
+  });
+
+/**
+ * Apply limits to future outgoing payments from every wallet owned by the account.
+ */
+export const replaceAccountSpendingPolicy = <ThrowOnError extends boolean = false>(
+  options: Options<ReplaceAccountSpendingPolicyData, ThrowOnError>
+): RequestResult<
+  ReplaceAccountSpendingPolicyResponses,
+  ReplaceAccountSpendingPolicyErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    ReplaceAccountSpendingPolicyResponses,
+    ReplaceAccountSpendingPolicyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/spending-policy',
     ...options,
     headers: {
       'Content-Type': 'application/json',
