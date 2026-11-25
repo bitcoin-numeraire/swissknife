@@ -1,4 +1,5 @@
 {
+  "statement": {"action": "Exporter le relevé", "title": "Relevé du portefeuille", "wallet": "Portefeuille {{wallet}}", "from": "Du (UTC)", "through": "Au (UTC)", "csv": "Télécharger le CSV"},
   "overview": "Aperçu",
   "money": "Portefeuille",
   "activity": "Activité",

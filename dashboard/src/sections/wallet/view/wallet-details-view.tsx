@@ -47,6 +47,7 @@ import { RegisterLnAddressDrawer } from 'src/components/ln-address';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { SendMoneyDrawer, ReceiveMoneyDrawer } from 'src/sections/wallet/money-drawers';
+import { WalletStatementDownload } from 'src/sections/activity/wallet-statement-download';
 import {
   DetailRow,
   DetailCard,
@@ -337,6 +338,9 @@ export function WalletDetailsView({ id }: Props) {
               ]}
               action={
                 <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                  <RoleBasedGuard permissions={[Permission.READ_TRANSACTION]}>
+                    <WalletStatementDownload key={wallet!.id} walletId={wallet!.id} admin />
+                  </RoleBasedGuard>
                   <RoleBasedGuard permissions={[Permission.WRITE_TRANSACTION]}>
                     <Button
                       color="inherit"
