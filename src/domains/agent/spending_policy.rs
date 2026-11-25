@@ -171,7 +171,7 @@ pub(crate) fn authorize_spending(limits: &SpendingLimits, usage: &SpendingUsage,
         ("monthly", limits.monthly_msat, usage.monthly_msat),
     ] {
         if let Some(cap) = cap {
-            if amount > cap.saturating_sub(charged) {
+            if u128::from(amount) > u128::from(cap).saturating_sub(charged) {
                 return Err(DataError::Validation(format!(
                     "Account {name} spending limit of {cap} msat exceeded (including fees)"
                 )));

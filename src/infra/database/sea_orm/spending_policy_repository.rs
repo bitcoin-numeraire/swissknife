@@ -36,21 +36,49 @@ impl From<policy::Model> for SpendingLimits {
     }
 }
 
-async fn usage(db: &impl ConnectionTrait, account: Uuid, today: NaiveDate) -> Result<SpendingUsage, DatabaseError> {
-    let mut totals = [0; 3];
-    for (total, date) in totals.iter_mut().zip(period_starts(today)) {
-        let amount = SpendingEntry::find()
-            .select_only()
-            .column_as(entry::Column::ChargedMsat.sum().cast_as(Alias::new("BIGINT")), "amount")
-            .filter(entry::Column::AccountId.eq(account))
-            .filter(entry::Column::AdmittedAt.gte(date.and_time(chrono::NaiveTime::MIN)))
-            .into_tuple::<Option<i64>>()
-            .one(db)
-            .await
-            .map_err(db_error)?
-            .flatten()
-            .unwrap_or(0);
-        *total = u64::try_from(amount).map_err(|_| DatabaseError::FindOne("Negative account spending usage".into()))?;
+async fn usage(tx: &DatabaseTransaction, account: Uuid, today: NaiveDate) -> Result<SpendingUsage, DatabaseError> {
+    use futures_util::TryStreamExt;
+    let starts = period_starts(today).map(|date| date.and_time(chrono::NaiveTime::MIN));
+    let mut totals = [0u128; 3];
+    let entries = SpendingEntry::find()
+        .select_only()
+        .filter(entry::Column::AccountId.eq(account));
+    if tx.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+        // PostgreSQL sums BIGINT as NUMERIC. Read its exact decimal representation.
+        for (total, start) in totals.iter_mut().zip(starts) {
+            let sum = entries
+                .clone()
+                .column_as(entry::Column::ChargedMsat.sum().cast_as(Alias::new("TEXT")), "amount")
+                .filter(entry::Column::AdmittedAt.gte(start))
+                .into_tuple::<Option<String>>()
+                .one(tx)
+                .await
+                .map_err(db_error)?
+                .flatten();
+            if let Some(sum) = sum {
+                *total = sum
+                    .parse()
+                    .map_err(|_| DatabaseError::FindOne("Invalid account spending total".into()))?;
+            }
+        }
+    } else {
+        // SQLite's integer SUM overflows at i64::MAX. Scan the overlapping calendar
+        // windows once, retaining only one row and the three exact totals.
+        let query = entries
+            .column(entry::Column::AdmittedAt)
+            .column(entry::Column::ChargedMsat)
+            .filter(entry::Column::AdmittedAt.gte(std::cmp::min(starts[1], starts[2])))
+            .into_tuple::<(chrono::NaiveDateTime, i64)>();
+        let mut rows = query.stream(tx).await.map_err(db_error)?;
+        while let Some((at, charge)) = rows.try_next().await.map_err(db_error)? {
+            let charge = u128::try_from(charge)
+                .map_err(|_| DatabaseError::FindOne("Negative account spending charge".into()))?;
+            for (total, start) in totals.iter_mut().zip(starts) {
+                if at >= start {
+                    *total += charge;
+                }
+            }
+        }
     }
     let [daily_msat, weekly_msat, monthly_msat] = totals;
     Ok(SpendingUsage {
@@ -291,7 +319,11 @@ pub(super) async fn admit(
     if let (Some(key), Some(cap)) = (agent_key_id, limits.agent_hourly_msat) {
         authorize_agent_hour(tx, account, key, now, cap, amount).await?;
     }
-    let used = usage(tx, account, now.date_naive()).await?;
+    let used = if limits.daily_msat.is_some() || limits.weekly_msat.is_some() || limits.monthly_msat.is_some() {
+        usage(tx, account, now.date_naive()).await?
+    } else {
+        SpendingUsage::default()
+    };
     authorize_spending(&limits, &used, amount)?;
     entry::ActiveModel {
         payment_id: Set(payment.id),

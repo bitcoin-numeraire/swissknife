@@ -87,7 +87,7 @@ async fn delegated_spending_obeys_the_account_budget_on_all_rails_and_survives_r
             policy.usage.weekly_msat,
             policy.usage.monthly_msat
         ),
-        (charged, charged, charged)
+        (u128::from(charged), u128::from(charged), u128::from(charged))
     );
 
     let internal_address = api
@@ -121,7 +121,7 @@ async fn delegated_spending_obeys_the_account_budget_on_all_rails_and_survives_r
             .parse::<SpendingPolicy>()
             .usage
             .daily_msat,
-        charged
+        u128::from(charged)
     );
     assert_status(&api.delete(&resource, operator).await, StatusCode::NO_CONTENT);
     assert_error(&api.get(&resource, operator).await, StatusCode::NOT_FOUND);
@@ -132,7 +132,7 @@ async fn delegated_spending_obeys_the_account_budget_on_all_rails_and_survives_r
     );
     let reread = api.get(&resource, operator).await;
     assert_eq!(reread.body["limits"]["monthly_msat"], "9007199254740993");
-    assert_eq!(reread.parse::<SpendingPolicy>().usage.monthly_msat, charged);
+    assert_eq!(reread.parse::<SpendingPolicy>().usage.monthly_msat, u128::from(charged));
     let report = format!("/v1/accounts/{}/spending-report", owner.account.id);
     let rows = api.get(&report, operator).await;
     assert_status(&rows, StatusCode::OK);

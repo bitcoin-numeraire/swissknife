@@ -1711,3 +1711,66 @@ async fn agent_hour_excludes_earlier_admissions_and_uses_corrected_reservations(
         4000
     );
 }
+
+#[tokio::test]
+async fn payment_admission_and_calendar_totals_after_multiple_ledger_sized_charges() {
+    use super::{
+        models::spending_entry,
+        spending_policy_repository::{admit, SeaOrmSpendingPolicyRepository},
+    };
+    use crate::domains::agent::SpendingPolicyRepository;
+    use swissknife_types::SpendingLimits;
+
+    let db = connect().await;
+    let wallet = seed_wallet(&db, 100_000).await;
+    let account = account_id(&db, wallet).await;
+    let policy = SeaOrmSpendingPolicyRepository(db.clone());
+    let limits = SpendingLimits {
+        per_payment_msat: Some(1000),
+        ..Default::default()
+    };
+    policy.replace(account, limits.clone()).await.unwrap();
+    let now = Utc::now().naive_utc();
+    for _ in 0..3 {
+        spending_entry::ActiveModel {
+            payment_id: Set(Uuid::new_v4()),
+            account_id: Set(account),
+            wallet_id: Set(Some(wallet)),
+            agent_key_id: Set(None),
+            admitted_at: Set(now),
+            charged_msat: Set(i64::MAX),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+    }
+    let total = 3 * i64::MAX as u128;
+    let usage = policy.get(account).await.unwrap().unwrap().usage;
+    assert_eq!(
+        (usage.daily_msat, usage.weekly_msat, usage.monthly_msat),
+        (total, total, total)
+    );
+    assert_eq!(serde_json::to_value(&usage).unwrap()["monthly_msat"], total.to_string());
+    let payment = pending_payment(wallet, 1000, 0);
+    let tx = db.begin().await.unwrap();
+    admit(&tx, &payment, 1000, None).await.unwrap();
+    tx.commit().await.unwrap();
+    policy
+        .replace(
+            account,
+            SpendingLimits {
+                monthly_msat: Some(i64::MAX as u64),
+                ..limits
+            },
+        )
+        .await
+        .unwrap();
+    let tx = db.begin().await.unwrap();
+    let error = admit(&tx, &pending_payment(wallet, 1, 0), 1, None).await.unwrap_err();
+    assert!(error.to_string().contains("monthly spending limit"), "{error}");
+    tx.rollback().await.unwrap();
+    assert_eq!(
+        policy.get(account).await.unwrap().unwrap().usage.monthly_msat,
+        total + 1000
+    );
+}
