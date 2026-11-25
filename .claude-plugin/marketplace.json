@@ -1,0 +1,12 @@
+{
+  "name": "numeraire",
+  "owner": { "name": "Numeraire", "url": "https://numeraire.tech" },
+  "metadata": { "description": "Wallet integrations maintained by Numeraire." },
+  "plugins": [
+    {
+      "name": "swissknife-wallet",
+      "source": "./packages/swissknife-wallet-plugin",
+      "description": "Connect to a wallet-scoped SwissKnife MCP endpoint."
+    }
+  ]
+}

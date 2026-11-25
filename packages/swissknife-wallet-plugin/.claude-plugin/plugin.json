@@ -1,0 +1,9 @@
+{
+  "name": "swissknife-wallet",
+  "version": "0.1.0",
+  "description": "Wallet-scoped balances, payments and contacts through a local SwissKnife MCP endpoint.",
+  "author": { "name": "Numeraire", "url": "https://numeraire.tech" },
+  "homepage": "https://numeraire.tech",
+  "repository": "https://github.com/bitcoin-numeraire/swissknife",
+  "license": "MIT"
+}
