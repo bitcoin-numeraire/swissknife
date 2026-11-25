@@ -16,3 +16,4 @@ pub use super::local_credential::Entity as LocalCredential;
 pub use super::payment::Entity as Payment;
 pub use super::payment_command::Entity as PaymentCommand;
 pub use super::wallet::Entity as Wallet;
+pub use super::withdrawal_command::Entity as WithdrawalCommand;

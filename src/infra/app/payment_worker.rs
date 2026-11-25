@@ -3,6 +3,19 @@ use std::{sync::Arc, time::Duration};
 use crate::application::composition::AppServices;
 
 pub fn start_payment_workers(services: Arc<AppServices>) {
+    // A held Lightning payment cannot occupy the on-chain worker. SQL leases coordinate across replicas.
+    let withdrawals = services.clone();
+    tokio::spawn(async move {
+        loop {
+            match withdrawals.payment.execute_next_withdrawal().await {
+                Ok(true) => continue,
+                Ok(false) => {}
+                Err(error) => tracing::warn!(%error, "Withdrawal command execution will retry"),
+            }
+            let _ =
+                tokio::time::timeout(Duration::from_secs(2), withdrawals.payment_command_available.notified()).await;
+        }
+    });
     // Bound simultaneous provider calls so one held invoice cannot block every other sender.
     for _ in 0..4 {
         let services = services.clone();

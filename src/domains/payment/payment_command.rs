@@ -32,6 +32,11 @@ impl SubmissionKey {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "rail", rename_all = "snake_case")]
 pub enum PaymentInstructions {
+    Onchain {
+        backend: String,
+        address: String,
+        maximum_fee_msat: u64,
+    },
     Lightning {
         bolt11: String,
         variable_amount_msat: Option<u64>,
@@ -43,6 +48,7 @@ pub enum PaymentInstructions {
 pub struct SubmittedPayment {
     pub payment: Payment,
     pub dispatched: bool,
+    pub withdrawal: Option<super::StoredWithdrawal>,
 }
 
 #[derive(Clone, Debug)]
@@ -52,19 +58,29 @@ pub struct ClaimedPayment {
 }
 
 impl SubmittedPayment {
+    pub fn check_original_backend(mut self, backend: &str) -> Self {
+        if let Some(withdrawal) = &mut self.withdrawal {
+            withdrawal.details.awaiting_original_provider =
+                self.payment.status == super::PaymentStatus::Pending && withdrawal.backend != backend;
+        }
+        self
+    }
     pub fn response(self, base: &str) -> swissknife_types::PaymentSubmission {
         use swissknife_types::{PaymentExecutionState as State, PaymentStatus};
-        let state = match self.payment.status {
-            PaymentStatus::Settled => State::Settled,
-            PaymentStatus::Failed => State::Failed,
-            PaymentStatus::Pending if self.dispatched => State::Processing,
-            PaymentStatus::Pending => State::Accepted,
+        let (execution, withdrawal) = self.withdrawal.map(|w| (w.state, w.details)).unzip();
+        let state = match (&self.payment.status, execution) {
+            (PaymentStatus::Settled, _) => State::Settled,
+            (_, Some(state)) => state,
+            (PaymentStatus::Failed, _) => State::Failed,
+            (PaymentStatus::Pending, _) if self.dispatched => State::Processing,
+            (PaymentStatus::Pending, _) => State::Accepted,
         };
         let status_url = format!("{base}/{}", self.payment.id);
         swissknife_types::PaymentSubmission {
             payment: self.payment,
             state,
             status_url,
+            withdrawal,
         }
     }
 }

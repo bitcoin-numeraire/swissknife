@@ -5,6 +5,7 @@ mod repositories;
 mod store;
 mod types;
 mod uow;
+mod withdrawal_command;
 
 #[cfg(all(test, feature = "itest"))]
 mod uow_tests;

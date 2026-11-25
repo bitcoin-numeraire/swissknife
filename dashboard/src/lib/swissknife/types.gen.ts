@@ -1074,6 +1074,11 @@ export type Payment = {
 export const PaymentExecutionState = {
   ACCEPTED: 'accepted',
   PROCESSING: 'processing',
+  WAITING: 'waiting',
+  BROADCAST: 'broadcast',
+  RECONCILING: 'reconciling',
+  CANCELLED: 'cancelled',
+  EXPIRED: 'expired',
   SETTLED: 'settled',
   FAILED: 'failed',
 } as const;
@@ -1137,6 +1142,7 @@ export type PaymentSubmission = {
    * Authorized REST resource for this submission, relative to the SwissKnife server.
    */
   status_url: string;
+  withdrawal?: WithdrawalSubmission | null;
 };
 
 /**
@@ -1302,7 +1308,7 @@ export type SignUpRequest = {
 };
 
 /**
- * Accept an external Lightning payment for durable execution.
+ * Accept an external Lightning or Bitcoin payment for durable execution.
  */
 export type SubmitPaymentRequest = {
   amount_msat?: number | null;
@@ -1310,7 +1316,7 @@ export type SubmitPaymentRequest = {
   idempotency_key: string;
   input: string;
   /**
-   * An optional additional ceiling below the node's configured maximum.
+   * Maximum approved fee in millisatoshis. Required in whole satoshis for Bitcoin withdrawals.
    */
   maximum_fee_msat?: number | null;
   /**
@@ -1498,6 +1504,19 @@ export type WalletOverview = {
    * Date of update in database
    */
   updated_at?: Date | null;
+};
+
+/**
+ * Approved Bitcoin withdrawal terms. The deadline applies until signing is committed.
+ */
+export type WithdrawalSubmission = {
+  address: string;
+  /**
+   * Execution resumes when this installation reconnects to the original node and network.
+   */
+  awaiting_original_provider: boolean;
+  expires_at: Date;
+  maximum_fee_msat: number;
 };
 
 export type WellKnownData = {
@@ -4875,6 +4894,37 @@ export type SubmitWalletPaymentResponses = {
 export type SubmitWalletPaymentResponse =
   SubmitWalletPaymentResponses[keyof SubmitWalletPaymentResponses];
 
+export type CancelWalletWithdrawalData = {
+  body?: never;
+  path: {
+    /**
+     * Owned wallet
+     */
+    wallet_id: string;
+    /**
+     * Payment ID
+     */
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/payments/submissions/{id}';
+};
+
+export type CancelWalletWithdrawalErrors = {
+  404: ErrorResponse;
+  409: ErrorResponse;
+};
+
+export type CancelWalletWithdrawalError =
+  CancelWalletWithdrawalErrors[keyof CancelWalletWithdrawalErrors];
+
+export type CancelWalletWithdrawalResponses = {
+  200: PaymentSubmission;
+};
+
+export type CancelWalletWithdrawalResponse =
+  CancelWalletWithdrawalResponses[keyof CancelWalletWithdrawalResponses];
+
 export type GetWalletPaymentSubmissionData = {
   body?: never;
   path: {
@@ -5212,6 +5262,31 @@ export type SubmitPaymentResponses = {
 };
 
 export type SubmitPaymentResponse = SubmitPaymentResponses[keyof SubmitPaymentResponses];
+
+export type CancelWithdrawalData = {
+  body?: never;
+  path: {
+    /**
+     * Payment ID
+     */
+    id: string;
+  };
+  query?: never;
+  url: '/v1/payments/submissions/{id}';
+};
+
+export type CancelWithdrawalErrors = {
+  404: ErrorResponse;
+  409: ErrorResponse;
+};
+
+export type CancelWithdrawalError = CancelWithdrawalErrors[keyof CancelWithdrawalErrors];
+
+export type CancelWithdrawalResponses = {
+  200: PaymentSubmission;
+};
+
+export type CancelWithdrawalResponse = CancelWithdrawalResponses[keyof CancelWithdrawalResponses];
 
 export type GetPaymentSubmissionData = {
   body?: never;

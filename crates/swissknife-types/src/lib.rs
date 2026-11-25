@@ -50,7 +50,7 @@ pub use nostr::{NostrNIP05QueryParams, NostrNIP05Response};
 pub use notification::*;
 pub use payment::{
     BtcPayment, InternalPayment, LnPayment, Payment, PaymentExecutionState, PaymentFeeEstimate, PaymentFilter,
-    PaymentStatus, PaymentSubmission, SendPaymentRequest, SubmitPaymentRequest,
+    PaymentStatus, PaymentSubmission, SendPaymentRequest, SubmitPaymentRequest, WithdrawalSubmission,
 };
 pub use permission::Permission;
 pub use query::OrderDirection;

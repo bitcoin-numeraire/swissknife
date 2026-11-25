@@ -31,7 +31,7 @@ use super::{BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate,
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(submit_payment, get_payment_submission, estimate_payment_fee, pay, get_payment, list_payments, delete_payment, delete_payments),
+    paths(submit_payment, get_payment_submission, cancel_withdrawal, estimate_payment_fee, pay, get_payment, list_payments, delete_payment, delete_payments),
     components(schemas(
         Payment,
         PaymentFeeEstimate,
@@ -54,7 +54,10 @@ pub const CONTEXT_PATH: &str = "/v1/payments";
 pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/submissions", post(submit_payment))
-        .route("/submissions/{id}", get(get_payment_submission))
+        .route(
+            "/submissions/{id}",
+            get(get_payment_submission).delete(cancel_withdrawal),
+        )
         .route("/fee-estimate", post(estimate_payment_fee))
         .route("/", post(pay))
         .route("/", get(list_payments))
@@ -63,7 +66,7 @@ pub fn router() -> Router<Arc<AppServices>> {
         .route("/", delete(delete_payments))
 }
 
-/// Accept an external Lightning payment for background execution.
+/// Accept an external Lightning or Bitcoin payment for background execution.
 #[utoipa::path(post, path = "/submissions", context_path = CONTEXT_PATH, tag = "Payments", request_body = SubmitPaymentRequest,
     responses((status = 202, description = "Durable payment submission", body = PaymentSubmission), (status = 403, description = "Missing permission", body = ErrorResponse), (status = 409, description = "Conflicting idempotency key", body = ErrorResponse), (status = 422, description = "Invalid payment", body = ErrorResponse)))]
 async fn submit_payment(
@@ -84,7 +87,7 @@ async fn submit_payment(
         .ok_or_else(|| DataError::Malformed("wallet_id is required".into()))?;
     let submission = services
         .payment
-        .submit_lightning(wallet, request)
+        .submit_payment(wallet, request)
         .await?
         .response("/v1/payments/submissions");
     services.payment_command_available.notify_one();
@@ -108,6 +111,24 @@ async fn get_payment_submission(
         services
             .payment
             .submission(None, id)
+            .await?
+            .response("/v1/payments/submissions"),
+    ))
+}
+
+/// Cancel a queued external Bitcoin withdrawal from an administrative payment submission.
+#[utoipa::path(delete, path = "/submissions/{id}", context_path = CONTEXT_PATH, tag = "Payments",
+    params(("id" = Uuid, Path, description = "Payment ID")), responses((status = 200, body = PaymentSubmission), (status = 404, body = ErrorResponse), (status = 409, body = ErrorResponse)))]
+async fn cancel_withdrawal(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(id): Path<Uuid>,
+) -> Result<Json<PaymentSubmission>, ApplicationError> {
+    user.check_permission(Permission::WriteTransaction)?;
+    Ok(Json(
+        services
+            .payment
+            .cancel_withdrawal(None, id)
             .await?
             .response("/v1/payments/submissions"),
     ))

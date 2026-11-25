@@ -37,6 +37,7 @@ mod m20261118_154958_add_lnurl_invoice_verification;
 mod m20261125_165812_account_notification;
 mod m20261125_172416_add_payment_command;
 mod m20261125_175156_replay_pending_onchain_withdrawals;
+mod m20261125_180048_add_withdrawal_command;
 
 pub struct Migrator;
 
@@ -81,6 +82,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261125_165812_account_notification::Migration),
             Box::new(m20261125_172416_add_payment_command::Migration),
             Box::new(m20261125_175156_replay_pending_onchain_withdrawals::Migration),
+            Box::new(m20261125_180048_add_withdrawal_command::Migration),
         ]
     }
 }

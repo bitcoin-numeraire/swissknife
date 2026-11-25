@@ -45,6 +45,80 @@ pub(super) async fn reserve_in_transaction(
     Ok(SeaOrmPaymentRepository::new(txn).insert(payment).await?)
 }
 
+pub(super) async fn settle_internal_in_transaction(
+    txn: &DatabaseTransaction,
+    mut payment: Payment,
+    invoice: Invoice,
+) -> Result<Payment, ApplicationError> {
+    let wallet_repo = SeaOrmWalletRepository::new(txn);
+    let invoice_repo = SeaOrmInvoiceRepository::new(txn);
+
+    let existing_invoice = !invoice.id.is_nil();
+    if existing_invoice && !invoice_repo.settle(&invoice).await? {
+        return Err(DataError::Conflict("Invoice has already been paid.".to_string()).into());
+    }
+
+    let debit_msat = payment.amount_msat.saturating_add(payment.fee_msat.unwrap_or_default());
+    if debit_msat > 0 && !wallet_repo.debit(payment.wallet_id, debit_msat).await? {
+        return Err(DataError::InsufficientFunds(debit_msat as f64).into());
+    }
+    payment.reserved_amount = 0;
+    let payment = SeaOrmPaymentRepository::new(txn).insert(payment).await?;
+
+    let invoice = if invoice.id.is_nil() {
+        if let Some(received_msat) = invoice.amount_received_msat {
+            wallet_repo.credit(invoice.wallet_id, received_msat).await?;
+        }
+        invoice_repo.insert(invoice).await?
+    } else {
+        if let Some(received_msat) = invoice.amount_received_msat {
+            wallet_repo.credit(invoice.wallet_id, received_msat).await?;
+        }
+        invoice
+    };
+
+    let event_repo = SeaOrmClientEventRepository::new(txn);
+    event_repo.append_event(NewClientEvent::payment(&payment)).await?;
+    event_repo.append_event(NewClientEvent::invoice_paid(&invoice)).await?;
+
+    Ok(payment)
+}
+
+pub(super) async fn fail_in_transaction(
+    txn: &DatabaseTransaction,
+    mut payment: Payment,
+) -> Result<Payment, ApplicationError> {
+    let payment_repo = SeaOrmPaymentRepository::new(txn);
+
+    // Single-winner, and only from Pending: a duplicate failure (sync result
+    // + failure event) returns the already-failed payment, and a payment that
+    // already settled is never moved back to Failed.
+    if !payment_repo
+        .try_transition(payment.id, &[PaymentStatus::Pending], PaymentStatus::Failed)
+        .await?
+    {
+        let failed = payment_repo
+            .find(payment.id)
+            .await?
+            .ok_or_else(|| DataError::NotFound(format!("Payment {} not found", payment.id)))?;
+        return Ok(failed);
+    }
+
+    let wallet_repo = SeaOrmWalletRepository::new(txn);
+    if payment.reserved_amount > 0 && !wallet_repo.release(payment.wallet_id, payment.reserved_amount).await? {
+        return Err(DataError::Inconsistency(format!("Reserved balance missing for payment {}", payment.id)).into());
+    }
+    payment.reserved_amount = 0;
+
+    let payment = payment_repo.update(payment).await?;
+
+    SeaOrmClientEventRepository::new(txn)
+        .append_event(NewClientEvent::payment(&payment))
+        .await?;
+
+    Ok(payment)
+}
+
 #[async_trait]
 impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
     async fn submission_by_id(
@@ -66,11 +140,52 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         reserve_amount: u64,
         instructions: PaymentInstructions,
     ) -> Result<SubmittedPayment, ApplicationError> {
-        super::payment_command::submit(&self.db, key, payment, reserve_amount, instructions).await
+        super::payment_command::submit(
+            &self.db,
+            key,
+            payment,
+            super::payment_command::Admission::External {
+                reserve: reserve_amount,
+                instructions,
+            },
+        )
+        .await
     }
 
+    async fn submit_internal(
+        &self,
+        key: &SubmissionKey,
+        payment: Payment,
+        invoice: Invoice,
+    ) -> Result<SubmittedPayment, ApplicationError> {
+        super::payment_command::submit(
+            &self.db,
+            key,
+            payment,
+            super::payment_command::Admission::Internal(Box::new(invoice)),
+        )
+        .await
+    }
     async fn claim(&self) -> Result<Option<ClaimedPayment>, ApplicationError> {
         super::payment_command::claim(&self.db).await
+    }
+
+    async fn claim_withdrawal(
+        &self,
+        backend: &str,
+    ) -> Result<Option<crate::domains::payment::ClaimedWithdrawal>, ApplicationError> {
+        super::withdrawal_command::claim(&self.db, backend).await
+    }
+    async fn advance_withdrawal(
+        &self,
+        claim: &crate::domains::payment::ClaimedWithdrawal,
+        progress: crate::domains::payment::WithdrawalProgress,
+        retry_seconds: i64,
+    ) -> Result<bool, ApplicationError> {
+        super::withdrawal_command::advance(&self.db, claim, progress, retry_seconds).await
+    }
+    async fn cancel_withdrawal(&self, wallet_id: Option<uuid::Uuid>, id: uuid::Uuid) -> Result<(), ApplicationError> {
+        super::withdrawal_command::cancel(&self.db, wallet_id, id).await
     }
 
     async fn reserve(&self, payment: Payment, reserve_amount_msat: u64) -> Result<Payment, ApplicationError> {
@@ -96,6 +211,9 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
+        if payment.ledger == crate::application::composition::Ledger::Onchain {
+            super::withdrawal_command::confirm(&txn, payment.id).await?;
+        }
         let payment_repo = SeaOrmPaymentRepository::new(&txn);
 
         // Single-winner: the synchronous pay result and the success event can
@@ -165,91 +283,28 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
         Ok(payment)
     }
 
-    async fn fail(&self, mut payment: Payment) -> Result<Payment, ApplicationError> {
+    async fn fail(&self, payment: Payment) -> Result<Payment, ApplicationError> {
         let txn = self
             .db
             .begin()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let payment_repo = SeaOrmPaymentRepository::new(&txn);
-
-        // Single-winner, and only from Pending: a duplicate failure (sync result
-        // + failure event) returns the already-failed payment, and a payment that
-        // already settled is never moved back to Failed.
-        if !payment_repo
-            .try_transition(payment.id, &[PaymentStatus::Pending], PaymentStatus::Failed)
-            .await?
-        {
-            let failed = payment_repo
-                .find(payment.id)
-                .await?
-                .ok_or_else(|| DataError::NotFound(format!("Payment {} not found", payment.id)))?;
-            txn.commit()
-                .await
-                .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-            return Ok(failed);
-        }
-
-        let wallet_repo = SeaOrmWalletRepository::new(&txn);
-        if payment.reserved_amount > 0 && !wallet_repo.release(payment.wallet_id, payment.reserved_amount).await? {
-            return Err(
-                DataError::Inconsistency(format!("Reserved balance missing for payment {}", payment.id)).into(),
-            );
-        }
-        payment.reserved_amount = 0;
-
-        let payment = payment_repo.update(payment).await?;
-
-        SeaOrmClientEventRepository::new(&txn)
-            .append_event(NewClientEvent::payment(&payment))
-            .await?;
-
+        let payment = fail_in_transaction(&txn, payment).await?;
         txn.commit()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
-
         Ok(payment)
     }
 
-    async fn settle_internal(&self, mut payment: Payment, invoice: Invoice) -> Result<Payment, ApplicationError> {
+    async fn settle_internal(&self, payment: Payment, invoice: Invoice) -> Result<Payment, ApplicationError> {
         let txn = self
             .db
             .begin()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let wallet_repo = SeaOrmWalletRepository::new(&txn);
-        let invoice_repo = SeaOrmInvoiceRepository::new(&txn);
-
-        let existing_invoice = !invoice.id.is_nil();
-        if existing_invoice && !invoice_repo.settle(&invoice).await? {
-            return Err(DataError::Conflict("Invoice has already been paid.".to_string()).into());
-        }
-
-        let debit_msat = payment.amount_msat.saturating_add(payment.fee_msat.unwrap_or_default());
-        if debit_msat > 0 && !wallet_repo.debit(payment.wallet_id, debit_msat).await? {
-            return Err(DataError::InsufficientFunds(debit_msat as f64).into());
-        }
-        payment.reserved_amount = 0;
-        let payment = SeaOrmPaymentRepository::new(&txn).insert(payment).await?;
-
-        let invoice = if invoice.id.is_nil() {
-            if let Some(received_msat) = invoice.amount_received_msat {
-                wallet_repo.credit(invoice.wallet_id, received_msat).await?;
-            }
-            invoice_repo.insert(invoice).await?
-        } else {
-            if let Some(received_msat) = invoice.amount_received_msat {
-                wallet_repo.credit(invoice.wallet_id, received_msat).await?;
-            }
-            invoice
-        };
-
-        let event_repo = SeaOrmClientEventRepository::new(&txn);
-        event_repo.append_event(NewClientEvent::payment(&payment)).await?;
-        event_repo.append_event(NewClientEvent::invoice_paid(&invoice)).await?;
-
+        let payment = settle_internal_in_transaction(&txn, payment, invoice).await?;
         txn.commit()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;

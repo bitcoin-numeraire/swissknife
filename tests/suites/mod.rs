@@ -22,3 +22,4 @@ mod wallets;
 mod well_known;
 
 mod notifications;
+mod withdrawal_submissions;

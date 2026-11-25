@@ -486,7 +486,17 @@ export const zPatchAccountPreferencesRequest = z.object({
   dashboard_settings: z.record(z.string(), z.unknown()),
 });
 
-export const zPaymentExecutionState = z.enum(['accepted', 'processing', 'settled', 'failed']);
+export const zPaymentExecutionState = z.enum([
+  'accepted',
+  'processing',
+  'waiting',
+  'broadcast',
+  'reconciling',
+  'cancelled',
+  'expired',
+  'settled',
+  'failed',
+]);
 
 /**
  * Fee quote for a prospective outgoing payment.
@@ -554,12 +564,6 @@ export const zPayment = z.object({
   status: zPaymentStatus,
   updated_at: z.iso.datetime().nullish(),
   wallet_id: z.uuid(),
-});
-
-export const zPaymentSubmission = z.object({
-  payment: zPayment,
-  state: zPaymentExecutionState,
-  status_url: z.string(),
 });
 
 /**
@@ -718,7 +722,7 @@ export const zSignUpRequest = z.object({
 });
 
 /**
- * Accept an external Lightning payment for durable execution.
+ * Accept an external Lightning or Bitcoin payment for durable execution.
  */
 export const zSubmitPaymentRequest = z.object({
   amount_msat: z.coerce
@@ -850,6 +854,25 @@ export const zWalletOverview = z.object({
     .gte(0)
     .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
   updated_at: z.iso.datetime().nullish(),
+});
+
+/**
+ * Approved Bitcoin withdrawal terms. The deadline applies until signing is committed.
+ */
+export const zWithdrawalSubmission = z.object({
+  address: z.string(),
+  awaiting_original_provider: z.boolean(),
+  expires_at: z.iso.datetime(),
+  maximum_fee_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+});
+
+export const zPaymentSubmission = z.object({
+  payment: zPayment,
+  state: zPaymentExecutionState,
+  status_url: z.string(),
+  withdrawal: zWithdrawalSubmission.nullish(),
 });
 
 export const zWellKnownPath = z.object({
@@ -1812,6 +1835,13 @@ export const zSubmitWalletPaymentPath = z.object({
 
 export const zSubmitWalletPaymentResponse = zPaymentSubmission;
 
+export const zCancelWalletWithdrawalPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+});
+
+export const zCancelWalletWithdrawalResponse = zPaymentSubmission;
+
 export const zGetWalletPaymentSubmissionPath = z.object({
   wallet_id: z.uuid(),
   id: z.uuid(),
@@ -1912,6 +1942,12 @@ export const zSubmitPaymentBody = zSubmitPaymentRequest;
  * Durable payment submission
  */
 export const zSubmitPaymentResponse = zPaymentSubmission;
+
+export const zCancelWithdrawalPath = z.object({
+  id: z.uuid(),
+});
+
+export const zCancelWithdrawalResponse = zPaymentSubmission;
 
 export const zGetPaymentSubmissionPath = z.object({
   id: z.uuid(),

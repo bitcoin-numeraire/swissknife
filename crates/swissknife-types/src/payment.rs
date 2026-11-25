@@ -137,7 +137,7 @@ pub enum PaymentStatus {
     Failed,
 }
 
-/// Accept an external Lightning payment for durable execution.
+/// Accept an external Lightning or Bitcoin payment for durable execution.
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct SubmitPaymentRequest {
     pub idempotency_key: Uuid,
@@ -146,7 +146,7 @@ pub struct SubmitPaymentRequest {
     pub input: String,
     pub amount_msat: Option<u64>,
     pub comment: Option<String>,
-    /// An optional additional ceiling below the node's configured maximum.
+    /// Maximum approved fee in millisatoshis. Required in whole satoshis for Bitcoin withdrawals.
     pub maximum_fee_msat: Option<u64>,
 }
 
@@ -155,14 +155,31 @@ pub struct SubmitPaymentRequest {
 pub enum PaymentExecutionState {
     Accepted,
     Processing,
+    Waiting,
+    Broadcast,
+    Reconciling,
+    Cancelled,
+    Expired,
     Settled,
     Failed,
+}
+
+/// Approved Bitcoin withdrawal terms. The deadline applies until signing is committed.
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+pub struct WithdrawalSubmission {
+    /// Execution resumes when this installation reconnects to the original node and network.
+    pub awaiting_original_provider: bool,
+    pub address: String,
+    pub maximum_fee_msat: u64,
+    pub expires_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct PaymentSubmission {
     pub payment: Payment,
     pub state: PaymentExecutionState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub withdrawal: Option<WithdrawalSubmission>,
     /// Authorized REST resource for this submission, relative to the SwissKnife server.
     pub status_url: String,
 }

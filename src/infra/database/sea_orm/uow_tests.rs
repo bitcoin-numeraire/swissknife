@@ -1241,3 +1241,248 @@ async fn payment_commands_reserve_once_claim_once_and_retain_deleted_keys() {
         Err(ApplicationError::Data(DataError::Conflict(_)))
     ));
 }
+
+#[tokio::test]
+async fn withdrawal_claims_fence_stale_workers_and_cancel_only_unstarted_owned_payments() {
+    use super::models::withdrawal_command::{Column, Entity};
+    use crate::domains::payment::{PaymentInstructions, SubmissionKey, WithdrawalProgress as Step};
+    use sea_orm::sea_query::Expr;
+
+    let conn = connect().await;
+    let wallet = seed_wallet(&conn, 100_000_000).await;
+    let other = seed_wallet(&conn, 100_000_000).await;
+    let uow = SeaOrmPaymentUnitOfWork::new(conn.clone());
+    let key = SubmissionKey {
+        wallet_id: wallet,
+        key: Uuid::new_v4(),
+        fingerprint: "payment A".into(),
+    };
+    let instructions = PaymentInstructions::Onchain {
+        backend: "original".into(),
+        address: "regtest destination".into(),
+        maximum_fee_msat: 1_000_000,
+    };
+    let payment = Payment {
+        wallet_id: wallet,
+        ledger: Ledger::Onchain,
+        amount_msat: 30_000_000,
+        status: PaymentStatus::Pending,
+        ..Default::default()
+    };
+    let (a, b) = tokio::join!(
+        uow.submit(&key, payment.clone(), 31_000_000, instructions.clone()),
+        uow.submit(&key, payment.clone(), 31_000_000, instructions.clone())
+    );
+    let id = a.unwrap().payment.id;
+    assert_eq!(id, b.unwrap().payment.id);
+    assert!(uow.cancel_withdrawal(Some(other), id).await.is_err());
+    uow.cancel_withdrawal(Some(wallet), id).await.unwrap();
+    uow.cancel_withdrawal(Some(wallet), id).await.unwrap();
+    assert_eq!(balance(&conn, wallet).await, (100_000_000, 0));
+    assert_eq!(
+        uow.submitted(&key).await.unwrap().unwrap().response("").state,
+        swissknife_types::PaymentExecutionState::Cancelled
+    );
+    let second = SubmissionKey {
+        key: Uuid::new_v4(),
+        ..key
+    };
+    let id = uow
+        .submit(&second, payment, 31_000_000, instructions)
+        .await
+        .unwrap()
+        .payment
+        .id;
+    assert!(uow.claim().await.unwrap().is_none());
+    assert!(uow.claim_withdrawal("replacement").await.unwrap().is_none());
+    let (a, b) = tokio::join!(uow.claim_withdrawal("original"), uow.claim_withdrawal("original"));
+    let winners: Vec<_> = [a.unwrap(), b.unwrap()].into_iter().flatten().collect();
+    assert_eq!(winners.len(), 1);
+    let original = &winners[0];
+    assert!(uow.cancel_withdrawal(Some(wallet), id).await.is_err());
+    let funding = Step::Funding {
+        owner: original.token,
+        waiting: false,
+    };
+    Entity::update_many()
+        .col_expr(
+            Column::NextAttempt,
+            Expr::value((Utc::now() - chrono::Duration::seconds(1)).naive_utc()),
+        )
+        .filter(Column::PaymentId.eq(id))
+        .exec(&conn)
+        .await
+        .unwrap();
+    let replacement = uow.claim_withdrawal("original").await.unwrap().unwrap();
+    assert!(!uow.advance_withdrawal(original, Step::Expired, 0).await.unwrap());
+    assert!(uow.advance_withdrawal(&replacement, funding, 0).await.unwrap());
+    for waiting in [true, false, true] {
+        let c = uow.claim_withdrawal("original").await.unwrap().unwrap();
+        assert!(uow
+            .advance_withdrawal(
+                &c,
+                Step::Funding {
+                    owner: original.token,
+                    waiting
+                },
+                0
+            )
+            .await
+            .unwrap());
+    }
+    let events = SeaOrmClientEventRepository::new(conn.clone())
+        .find_after(account_id(&conn, wallet).await, 0, 50)
+        .await
+        .unwrap();
+    assert_eq!(
+        events
+            .iter()
+            .filter(|e| e.resource_id == id && e.event_type == ClientEventType::WithdrawalWaiting)
+            .count(),
+        2
+    );
+    Entity::update_many()
+        .col_expr(
+            Column::ExpiresAt,
+            Expr::value((Utc::now() - chrono::Duration::seconds(1)).naive_utc()),
+        )
+        .filter(Column::PaymentId.eq(id))
+        .exec(&conn)
+        .await
+        .unwrap();
+    let expired = uow.claim_withdrawal("replacement").await.unwrap().unwrap();
+    assert!(!expired.original_backend);
+    assert!(uow.advance_withdrawal(&expired, Step::Expired, 0).await.unwrap());
+    assert!(!uow.advance_withdrawal(&expired, Step::Expired, 0).await.unwrap());
+    assert_eq!(balance(&conn, wallet).await, (100_000_000, 0));
+}
+
+#[tokio::test]
+async fn withdrawal_reconciliation_keeps_the_signed_payload_and_full_cap_until_confirmation() {
+    use crate::domains::bitcoin::BtcBroadcastTransaction;
+    use crate::domains::payment::{PaymentInstructions, Publication, SubmissionKey, WithdrawalProgress as Step};
+    let conn = connect().await;
+    let wallet = seed_wallet(&conn, 100_000_000).await;
+    let uow = SeaOrmPaymentUnitOfWork::new(conn.clone());
+    let key = SubmissionKey {
+        wallet_id: wallet,
+        key: Uuid::new_v4(),
+        fingerprint: "approved capped payment".into(),
+    };
+    let payment = Payment {
+        wallet_id: wallet,
+        ledger: Ledger::Onchain,
+        amount_msat: 30_000_000,
+        status: PaymentStatus::Pending,
+        ..Default::default()
+    };
+    let original = uow
+        .submit(
+            &key,
+            payment,
+            35_000_000,
+            PaymentInstructions::Onchain {
+                backend: "node".into(),
+                address: "external".into(),
+                maximum_fee_msat: 5_000_000,
+            },
+        )
+        .await
+        .unwrap()
+        .payment;
+    let txid = "a4".repeat(32);
+    let signed = BtcBroadcastTransaction::SignedPsbt {
+        txid: txid.clone(),
+        psbt: "signed fixture".into(),
+    };
+    let funding = uow.claim_withdrawal("node").await.unwrap().unwrap();
+    assert!(uow
+        .advance_withdrawal(
+            &funding,
+            Step::Funding {
+                owner: funding.token,
+                waiting: false
+            },
+            0
+        )
+        .await
+        .unwrap());
+    let preparing = uow.claim_withdrawal("node").await.unwrap().unwrap();
+    let plan = crate::domains::bitcoin::BtcPreparedTransaction {
+        txid: txid.clone(),
+        fee_sat: 500,
+        psbt: "funded fixture".into(),
+        locked_utxos: vec![],
+    };
+    assert!(uow
+        .advance_withdrawal(
+            &preparing,
+            Step::Planned {
+                owner: funding.token,
+                plan,
+                waiting: false
+            },
+            0
+        )
+        .await
+        .unwrap());
+    let funding = uow.claim_withdrawal("node").await.unwrap().unwrap();
+    assert!(uow
+        .advance_withdrawal(
+            &funding,
+            Step::Signed {
+                transaction: signed,
+                fee_msat: 500_000,
+                publication: Publication::Ready
+            },
+            0
+        )
+        .await
+        .unwrap());
+    for publication in [
+        Publication::Unknown,
+        Publication::Broadcast,
+        Publication::Unknown,
+        Publication::Broadcast,
+    ] {
+        let restarted = SeaOrmPaymentUnitOfWork::new(conn.clone());
+        assert!(restarted.claim_withdrawal("other node").await.unwrap().is_none());
+        let c = restarted.claim_withdrawal("node").await.unwrap().unwrap();
+        let Step::Signed {
+            transaction, fee_msat, ..
+        } = c.progress.clone()
+        else {
+            panic!("signed artifact was lost");
+        };
+        assert_eq!(transaction.txid(), txid);
+        assert_eq!(c.payment.bitcoin.as_ref().unwrap().txid, txid);
+        assert_eq!(c.payment.fee_msat, Some(fee_msat));
+        assert!(restarted
+            .advance_withdrawal(
+                &c,
+                Step::Signed {
+                    transaction,
+                    fee_msat,
+                    publication
+                },
+                0
+            )
+            .await
+            .unwrap());
+        assert_eq!(balance(&conn, wallet).await, (65_000_000, 35_000_000));
+    }
+    let mut settled = SeaOrmPaymentRepository::new(conn.clone())
+        .find(original.id)
+        .await
+        .unwrap()
+        .unwrap();
+    settled.status = PaymentStatus::Settled;
+    uow.settle(settled.clone()).await.unwrap();
+    uow.settle(settled).await.unwrap();
+    assert_eq!(balance(&conn, wallet).await, (69_500_000, 0));
+    assert_eq!(
+        uow.submitted(&key).await.unwrap().unwrap().response("").state,
+        swissknife_types::PaymentExecutionState::Settled
+    );
+    assert!(uow.claim_withdrawal("node").await.unwrap().is_none());
+}
