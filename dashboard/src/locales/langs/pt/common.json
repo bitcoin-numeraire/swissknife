@@ -1190,5 +1190,27 @@
     "incoming_alerts": "Avisos de pagamentos recebidos",
     "outgoing_alerts": "Avisos de pagamentos enviados",
     "sound": "Reproduzir um som para os avisos de pagamento"
+  },
+  "spending_policy": {
+    "title": "Orçamento de despesas",
+    "load_error": "Não foi possível carregar o orçamento.",
+    "loading": "Carregando orçamento…",
+    "periods": "Inclui taxas e valores reservados. Os períodos começam à meia-noite UTC. A semana começa na segunda-feira.",
+    "per_payment_msat": "Por pagamento",
+    "unlimited": "Sem limite",
+    "daily_msat": "Hoje",
+    "weekly_msat": "Esta semana",
+    "monthly_msat": "Este mês",
+    "sats": "{{value}} sats",
+    "uncapped_usage": "{{used}} sats utilizados · sem limite",
+    "usage": "{{used}} de {{cap}} sats",
+    "inactive": "Esta conta não tem um limite de gastos ativo.",
+    "edit": "Editar limites",
+    "create": "Definir limites de gastos",
+    "disable": "Desativar orçamento",
+    "input_help": "Insira os valores em sats com até três casas decimais. Deixe o campo em branco para permitir gastos sem limite nesse período. Zero bloqueia os gastos.",
+    "cancel": "Cancelar",
+    "save": "Salvar limites",
+    "disable_help": "Os pagamentos de saída serão permitidos sem estes limites. Os gastos já contabilizados serão mantidos."
   }
 }
