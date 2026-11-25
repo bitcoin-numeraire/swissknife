@@ -46,6 +46,7 @@ import { LanguagePopover } from '../components/language-popover';
 import { CurrencyPopover } from '../components/currency-popover';
 import { navData as accountNavData } from '../nav-config-account';
 import { dashboardLayoutVars, dashboardNavColorVars } from './css-vars';
+import { NotificationsDrawer } from '../components/notifications-drawer';
 import {
   getDashboardFlags,
   filterDashboardNavData,
@@ -168,9 +169,7 @@ export function DashboardLayout({
           {/** @slot Currencies button */}
           <CurrencyPopover data={currencies} />
 
-          {/** @slot Notifications popover
-          <NotificationsDrawer data={_notifications} />
-          */}
+          <NotificationsDrawer />
 
           {/** @slot Contacts popover
           <ContactsPopover data={_contacts} />

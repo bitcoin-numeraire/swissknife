@@ -8,7 +8,9 @@ import { PaymentDetailsView } from './payment-details-view';
 // ----------------------------------------------------------------------
 
 export function PaymentsView() {
-  const id = useSearchParams().get('id');
+  const params = useSearchParams();
+  const id = params.get('id');
+  const walletId = params.get('wallet_id') ?? undefined;
 
-  return id ? <PaymentDetailsView id={id} /> : <PaymentListView />;
+  return id ? <PaymentDetailsView walletId={walletId} id={id} /> : <PaymentListView />;
 }

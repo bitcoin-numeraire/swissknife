@@ -1,4 +1,36 @@
 {
+  "notification_inbox": {
+    "title": "Notifications",
+    "open_one": "Notifications, {{count}} unread",
+    "open_other": "Notifications, {{count}} unread",
+    "inbox": "Inbox",
+    "archived": "Archived",
+    "all_read": "Mark all as read",
+    "read": "Mark as read",
+    "archive": "Archive",
+    "view": "View activity",
+    "newer": "Newer",
+    "older": "Older",
+    "loading": "Loading notifications",
+    "load_error": "Notifications could not be loaded.",
+    "retry": "Retry",
+    "update_error": "Your notification could not be updated.",
+    "empty": "No notifications yet.",
+    "empty_archive": "No archived notifications.",
+    "received": "Payment received",
+    "sent": "Payment sent",
+    "failed": "Payment failed",
+    "pending": "Payment pending",
+    "unread": "Unread",
+    "amount": "{{amount}} msat",
+    "rail_Lightning": "Lightning",
+    "rail_Internal": "Internal",
+    "rail_Onchain": "On-chain",
+    "preferences": "Preferences",
+    "incoming_alerts": "Incoming payment alerts",
+    "outgoing_alerts": "Outgoing payment alerts",
+    "sound": "Play a sound for payment alerts"
+  },
   "overview": "Overview",
   "money": "Wallet",
   "activity": "Activity",
@@ -66,7 +98,6 @@
   "important": "Important",
   "view_all": "View All",
   "event_notifications": {
-    "incoming_title": "{{amount}} sats incoming — waiting for confirmation",
     "received_title": "{{amount}} sats received — confirmed",
     "see_details": "See details",
     "rail": {
@@ -74,7 +105,10 @@
       "internal": "Internal",
       "onchain": "On-chain",
       "bitcoin": "Bitcoin"
-    }
+    },
+    "pending_title": "{{amount}} sats incoming — waiting for confirmation",
+    "sent_title": "{{amount}} sats sent",
+    "failed_title": "Payment of {{amount}} sats failed"
   },
   "need_help": "Need help?",
   "auth_panel": {

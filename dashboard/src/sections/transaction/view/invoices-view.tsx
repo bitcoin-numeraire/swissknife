@@ -8,7 +8,9 @@ import { InvoiceDetailsView } from './invoice-details-view';
 // ----------------------------------------------------------------------
 
 export function InvoicesView() {
-  const id = useSearchParams().get('id');
+  const params = useSearchParams();
+  const id = params.get('id');
+  const walletId = params.get('wallet_id') ?? undefined;
 
-  return id ? <InvoiceDetailsView id={id} /> : <InvoiceListView />;
+  return id ? <InvoiceDetailsView walletId={walletId} id={id} /> : <InvoiceListView />;
 }

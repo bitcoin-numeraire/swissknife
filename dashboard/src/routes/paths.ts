@@ -68,9 +68,11 @@ export const paths = {
   wallet: {
     root: '/wallet',
     payments: '/wallet/payments',
-    payment: (id: string) => `/wallet/payments?id=${id}`,
+    payment: (id: string, walletId?: string) =>
+      `/wallet/payments?${new URLSearchParams(walletId ? { id, wallet_id: walletId } : { id })}`,
     invoices: '/wallet/invoices',
-    invoice: (id: string) => `/wallet/invoices?id=${id}`,
+    invoice: (id: string, walletId?: string) =>
+      `/wallet/invoices?${new URLSearchParams(walletId ? { id, wallet_id: walletId } : { id })}`,
     lightningAddress: '/wallet/lightning-address',
     nostrAddress: '/wallet/nostr-address',
     contacts: '/wallet/contacts',

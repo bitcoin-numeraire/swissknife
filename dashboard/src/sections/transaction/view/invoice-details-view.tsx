@@ -17,12 +17,13 @@ import { InvoiceDetails } from '../invoice-details';
 
 type Props = {
   id: string;
+  walletId?: string;
 };
 
-export function InvoiceDetailsView({ id }: Props) {
+export function InvoiceDetailsView({ id, walletId }: Props) {
   const { t } = useTranslate();
 
-  const { invoice, invoiceLoading, invoiceError } = useGetWalletInvoice(id);
+  const { invoice, invoiceLoading, invoiceError } = useGetWalletInvoice(id, walletId);
 
   const errors = [invoiceError];
   const data = [invoice];

@@ -48,6 +48,18 @@ describe('account event cache invalidation', () => {
     );
   });
 
+  it('revalidates only the signed-in inbox on new events and reconnection', () => {
+    for (const clientEvent of [event('41'), undefined]) {
+      expect(
+        isAccountEventCacheKey(['accountNotifications', 'alice', true, 10], clientEvent, 'alice')
+      ).toBe(true);
+      expect(
+        isAccountEventCacheKey(['accountNotifications', 'bob', false], clientEvent, 'alice')
+      ).toBe(false);
+      expect(isAccountEventCacheKey(['accountNotifications', 'alice'], clientEvent)).toBe(false);
+    }
+  });
+
   it('refreshes shared dashboard aggregates', () => {
     const clientEvent = event('41');
 

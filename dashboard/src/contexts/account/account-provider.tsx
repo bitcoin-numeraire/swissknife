@@ -40,7 +40,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
   const account = accountResult.data;
   const wallets = useMemo(() => account?.wallets ?? [], [account?.wallets]);
   const recentClientEvents = useAccountEventStream(account?.id);
-  useAccountEventNotifications(account?.id, recentClientEvents, wallets);
+  useAccountEventNotifications(account, recentClientEvents, wallets);
 
   useEffect(() => {
     if (!account) {
