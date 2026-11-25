@@ -1,4 +1,31 @@
 {
+  "payment_review": {
+    "title": "Aprovações de pagamentos",
+    "load_error": "Não foi possível carregar os pagamentos pendentes.",
+    "empty": "Não há pagamentos a aguardar aprovação.",
+    "amount": "{{value}} msat",
+    "review": "Rever pagamento",
+    "principal": "Montante do pagamento",
+    "fee": "Comissão máxima",
+    "maximum": "Total máximo",
+    "input": "Pedido de pagamento original",
+    "destination": "Destino resolvido",
+    "wallet": "Carteira",
+    "credential": "Credencial delegada",
+    "expires": "Validade da aprovação",
+    "retry_help": "A aprovação permite à credencial original voltar a submeter este pagamento uma vez. A carteira verifica os limites em vigor antes de reservar ou transferir fundos.",
+    "decision_error": "Não foi possível guardar a decisão. Feche o pagamento e consulte a lista atual.",
+    "reject": "Rejeitar",
+    "approve": "Aprovar nova tentativa",
+    "approved": "Nova tentativa de pagamento aprovada.",
+    "rejected": "Pagamento rejeitado."
+  },
+  "spending_templates": {
+    "title": "Começar a partir de um modelo",
+    "conservative": "Conservador",
+    "moderate": "Moderado",
+    "generous": "Generoso"
+  },
   "merchant_tools": {
     "title": "Ferramentas do comerciante",
     "routes": "Rotas pagas",
@@ -1228,6 +1255,7 @@
     "sound": "Reproduzir um som para os avisos de pagamento"
   },
   "spending_policy": {
+    "approval_above_msat": "Exigir aprovação acima de",
     "title": "Orçamento de despesas",
     "load_error": "Não foi possível carregar o orçamento.",
     "loading": "Carregando orçamento…",
