@@ -1,4 +1,18 @@
 {
+  "agent_activity": {
+    "title": "Agent spending activity",
+    "updated": "Updated at {{time}}",
+    "load_error": "Couldn’t load agent spending activity.",
+    "credential": "Credential",
+    "current": "Last 60 minutes",
+    "previous": "Previous 60 minutes",
+    "sats": "{{amount}} sats",
+    "payments_one": "{{count}} payment",
+    "payments_other": "{{count}} payments",
+    "empty": "No delegated payments were recorded in the last two hours.",
+    "back": "Previous",
+    "next": "Next"
+  },
   "payment_review": {
     "title": "Payment approvals",
     "load_error": "Couldn’t load the payment review queue.",

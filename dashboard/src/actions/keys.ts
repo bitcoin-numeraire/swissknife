@@ -9,6 +9,8 @@ export const endpointKeys = {
   },
   accounts: {
     list: 'listAccounts',
+    agentActivity: (id: string, after?: string) =>
+      ['accountAgentSpendingActivity', id, after ?? ''] as const,
     paymentApprovals: (id: string) => ['accountPaymentApprovals', id] as const,
     spendingPolicy: (id: string) => ['accountSpendingPolicy', id] as const,
     get: (id: string) => ['getAccount', id] as const,
