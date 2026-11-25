@@ -6,7 +6,7 @@ use reqwest::StatusCode;
 use swissknife_types::{ChangePasswordRequest, SignInRequest, SignInResponse, SignUpRequest};
 
 use crate::common::client::ApiClient;
-use crate::common::harness::{matrix_cell, spawn_instance, ADMIN_PASSWORD};
+use crate::common::harness::{matrix_cell, spawn_instance, Spawned, ADMIN_PASSWORD};
 use crate::common::{app, assert_error, assert_status, Auth, TestApp};
 
 mod sign_in {
@@ -231,7 +231,8 @@ mod change_password {
 
     #[tokio::test]
     async fn with_the_correct_current_password_updates_future_sign_ins() {
-        let api = isolated_api("auth-change-password").await;
+        let instance = isolated_instance("auth-change-password").await;
+        let api = ApiClient::new(instance.base_url);
         let admin_token = bootstrap_admin(&api, ADMIN_PASSWORD).await;
         let new_password = "new-integration-admin-password";
 
@@ -277,11 +278,10 @@ mod change_password {
         );
     }
 
-    async fn isolated_api(label: &str) -> ApiClient {
+    async fn isolated_instance(label: &str) -> Spawned {
         let (database, provider) = matrix_cell();
         let label = format!("{database}-{provider}-{label}");
-        let spawned = spawn_instance(&database, &provider, &label, &[]).await;
-        ApiClient::new(spawned.base_url)
+        spawn_instance(&database, &provider, &label, &[]).await
     }
 
     async fn bootstrap_admin(api: &ApiClient, password: &str) -> String {

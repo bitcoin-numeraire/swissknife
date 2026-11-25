@@ -14,7 +14,7 @@ use serde_json::Value;
 use tokio::sync::OnceCell;
 
 use super::client::ApiClient;
-use super::harness::{matrix_cell, spawn_instance};
+use super::harness::{matrix_cell, spawn_instance, TestProcess};
 
 /// Audience the IdP mints into tokens and the instance is configured to require.
 /// Kept in sync with `tests/itest/config/mock-oauth2/config.json`.
@@ -46,6 +46,7 @@ pub async fn oauth2_app() -> &'static OAuth2App {
 }
 
 pub struct OAuth2App {
+    _process: TestProcess,
     pub base_url: String,
     idp_base: String,
 }
@@ -74,6 +75,7 @@ impl OAuth2App {
         .await;
 
         OAuth2App {
+            _process: spawned.process,
             base_url: spawned.base_url,
             idp_base,
         }

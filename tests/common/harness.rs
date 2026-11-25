@@ -43,15 +43,41 @@ fn reap_spawned_instances() {
     for child in children.iter_mut() {
         let _ = std::process::Command::new("kill").arg(child.id().to_string()).status();
     }
-    for mut child in children.drain(..) {
-        for _ in 0..50 {
-            if matches!(child.try_wait(), Ok(Some(_))) {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(100));
+    for child in children.drain(..) {
+        wait_for_shutdown(child);
+    }
+}
+
+fn wait_for_shutdown(mut child: Child) {
+    for _ in 0..50 {
+        if matches!(child.try_wait(), Ok(Some(_))) {
+            return;
         }
-        let _ = child.kill(); // hard-kill any straggler that ignored SIGTERM
-        let _ = child.wait();
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+/// Own the registered process until the test finishes. The shared servers
+/// instead live in static cells and are reaped by the process-exit hook.
+pub(super) struct TestProcess(Mutex<Option<u32>>);
+
+impl TestProcess {
+    fn take(&self) -> Option<Child> {
+        let id = self.0.lock().expect("test process lock").take()?;
+        let mut children = SPAWNED.lock().expect("spawned registry lock");
+        let index = children.iter().position(|child| child.id() == id)?;
+        Some(children.swap_remove(index))
+    }
+}
+
+impl Drop for TestProcess {
+    fn drop(&mut self) {
+        if let Some(child) = self.take() {
+            let _ = Command::new("kill").arg(child.id().to_string()).status();
+            wait_for_shutdown(child);
+        }
     }
 }
 
@@ -68,7 +94,7 @@ pub struct TestApp {
     pub database_url: String,
     pub database: String,
     pub provider: String,
-    process_id: u32,
+    process: TestProcess,
     admin_jwt: String,
     stdout_path: PathBuf,
     stderr_path: PathBuf,
@@ -88,7 +114,7 @@ pub struct Spawned {
     pub database_url: String,
     pub stdout_path: PathBuf,
     pub stderr_path: PathBuf,
-    process_id: u32,
+    pub(super) process: TestProcess,
 }
 
 /// Spawn a SwissKnife instance against the regtest stack with `extra_env`
@@ -140,7 +166,7 @@ async fn spawn_with_database(database_url: &str, provider: &str, label: &str, ex
     let child = command
         .spawn()
         .expect("spawn swissknife binary (run `make build` first)");
-    let process_id = child.id();
+    let process = TestProcess(Mutex::new(Some(child.id())));
     SPAWNED.lock().expect("spawned registry lock").push(child);
 
     let api = ApiClient::new(base_url.clone());
@@ -151,7 +177,7 @@ async fn spawn_with_database(database_url: &str, provider: &str, label: &str, ex
         database_url: database_url.to_string(),
         stdout_path,
         stderr_path,
-        process_id,
+        process,
     }
 }
 
@@ -170,7 +196,7 @@ impl TestApp {
             database_url: spawned.database_url,
             database,
             provider,
-            process_id: spawned.process_id,
+            process: spawned.process,
             admin_jwt,
             stdout_path: spawned.stdout_path,
             stderr_path: spawned.stderr_path,
@@ -191,7 +217,7 @@ impl TestApp {
             database_url: spawned.database_url,
             database,
             provider,
-            process_id: spawned.process_id,
+            process: spawned.process,
             admin_jwt,
             stdout_path: spawned.stdout_path,
             stderr_path: spawned.stderr_path,
@@ -200,14 +226,7 @@ impl TestApp {
 
     /// Stop this process without removing its database, for recovery scenarios.
     pub fn stop(&self) {
-        let child = {
-            let mut children = SPAWNED.lock().expect("spawned registry lock");
-            children
-                .iter()
-                .position(|child| child.id() == self.process_id)
-                .map(|index| children.swap_remove(index))
-        };
-        if let Some(mut child) = child {
+        if let Some(mut child) = self.process.take() {
             child.kill().expect("stop test instance");
             child.wait().expect("reap stopped test instance");
         }
@@ -223,7 +242,7 @@ impl TestApp {
             database_url: spawned.database_url,
             database: self.database.clone(),
             provider: self.provider.clone(),
-            process_id: spawned.process_id,
+            process: spawned.process,
             admin_jwt: self.admin_jwt.clone(),
             stdout_path: spawned.stdout_path,
             stderr_path: spawned.stderr_path,
@@ -314,4 +333,16 @@ fn tail(path: &Path) -> String {
     let mut lines: Vec<&str> = content.lines().rev().take(60).collect();
     lines.reverse();
     lines.join("\n")
+}
+
+#[tokio::test]
+async fn dropping_an_isolated_server_releases_its_listener_and_keeps_the_shared_server() {
+    let shared = app().await;
+    let isolated_api = {
+        let instance = TestApp::isolated("scope-exit", &[]).await;
+        instance.api()
+    };
+    assert!(isolated_api.try_get("/v1/system/ready").await.is_err());
+    let response = shared.api().try_get("/v1/system/ready").await.unwrap();
+    assert_eq!(response.status, reqwest::StatusCode::NO_CONTENT);
 }
