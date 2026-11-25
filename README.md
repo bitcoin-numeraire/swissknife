@@ -33,6 +33,8 @@ If you like what we do, consider starring, sharing and contributing!
 - Data availability through pagination and advanced search.
 - Account-scoped API key authentication
 
+A [native desktop client](desktop/README.md) can connect to a hosted or self-hosted dashboard.
+
 Numeraire SwissKnife ships with a [Dashboard](https://github.com/bitcoin-numeraire/swissknife/tree/main/dashboard).
 
 ## Lightning Providers

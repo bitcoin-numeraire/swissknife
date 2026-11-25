@@ -1,0 +1,98 @@
+name: Desktop packages
+
+on:
+  pull_request:
+    paths:
+      - desktop/**
+      - .github/workflows/desktop.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Desktop ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macOS
+            runner: macos-latest
+            bundles: dmg
+            flags: --target universal-apple-darwin
+          - platform: Windows
+            runner: windows-latest
+            bundles: nsis
+            flags: ''
+          - platform: Linux
+            runner: ubuntu-24.04
+            bundles: deb,appimage
+            flags: ''
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: clippy,rustfmt
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '24.22.3'
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - name: Install both macOS targets
+        if: runner.os == 'macOS'
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+      - uses: swatinem/rust-cache@v2.9.3
+        with:
+          workspaces: desktop
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - name: Package application
+        run: npm exec --yes --package=@tauri-apps/cli@2.12.6 -- tauri build ${{ matrix.flags }} --bundles ${{ matrix.bundles }} -- --locked
+        env:
+          NO_STRIP: 'true'
+      - name: Open the packaged Linux wallet
+        if: runner.os == 'Linux'
+        run: |
+          dpkg-deb --extract target/release/bundle/deb/*.deb "$RUNNER_TEMP/swissknife-deb"
+          xvfb-run -a python3 tests/launch.py "$RUNNER_TEMP/swissknife-deb/usr/bin/swissknife-desktop"
+      - name: Open the packaged macOS wallet
+        if: runner.os == 'macOS'
+        run: |
+          image=(target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          mount="$RUNNER_TEMP/swissknife-dmg"
+          hdiutil verify "${image[0]}"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "${image[0]}"
+          trap 'hdiutil detach "$mount"' EXIT
+          executable="$mount/SwissKnife.app/Contents/MacOS/swissknife-desktop"
+          architectures=$(lipo -archs "$executable")
+          grep -qw x86_64 <<< "$architectures"
+          grep -qw arm64 <<< "$architectures"
+          python3 tests/launch.py "$executable"
+      - name: Install and open the Windows wallet
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem target/release/bundle/nsis/*.exe -ErrorAction Stop).FullName
+          $installDir = Join-Path $env:RUNNER_TEMP SwissKnifeDesktop
+          $result = Start-Process -FilePath $installer -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
+          if ($result.ExitCode -ne 0) { throw "NSIS exited with $($result.ExitCode)" }
+          python tests/launch.py (Join-Path $installDir swissknife-desktop.exe)
+      - name: Upload installable packages
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: SwissKnife-${{ matrix.platform }}
+          if-no-files-found: error
+          path: |
+            desktop/target/**/bundle/dmg/*.dmg
+            desktop/target/**/bundle/nsis/*.exe
+            desktop/target/**/bundle/deb/*.deb
+            desktop/target/**/bundle/appimage/*.AppImage

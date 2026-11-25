@@ -1,0 +1,20 @@
+[package]
+name = "swissknife-desktop"
+version = "0.3.5"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "=2.7.6", features = [] }
+
+[dependencies]
+tauri = { version = "=2.12.7", features = [] }
+open = "5"
+url = "2"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

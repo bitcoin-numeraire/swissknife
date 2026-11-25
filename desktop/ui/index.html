@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SwissKnife</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="launcher.js"></script>
+</head>
+<body>
+  <main>
+    <img src="logo.svg" alt="SwissKnife" width="54" height="54">
+    <h1>Connect to SwissKnife</h1>
+    <form id="connect">
+      <label for="instance">Dashboard URL</label>
+      <input id="instance" type="url" required spellcheck="false" value="https://app.numeraire.tech">
+      <details id="advanced">
+        <summary>Single sign-on</summary>
+        <label for="login">Identity provider URL</label>
+        <input id="login" type="url" spellcheck="false" placeholder="https://login.example.com">
+        <p>Enter your provider’s origin if your instance uses single sign-on.</p>
+      </details>
+      <button type="submit">Open wallet</button>
+      <p role="alert" id="error"></p>
+    </form>
+  </main>
+</body>
+</html>
