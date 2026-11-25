@@ -771,6 +771,7 @@ export const zSpendingInterval = z.enum(['day', 'week']);
  * Omitted limits are unrestricted. Zero blocks positive payments.
  */
 export const zSpendingLimits = z.object({
+  agent_hourly_msat: z.string().nullish(),
   daily_msat: z.string().nullish(),
   monthly_msat: z.string().nullish(),
   per_payment_msat: z.string().nullish(),

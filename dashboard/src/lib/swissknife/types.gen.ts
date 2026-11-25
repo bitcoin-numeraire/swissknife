@@ -1404,6 +1404,10 @@ export type SpendingInterval = (typeof SpendingInterval)[keyof typeof SpendingIn
  * Omitted limits are unrestricted. Zero blocks positive payments.
  */
 export type SpendingLimits = {
+  /**
+   * Maximum charged to each delegated credential over a rolling hour, including fees.
+   */
+  agent_hourly_msat?: string | null;
   daily_msat?: string | null;
   monthly_msat?: string | null;
   per_payment_msat?: string | null;

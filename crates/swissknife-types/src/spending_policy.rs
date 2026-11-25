@@ -20,6 +20,10 @@ pub struct SpendingLimits {
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = Option<String>)]
     pub monthly_msat: Option<u64>,
+    /// Maximum charged to each delegated credential over a rolling hour, including fees.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = Option<String>, example = "500000")]
+    pub agent_hourly_msat: Option<u64>,
 }
 
 /// Consumption in the current UTC day, ISO week and calendar month.

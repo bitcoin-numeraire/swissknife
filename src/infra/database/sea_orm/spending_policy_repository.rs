@@ -30,6 +30,7 @@ impl From<policy::Model> for SpendingLimits {
             daily_msat: row.daily_msat.map(|n| n as u64),
             weekly_msat: row.weekly_msat.map(|n| n as u64),
             monthly_msat: row.monthly_msat.map(|n| n as u64),
+            agent_hourly_msat: row.agent_hourly_msat.map(|n| n as u64),
         }
     }
 }
@@ -185,10 +186,18 @@ impl SpendingPolicyRepository for SeaOrmSpendingPolicyRepository {
             daily_msat: Set(limits.daily_msat.map(|n| n as i64)),
             weekly_msat: Set(limits.weekly_msat.map(|n| n as i64)),
             monthly_msat: Set(limits.monthly_msat.map(|n| n as i64)),
+            agent_hourly_msat: Set(limits.agent_hourly_msat.map(|n| n as i64)),
         })
         .on_conflict(
             OnConflict::column(AccountId)
-                .update_columns([Enabled, PerPaymentMsat, DailyMsat, WeeklyMsat, MonthlyMsat])
+                .update_columns([
+                    Enabled,
+                    PerPaymentMsat,
+                    DailyMsat,
+                    WeeklyMsat,
+                    MonthlyMsat,
+                    AgentHourlyMsat,
+                ])
                 .to_owned(),
         )
         .exec(&self.0)
@@ -246,7 +255,10 @@ pub(super) async fn admit(
     let Some(row) = locked_policy(tx, account).await?.filter(|row| row.enabled) else {
         return Ok(());
     };
-    let limits = row.into();
+    let limits: SpendingLimits = row.into();
+    if let (Some(key), Some(cap)) = (agent_key_id, limits.agent_hourly_msat) {
+        authorize_agent_hour(tx, account, key, now, cap, amount).await?;
+    }
     let used = usage(tx, account, now.date_naive()).await?;
     authorize_spending(&limits, &used, amount)?;
     entry::ActiveModel {
@@ -261,6 +273,39 @@ pub(super) async fn admit(
     .insert(tx)
     .await
     .map_err(db_error)?;
+    Ok(())
+}
+
+async fn authorize_agent_hour(
+    tx: &DatabaseTransaction,
+    account: Uuid,
+    key: Uuid,
+    now: chrono::DateTime<Utc>,
+    cap: u64,
+    amount: u64,
+) -> Result<(), ApplicationError> {
+    use futures_util::TryStreamExt;
+    let exceeded = || {
+        DataError::Validation(format!(
+            "Agent rolling hourly spending limit of {cap} msat exceeded (including fees)"
+        ))
+    };
+    let mut remaining = cap.checked_sub(amount).ok_or_else(exceeded)?;
+    // The caller holds the account policy lock throughout admission. Subtract
+    // exact charges incrementally so a historical total can exceed SQL BIGINT.
+    let entries = SpendingEntry::find()
+        .select_only()
+        .column(entry::Column::ChargedMsat)
+        .filter(entry::Column::AccountId.eq(account))
+        .filter(entry::Column::AgentKeyId.eq(key))
+        .filter(entry::Column::AdmittedAt.gt((now - chrono::Duration::hours(1)).naive_utc()))
+        .into_tuple::<i64>();
+    let mut rows = entries.stream(tx).await.map_err(db_error)?;
+    while let Some(value) = rows.try_next().await.map_err(db_error)? {
+        let charge =
+            u64::try_from(value).map_err(|_| DataError::Inconsistency("Negative agent spending entry".into()))?;
+        remaining = remaining.checked_sub(charge).ok_or_else(exceeded)?;
+    }
     Ok(())
 }
 

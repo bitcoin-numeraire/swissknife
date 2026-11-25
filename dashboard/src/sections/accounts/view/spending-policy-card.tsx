@@ -91,12 +91,14 @@ export function SpendingPolicyCard({ accountId }: { accountId: string }) {
               <Typography variant="body2" color="text.secondary">
                 {t('spending_policy.periods')}
               </Typography>
-              <Typography variant="body2">
-                {t('spending_policy.per_payment_msat')} ·{' '}
-                {data.limits.per_payment_msat == null
-                  ? t('spending_policy.unlimited')
-                  : t('spending_policy.sats', { value: sats(data.limits.per_payment_msat) })}
-              </Typography>
+              {(['per_payment_msat', 'agent_hourly_msat'] as const).map((field) => (
+                <Typography key={field} variant="body2">
+                  {t(`spending_policy.${field}`)} ·{' '}
+                  {data.limits[field] == null
+                    ? t('spending_policy.unlimited')
+                    : t('spending_policy.sats', { value: sats(data.limits[field]) })}
+                </Typography>
+              ))}
               {periods.map((field) => {
                 const cap = data.limits[field];
                 const used = data.usage[field];

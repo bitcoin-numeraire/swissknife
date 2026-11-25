@@ -1100,6 +1100,7 @@
     "load_error": "Unable to load this budget.",
     "loading": "Loading budget…",
     "periods": "Includes fees and pending reservations. Periods start at midnight UTC. The week starts on Monday.",
+    "agent_hourly_msat": "Per agent in a rolling hour",
     "per_payment_msat": "Per payment",
     "unlimited": "Unlimited",
     "daily_msat": "Today",
