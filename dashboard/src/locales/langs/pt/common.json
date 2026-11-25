@@ -1,4 +1,28 @@
 {
+  "merchant_tools": {
+    "title": "Ferramentas do comerciante",
+    "routes": "Rotas pagas",
+    "load_error": "Não foi possível carregar as rotas pagas.",
+    "no_origins": "Peça ao operador da sua instância que atribua um recurso a esta carteira antes de publicar uma rota.",
+    "choose": "Escolher uma rota",
+    "new": "Nova rota",
+    "public_url": "URL público",
+    "withdrawn": "O operador retirou este recurso. As vendas e o acesso estão indisponíveis.",
+    "name": "Nome da rota",
+    "duplicate": "Este nome já está em uso. Selecione a rota existente para a editar.",
+    "name_help": "Utilize entre 1 e 57 letras minúsculas, algarismos ou hífenes.",
+    "origin": "Recurso",
+    "quote_limit": "Valor máximo por fatura (msat)",
+    "price": "Preço (msat)",
+    "maximum": "Máximo de {{value}} msat",
+    "duration": "O acesso dura {{value}} segundos.",
+    "requests": "Cada pagamento inclui {{value}} pedidos.",
+    "sales": "Aceitar novas vendas",
+    "save_error": "Não foi possível guardar a rota. Verifique o recurso e o preço e tente novamente.",
+    "save": "Guardar alterações",
+    "publish": "Publicar rota",
+    "saved": "Rota guardada."
+  },
   "merchant_revenue": {
     "title": "Receitas do comerciante",
     "from": "De (UTC)",

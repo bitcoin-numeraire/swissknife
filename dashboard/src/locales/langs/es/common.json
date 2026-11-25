@@ -1,4 +1,28 @@
 {
+  "merchant_tools": {
+    "title": "Herramientas para comerciantes",
+    "routes": "Rutas de pago",
+    "load_error": "No se pudieron cargar las rutas de pago.",
+    "no_origins": "Pide al operador de tu instancia que asigne un recurso a esta cartera antes de publicar una ruta.",
+    "choose": "Seleccionar ruta",
+    "new": "Nueva ruta",
+    "public_url": "URL pública",
+    "withdrawn": "El operador ha retirado este recurso. Las ventas y el acceso están desactivados.",
+    "name": "Nombre de la ruta",
+    "duplicate": "Este nombre ya está en uso. Selecciona la ruta existente para editarla.",
+    "name_help": "Usa entre 1 y 57 letras minúsculas, dígitos o guiones.",
+    "origin": "Recurso",
+    "quote_limit": "Importe máximo por factura (msat)",
+    "price": "Precio (msat)",
+    "maximum": "Máximo de {{value}} msat",
+    "duration": "El acceso dura {{value}} segundos.",
+    "requests": "Cada pago incluye {{value}} solicitudes.",
+    "sales": "Aceptar nuevas ventas",
+    "save_error": "No se pudo guardar la ruta. Comprueba el recurso y el precio e inténtalo de nuevo.",
+    "save": "Guardar cambios",
+    "publish": "Publicar ruta",
+    "saved": "Ruta guardada."
+  },
   "merchant_revenue": {
     "title": "Ingresos del comercio",
     "from": "Desde (UTC)",

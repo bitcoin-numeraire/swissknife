@@ -1,4 +1,28 @@
 {
+  "merchant_tools": {
+    "title": "Händlerwerkzeuge",
+    "routes": "Kostenpflichtige Routen",
+    "load_error": "Die kostenpflichtigen Routen konnten nicht geladen werden.",
+    "no_origins": "Bitte den Betreiber deiner Instanz, dieser Wallet vor dem Veröffentlichen eine Ressource zuzuweisen.",
+    "choose": "Route auswählen",
+    "new": "Neue Route",
+    "public_url": "Öffentliche URL",
+    "withdrawn": "Der Betreiber hat diese Ressource zurückgezogen. Verkauf und Zugriff sind gesperrt.",
+    "name": "Routenname",
+    "duplicate": "Dieser Name ist bereits vergeben. Wähle die bestehende Route aus, um sie zu bearbeiten.",
+    "name_help": "Verwende 1–57 Kleinbuchstaben, Ziffern oder Bindestriche.",
+    "origin": "Ressource",
+    "quote_limit": "Höchstbetrag je Rechnung (msat)",
+    "price": "Preis (msat)",
+    "maximum": "Maximal {{value}} msat",
+    "duration": "Der Zugriff gilt für {{value}} Sekunden.",
+    "requests": "Jede Zahlung umfasst {{value}} Anfragen.",
+    "sales": "Neue Verkäufe zulassen",
+    "save_error": "Die Route konnte nicht gespeichert werden. Prüfe die Ressource und den Preis und versuche es erneut.",
+    "save": "Änderungen speichern",
+    "publish": "Route veröffentlichen",
+    "saved": "Route gespeichert."
+  },
   "merchant_revenue": {
     "title": "Händlereinnahmen",
     "from": "Von (UTC)",

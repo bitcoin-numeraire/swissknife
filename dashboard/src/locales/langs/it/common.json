@@ -1,4 +1,28 @@
 {
+  "merchant_tools": {
+    "title": "Strumenti per esercenti",
+    "routes": "Percorsi a pagamento",
+    "load_error": "Impossibile caricare i percorsi a pagamento.",
+    "no_origins": "Chiedi al gestore della tua istanza di assegnare una risorsa a questo portafoglio prima di pubblicare un percorso.",
+    "choose": "Seleziona un percorso",
+    "new": "Nuovo percorso",
+    "public_url": "URL pubblico",
+    "withdrawn": "Il gestore ha ritirato questa risorsa. Vendite e accesso sono disattivati.",
+    "name": "Nome del percorso",
+    "duplicate": "Questo nome è già in uso. Seleziona il percorso esistente per modificarlo.",
+    "name_help": "Usa da 1 a 57 lettere minuscole, cifre o trattini.",
+    "origin": "Risorsa",
+    "quote_limit": "Importo massimo per fattura (msat)",
+    "price": "Prezzo (msat)",
+    "maximum": "Massimo {{value}} msat",
+    "duration": "L’accesso dura {{value}} secondi.",
+    "requests": "Ogni pagamento include {{value}} richieste.",
+    "sales": "Accetta nuove vendite",
+    "save_error": "Impossibile salvare il percorso. Verifica la risorsa e il prezzo e riprova.",
+    "save": "Salva modifiche",
+    "publish": "Pubblica percorso",
+    "saved": "Percorso salvato."
+  },
   "merchant_revenue": {
     "title": "Ricavi del commerciante",
     "from": "Dal (UTC)",
