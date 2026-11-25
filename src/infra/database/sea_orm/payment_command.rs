@@ -129,11 +129,12 @@ pub(super) async fn submit(
             .ok_or_else(|| DatabaseError::FindOne("Conflicting payment submission disappeared".into()).into());
     }
     let (payment, instructions) = match admission {
-        Admission::External { reserve, instructions } => {
-            (reserve_in_transaction(&tx, payment, reserve).await?, Some(instructions))
-        }
+        Admission::External { reserve, instructions } => (
+            reserve_in_transaction(&tx, payment, reserve, key.agent_key_id).await?,
+            Some(instructions),
+        ),
         Admission::Internal(invoice) => (
-            super::uow::settle_internal_in_transaction(&tx, payment, *invoice).await?,
+            super::uow::settle_internal_in_transaction(&tx, payment, *invoice, key.agent_key_id).await?,
             None,
         ),
     };

@@ -1161,7 +1161,7 @@ async fn payment_commands_reserve_once_claim_once_and_retain_deleted_keys() {
         comment: None,
         maximum_fee_msat: Some(1_000),
     };
-    let key = SubmissionKey::new(wallet, &request);
+    let key = SubmissionKey::new(wallet, &request, None);
     let instructions = PaymentInstructions::Lightning {
         invoice: "synthetic invoice".into(),
         variable_amount_msat: None,
@@ -1205,6 +1205,7 @@ async fn payment_commands_reserve_once_claim_once_and_retain_deleted_keys() {
             comment: Some("different authorization".into()),
             ..request.clone()
         },
+        None,
     );
     assert!(matches!(
         uow.submitted(&changed).await,
@@ -1217,6 +1218,7 @@ async fn payment_commands_reserve_once_claim_once_and_retain_deleted_keys() {
             idempotency_key: Uuid::new_v4(),
             ..request
         },
+        None,
     );
     assert!(uow
         .submit(&rejected, pending_payment(wallet, 90_000, 0), 90_000, instructions)
@@ -1258,6 +1260,7 @@ async fn withdrawal_claims_fence_stale_workers_and_cancel_only_unstarted_owned_p
         wallet_id: wallet,
         key: Uuid::new_v4(),
         fingerprint: "payment A".into(),
+        agent_key_id: None,
     };
     let instructions = PaymentInstructions::Onchain {
         backend: "original".into(),
@@ -1370,6 +1373,7 @@ async fn withdrawal_reconciliation_keeps_the_signed_payload_and_full_cap_until_c
         wallet_id: wallet,
         key: Uuid::new_v4(),
         fingerprint: "approved capped payment".into(),
+        agent_key_id: None,
     };
     let payment = Payment {
         wallet_id: wallet,

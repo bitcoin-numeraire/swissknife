@@ -133,4 +133,58 @@ async fn delegated_spending_obeys_the_account_budget_on_all_rails_and_survives_r
     let reread = api.get(&resource, operator).await;
     assert_eq!(reread.body["limits"]["monthly_msat"], "9007199254740993");
     assert_eq!(reread.parse::<SpendingPolicy>().usage.monthly_msat, charged);
+    let report = format!("/v1/accounts/{}/spending-report", owner.account.id);
+    let rows = api.get(&report, operator).await;
+    assert_status(&rows, StatusCode::OK);
+    let first = &rows.body[0];
+    assert_eq!(first["payments"], 1);
+    assert_eq!(first["charged_msat"], charged.to_string());
+    let date = first["period_start"].as_str().unwrap();
+    let filtered = format!(
+        "{report}?from={date}&through={date}&wallet_id={}&agent_key_id={}",
+        owner.wallet.id, key.metadata.id
+    );
+    assert_eq!(api.get(&filtered, operator).await.body, rows.body);
+    let monday = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
+        .unwrap()
+        .week(chrono::Weekday::Mon)
+        .first_day();
+    assert_eq!(
+        api.get(&format!("{filtered}&interval=week"), operator).await.body[0]["period_start"],
+        monday.to_string()
+    );
+    for filter in [
+        format!("wallet_id={}", recipient.wallet.id),
+        format!("agent_key_id={}", Uuid::new_v4()),
+    ] {
+        assert_eq!(api.get(&format!("{report}?{filter}"), operator).await.body, json!([]));
+    }
+    assert_error(
+        &api.get(&format!("{report}?from=2020-01-01&through=2025-01-01"), operator)
+            .await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+    );
+    assert_error(&api.get(&report, agent).await, StatusCode::UNAUTHORIZED);
+    assert_error(
+        &api.get(&report, Auth::ApiKey(&restricted)).await,
+        StatusCode::FORBIDDEN,
+    );
+    let revoke = format!("{wallet}/agent-keys/{}", key.metadata.id);
+    assert_status(
+        &api.delete(&revoke, Auth::ApiKey(&owner.key)).await,
+        StatusCode::NO_CONTENT,
+    );
+    assert_eq!(api.get(&filtered, operator).await.body, rows.body);
+    let csv = reqwest::Client::new()
+        .get(format!("{}{report}.csv", restart.base_url))
+        .bearer_auth(admin)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(csv.status(), StatusCode::OK);
+    assert_eq!(csv.headers()["content-type"], "text/csv; charset=utf-8");
+    assert_eq!(
+        csv.text().await.unwrap(),
+        format!("period_start,payments,charged_msat\r\n{date},1,{charged}\r\n")
+    );
 }

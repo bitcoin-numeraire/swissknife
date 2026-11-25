@@ -11,6 +11,7 @@ pub trait PaymentsUseCases: Send + Sync {
     async fn submit_payment(
         &self,
         wallet_id: Uuid,
+        agent_key_id: Option<Uuid>,
         request: swissknife_types::SubmitPaymentRequest,
     ) -> Result<super::SubmittedPayment, ApplicationError>;
     async fn submission(&self, wallet_id: Option<Uuid>, id: Uuid) -> Result<super::SubmittedPayment, ApplicationError>;

@@ -32,6 +32,11 @@ impl FromRequestParts<Arc<AppServices>> for WalletActor {
     }
 }
 
+pub struct WalletAccess {
+    pub account_id: Uuid,
+    pub agent_key_id: Option<Uuid>,
+}
+
 impl WalletActor {
     pub async fn account_for(
         self,
@@ -39,8 +44,20 @@ impl WalletActor {
         wallet: Uuid,
         capability: WalletCapability,
     ) -> Result<Uuid, ApplicationError> {
+        Ok(self.authorize(services, wallet, capability).await?.account_id)
+    }
+
+    pub async fn authorize(
+        self,
+        services: &AppServices,
+        wallet: Uuid,
+        capability: WalletCapability,
+    ) -> Result<WalletAccess, ApplicationError> {
         match self {
-            Self::Owner(user) => Ok(user.account_id),
+            Self::Owner(user) => Ok(WalletAccess {
+                account_id: user.account_id,
+                agent_key_id: None,
+            }),
             Self::Delegated(secret) => services.agent_keys.authorize(wallet, &secret, capability).await,
         }
     }

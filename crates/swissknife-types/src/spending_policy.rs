@@ -42,3 +42,34 @@ pub struct SpendingPolicy {
     pub limits: SpendingLimits,
     pub usage: SpendingUsage,
 }
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum SpendingInterval {
+    #[default]
+    Day,
+    Week,
+}
+
+#[derive(Default, Deserialize, utoipa::IntoParams)]
+pub struct SpendingReportQuery {
+    /// First UTC admission date, inclusive. Defaults to 29 days before the last date.
+    pub from: Option<chrono::NaiveDate>,
+    /// Last UTC admission date, inclusive. Defaults to today.
+    pub through: Option<chrono::NaiveDate>,
+    pub wallet_id: Option<uuid::Uuid>,
+    /// Filter by the credential that originally admitted a payment, including revoked keys.
+    pub agent_key_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    pub interval: SpendingInterval,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct SpendingReportRow {
+    /// UTC day or Monday of the ISO week.
+    pub period_start: chrono::NaiveDate,
+    /// All admitted payments in the selected period, including subsequently released reservations.
+    pub payments: u64,
+    /// Current amount charged, in exact decimal millisatoshis, including outstanding reservations.
+    pub charged_msat: String,
+}

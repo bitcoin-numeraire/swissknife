@@ -9,10 +9,11 @@ pub struct SubmissionKey {
     pub wallet_id: Uuid,
     pub key: Uuid,
     pub fingerprint: String,
+    pub agent_key_id: Option<Uuid>,
 }
 
 impl SubmissionKey {
-    pub fn new(wallet_id: Uuid, request: &swissknife_types::SubmitPaymentRequest) -> Self {
+    pub fn new(wallet_id: Uuid, request: &swissknife_types::SubmitPaymentRequest, agent_key_id: Option<Uuid>) -> Self {
         // Fingerprint the original intent. LNURL resolution can return a new invoice on each call.
         let intent = (
             &request.input,
@@ -29,6 +30,7 @@ impl SubmissionKey {
         Self {
             wallet_id,
             key: request.idempotency_key,
+            agent_key_id,
             fingerprint: sha256::Hash::hash(&bytes).to_string(),
         }
     }

@@ -747,6 +747,8 @@ export const zSignUpRequest = z.object({
   username: z.string(),
 });
 
+export const zSpendingInterval = z.enum(['day', 'week']);
+
 /**
  * Account-wide limits, including fees. Amounts are decimal millisatoshi strings.
  * Omitted limits are unrestricted. Zero blocks positive payments.
@@ -756,6 +758,14 @@ export const zSpendingLimits = z.object({
   monthly_msat: z.string().nullish(),
   per_payment_msat: z.string().nullish(),
   weekly_msat: z.string().nullish(),
+});
+
+export const zSpendingReportRow = z.object({
+  charged_msat: z.string(),
+  payments: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+  period_start: z.iso.date(),
 });
 
 /**
@@ -1097,6 +1107,34 @@ export const zReplaceAccountSpendingPolicyPath = z.object({
 });
 
 export const zReplaceAccountSpendingPolicyResponse = z.void();
+
+export const zGetAccountSpendingReportPath = z.object({
+  account_id: z.uuid(),
+});
+
+export const zGetAccountSpendingReportQuery = z.object({
+  from: z.iso.date().nullish(),
+  through: z.iso.date().nullish(),
+  wallet_id: z.uuid().nullish(),
+  agent_key_id: z.uuid().nullish(),
+  interval: zSpendingInterval.optional(),
+});
+
+export const zGetAccountSpendingReportResponse = z.array(zSpendingReportRow);
+
+export const zExportAccountSpendingReportPath = z.object({
+  account_id: z.uuid(),
+});
+
+export const zExportAccountSpendingReportQuery = z.object({
+  from: z.iso.date().nullish(),
+  through: z.iso.date().nullish(),
+  wallet_id: z.uuid().nullish(),
+  agent_key_id: z.uuid().nullish(),
+  interval: zSpendingInterval.optional(),
+});
+
+export const zExportAccountSpendingReportResponse = z.string();
 
 export const zDeleteAccountByIdPath = z.object({
   id: z.uuid(),
