@@ -1,4 +1,25 @@
 {
+  "payment_review": {
+    "title": "Approbations de paiement",
+    "load_error": "Impossible de charger les paiements à examiner.",
+    "empty": "Aucun paiement en attente d’approbation.",
+    "amount": "{{value}} msat",
+    "review": "Examiner le paiement",
+    "principal": "Montant du paiement",
+    "fee": "Frais maximaux",
+    "maximum": "Total maximal",
+    "input": "Demande de paiement initiale",
+    "destination": "Destination résolue",
+    "wallet": "Portefeuille",
+    "credential": "Identifiant délégué",
+    "expires": "Expiration de l’approbation",
+    "retry_help": "L’approbation permet à l’identifiant d’origine de réessayer ce paiement une fois. Le portefeuille vérifie ses limites en vigueur avant de réserver ou de transférer les fonds.",
+    "decision_error": "Impossible d’enregistrer cette décision. Fermez le paiement et vérifiez la liste actuelle.",
+    "reject": "Rejeter",
+    "approve": "Approuver la nouvelle tentative",
+    "approved": "Nouvelle tentative de paiement approuvée.",
+    "rejected": "Paiement rejeté."
+  },
   "spending_templates": {
     "title": "Partir d’un modèle",
     "conservative": "Prudent",

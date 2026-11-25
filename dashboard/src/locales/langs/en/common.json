@@ -1,4 +1,25 @@
 {
+  "payment_review": {
+    "title": "Payment approvals",
+    "load_error": "Couldn’t load the payment review queue.",
+    "empty": "No payments are awaiting approval.",
+    "amount": "{{value}} msat",
+    "review": "Review payment",
+    "principal": "Payment amount",
+    "fee": "Maximum fee",
+    "maximum": "Maximum total",
+    "input": "Original payment request",
+    "destination": "Resolved destination",
+    "wallet": "Wallet",
+    "credential": "Delegated credential",
+    "expires": "Approval expires",
+    "retry_help": "Approving lets the original credential retry this payment once. The wallet checks its current limits before reserving or transferring funds.",
+    "decision_error": "Couldn’t record this decision. Close the payment and check the current queue.",
+    "reject": "Reject",
+    "approve": "Approve retry",
+    "approved": "Payment retry approved.",
+    "rejected": "Payment rejected."
+  },
   "spending_templates": {
     "title": "Start from a template",
     "conservative": "Conservative",
