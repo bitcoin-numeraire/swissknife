@@ -10,6 +10,7 @@ use crate::{
         invoice::{InvoiceService, InvoiceUseCases},
         ln_address::{LnAddressService, LnAddressUseCases},
         lnurl::{LnUrlService, LnUrlUseCases},
+        node::NodeService,
         nostr::{NostrService, NostrUseCases},
         payment::{PaymentService, PaymentsUseCases},
         system::{SystemService, SystemUseCases},
@@ -18,6 +19,7 @@ use crate::{
 };
 
 pub struct AppServices {
+    pub node: NodeService,
     pub invoice: Box<dyn InvoiceUseCases>,
     pub payment: Box<dyn PaymentsUseCases>,
     pub wallet: Box<dyn WalletUseCases>,
@@ -47,6 +49,7 @@ impl AppServices {
 
         let AppAdapters {
             store,
+            node_reader,
             ln_client,
             bitcoin_wallet,
             jwt_authenticator,
@@ -54,6 +57,11 @@ impl AppServices {
             ..
         } = adapters;
 
+        let node = NodeService::new(
+            node_reader,
+            config.ln_provider.to_string(),
+            (config.web.request_timeout / 2).min(std::time::Duration::from_secs(5)),
+        );
         let event = Arc::new(EventService::new(store.clone()));
         let client_event = ClientEventService::new(store.clone(), client_events.retention);
         let payments = PaymentService::new(
@@ -102,6 +110,7 @@ impl AppServices {
         );
 
         AppServices {
+            node,
             invoice: Box::new(invoices),
             payment: Box::new(payments),
             wallet: Box::new(wallet),
@@ -125,6 +134,7 @@ impl AppServices {
 /// `AppServices` suitable for handler unit tests.
 #[cfg(test)]
 pub struct MockAppServicesBuilder {
+    pub node: crate::domains::node::MockNodeReader,
     pub invoice: crate::domains::invoice::MockInvoiceUseCases,
     pub payment: crate::domains::payment::MockPaymentsUseCases,
     pub wallet: crate::domains::wallet::MockWalletUseCases,
@@ -144,6 +154,7 @@ pub struct MockAppServicesBuilder {
 impl MockAppServicesBuilder {
     pub fn new() -> Self {
         Self {
+            node: crate::domains::node::MockNodeReader::new(),
             invoice: crate::domains::invoice::MockInvoiceUseCases::new(),
             payment: crate::domains::payment::MockPaymentsUseCases::new(),
             wallet: crate::domains::wallet::MockWalletUseCases::new(),
@@ -162,6 +173,7 @@ impl MockAppServicesBuilder {
 
     pub fn build(self) -> AppServices {
         AppServices {
+            node: NodeService::new(Arc::new(self.node), "mock".into(), std::time::Duration::from_secs(1)),
             invoice: Box::new(self.invoice),
             payment: Box::new(self.payment),
             wallet: Box::new(self.wallet),

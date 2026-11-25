@@ -8,6 +8,7 @@ use crate::{
         invoice::InvoiceHandler,
         ln_address::LnAddressHandler,
         lnurl::LnURLHandler,
+        node::NodeHandler,
         nostr::NostrHandler,
         payment::PaymentHandler,
         system::SystemHandler,
@@ -45,6 +46,7 @@ pub fn merged_openapi() -> OpenApi {
     openapi.merge(PaymentHandler::openapi());
     openapi.merge(LnAddressHandler::openapi());
     openapi.merge(LnURLHandler::openapi());
+    openapi.merge(NodeHandler::openapi());
     openapi.merge(NostrHandler::openapi());
     openapi.merge(SystemHandler::openapi());
     openapi.merge(ApiKeyHandler::openapi());

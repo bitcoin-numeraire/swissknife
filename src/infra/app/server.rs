@@ -6,7 +6,7 @@ use crate::{
         docs::merged_openapi,
         errors::WebServerError,
     },
-    domains::{account, bitcoin, invoice, ln_address, lnurl, nostr, payment, system, wallet},
+    domains::{account, bitcoin, invoice, ln_address, lnurl, node, nostr, payment, system, wallet},
 };
 use axum::{routing::get, Router};
 use std::future::Future;
@@ -27,6 +27,7 @@ impl Server {
     pub fn new(adapters: AppAdapters, services: Arc<AppServices>, dashboard_dir: Option<&str>) -> Self {
         let router = Router::new()
             .nest("/.well-known", Self::well_known_router())
+            .nest("/v1/node", node::router())
             .nest("/v1/system", system::router())
             .nest("/lnurlp", lnurl::router())
             .nest("/v1/invoices", invoice::router())

@@ -105,7 +105,7 @@ pub struct LndGrpcClientConfig {
 }
 
 pub struct LndGrpcClient {
-    client: LightningClient<LndChannel>,
+    pub(super) client: LightningClient<LndChannel>,
     invoices: InvoicesClient<LndChannel>,
     router: RouterClient<LndChannel>,
     wallet: WalletKitClient<LndChannel>,

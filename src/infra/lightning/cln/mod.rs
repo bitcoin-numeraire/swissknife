@@ -5,6 +5,7 @@ mod cln_rest_client;
 mod cln_rest_types;
 mod cln_websocket_listener;
 mod cln_websocket_types;
+mod telemetry;
 
 pub use cln_grpc_client::*;
 pub use cln_grpc_listener::ClnGrpcListener;

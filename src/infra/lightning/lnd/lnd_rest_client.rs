@@ -172,7 +172,7 @@ impl LndRestClient {
         Ok(result)
     }
 
-    async fn get_request<T>(&self, endpoint: &str) -> anyhow::Result<T>
+    pub(super) async fn get_request<T>(&self, endpoint: &str) -> anyhow::Result<T>
     where
         T: DeserializeOwned,
     {

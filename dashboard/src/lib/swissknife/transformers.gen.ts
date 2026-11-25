@@ -40,6 +40,7 @@ import type {
   NewWalletBtcAddressResponse,
   NewWalletInvoiceResponse,
   PayResponse,
+  ReadNodeOverviewResponse,
   RegisterAccountAddressResponse,
   RegisterAddressResponse,
   RegisterWalletResponse,
@@ -487,6 +488,18 @@ export const getWalletPaymentResponseTransformer = async (
   data: any
 ): Promise<GetWalletPaymentResponse> => {
   data = paymentSchemaResponseTransformer(data);
+  return data;
+};
+
+const nodeOverviewSchemaResponseTransformer = (data: any) => {
+  data.observed_at = new Date(data.observed_at);
+  return data;
+};
+
+export const readNodeOverviewResponseTransformer = async (
+  data: any
+): Promise<ReadNodeOverviewResponse> => {
+  data = nodeOverviewSchemaResponseTransformer(data);
   return data;
 };
 

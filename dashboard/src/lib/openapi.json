@@ -6877,6 +6877,47 @@
         }
       }
     },
+    "/v1/node/overview": {
+      "get": {
+        "tags": [
+          "Node"
+        ],
+        "summary": "Read live provider telemetry. Each unavailable section has an accompanying alert.",
+        "operationId": "read_node_overview",
+        "responses": {
+          "200": {
+            "description": "Current provider observations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Requires read:ln_node",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/payments": {
       "get": {
         "tags": [
@@ -9708,6 +9749,205 @@
           }
         }
       },
+      "NodeAlert": {
+        "type": "string",
+        "enum": [
+          "info_unavailable",
+          "peers_unavailable",
+          "channels_unavailable",
+          "onchain_unavailable",
+          "chain_not_synced",
+          "no_connected_peers",
+          "no_active_channels",
+          "liquidity_unavailable"
+        ]
+      },
+      "NodeChannel": {
+        "type": "object",
+        "required": [
+          "peer_id",
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Provider channel identifier, if already assigned."
+          },
+          "inbound_msat": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "CLN receivable amount or LND remote balance less channel reserve."
+          },
+          "outbound_msat": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "CLN spendable amount or LND local balance less channel reserve."
+          },
+          "peer_id": {
+            "type": "string"
+          }
+        }
+      },
+      "NodeInfo": {
+        "type": "object",
+        "required": [
+          "alias",
+          "network",
+          "block_height",
+          "synced_to_chain"
+        ],
+        "properties": {
+          "alias": {
+            "type": "string"
+          },
+          "block_height": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "network": {
+            "type": "string"
+          },
+          "synced_to_chain": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NodeLiquidity": {
+        "type": "object",
+        "properties": {
+          "inbound_msat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outbound_msat": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sum over active channels. A missing provider value makes that direction unknown."
+          }
+        }
+      },
+      "NodeOnchainBalance": {
+        "type": "object",
+        "required": [
+          "confirmed_sat",
+          "unconfirmed_sat"
+        ],
+        "properties": {
+          "confirmed_sat": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Confirmed provider wallet funds, including reserved outputs.",
+            "minimum": 0
+          },
+          "unconfirmed_sat": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "NodeOverview": {
+        "type": "object",
+        "description": "Point-in-time observations from the configured Lightning provider.",
+        "required": [
+          "provider",
+          "observed_at",
+          "alerts"
+        ],
+        "properties": {
+          "alerts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeAlert"
+            }
+          },
+          "channels": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/NodeChannel"
+            }
+          },
+          "info": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NodeInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "liquidity": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NodeLiquidity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "onchain": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NodeOnchainBalance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "peers": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/NodePeer"
+            }
+          },
+          "provider": {
+            "type": "string"
+          }
+        }
+      },
+      "NodePeer": {
+        "type": "object",
+        "required": [
+          "id",
+          "connected"
+        ],
+        "properties": {
+          "connected": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
       "NostrNIP05Response": {
         "type": "object",
         "description": "Nostr NIP-05 response. Maps each queried name to its hex-encoded public key.",
@@ -10502,6 +10742,10 @@
     {
       "name": "LNURL",
       "description": "Public LNURL endpoints as defined in the [protocol specification](https://github.com/lnurl/luds). Allows any active Lightning Address to receive payments"
+    },
+    {
+      "name": "Node",
+      "description": "Lightning provider telemetry"
     },
     {
       "name": "Nostr",

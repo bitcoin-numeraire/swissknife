@@ -49,6 +49,7 @@ import {
   newWalletBtcAddressResponseTransformer,
   newWalletInvoiceResponseTransformer,
   payResponseTransformer,
+  readNodeOverviewResponseTransformer,
   registerAccountAddressResponseTransformer,
   registerAddressResponseTransformer,
   registerWalletResponseTransformer,
@@ -248,6 +249,9 @@ import type {
   PayResponses,
   ReadinessCheckData,
   ReadinessCheckResponses,
+  ReadNodeOverviewData,
+  ReadNodeOverviewErrors,
+  ReadNodeOverviewResponses,
   RegisterAccountAddressData,
   RegisterAccountAddressErrors,
   RegisterAccountAddressResponses,
@@ -1515,6 +1519,19 @@ export const getWalletPayment = <ThrowOnError extends boolean = false>(
     responseTransformer: getWalletPaymentResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/wallets/{wallet_id}/payments/{id}',
+    ...options,
+  });
+
+/**
+ * Read live provider telemetry. Each unavailable section has an accompanying alert.
+ */
+export const readNodeOverview = <ThrowOnError extends boolean = false>(
+  options?: Options<ReadNodeOverviewData, ThrowOnError>
+): RequestResult<ReadNodeOverviewResponses, ReadNodeOverviewErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ReadNodeOverviewResponses, ReadNodeOverviewErrors, ThrowOnError>({
+    responseTransformer: readNodeOverviewResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/node/overview',
     ...options,
   });
 
