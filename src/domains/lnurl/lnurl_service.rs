@@ -13,7 +13,7 @@ use crate::{
     domains::invoice::{InvoiceFilter, InvoiceStatus, LnInvoiceOptions, LnUrlInvoiceData},
     infra::lightning::LnClient,
 };
-use swissknife_types::LnUrlVerifyResponse;
+use swissknife_types::{LnUrlVerifyResponse, ReceiveIdentity};
 
 use super::{LnURLPayRequest, LnUrlCallback, LnUrlSuccessAction, LnUrlUseCases};
 
@@ -42,7 +42,7 @@ impl LnUrlService {
             ln_client,
             invoice_expiry,
             domain,
-            host,
+            host: host.trim_end_matches('/').to_owned(),
         }
     }
 
@@ -57,6 +57,29 @@ impl LnUrlService {
 
 #[async_trait]
 impl LnUrlUseCases for LnUrlService {
+    fn receive_identity(&self) -> ReceiveIdentity {
+        let domain = self.domain.trim();
+        ReceiveIdentity {
+            domain: reqwest::Url::parse(&format!("https://{domain}"))
+                .ok()
+                .and_then(|url| url.domain().map(ToOwned::to_owned))
+                .filter(|host| host.contains('.') && host.eq_ignore_ascii_case(domain)),
+            lnurl_base_url: reqwest::Url::parse(&self.host)
+                .ok()
+                .filter(|host| {
+                    host.scheme() == "https"
+                        || (host.scheme() == "http" && host.host_str().is_some_and(|name| name.ends_with(".onion")))
+                })
+                .filter(|host| {
+                    host.username().is_empty()
+                        && host.password().is_none()
+                        && host.query().is_none()
+                        && host.fragment().is_none()
+                })
+                .map(|host| format!("{}/.well-known/lnurlp/", host.as_str().trim_end_matches('/'))),
+        }
+    }
+
     async fn lnurlp(&self, username: String) -> Result<LnURLPayRequest, ApplicationError> {
         debug!(username, "Generating LNURLp");
 
@@ -336,6 +359,37 @@ mod tests {
                     Err(ApplicationError::Database(DatabaseError::FindMany(_)))
                 ));
             }
+        }
+    }
+
+    #[test]
+    fn public_identity_uses_the_advertised_host_and_address_domain() {
+        let mut service = service(MockAppStoreBuilder::new(), MockLnClient::new());
+        service.domain = "pay.example".into();
+        for (host, expected) in [
+            (
+                "https://api.example/site/",
+                Some("https://api.example/site/.well-known/lnurlp/"),
+            ),
+            ("http://example.onion", Some("http://example.onion/.well-known/lnurlp/")),
+            ("http://localhost:3000", None),
+            ("https://user:pass@api.example", None),
+        ] {
+            service.host = host.into();
+            let identity = service.receive_identity();
+            assert_eq!(identity.domain.as_deref(), Some("pay.example"));
+            assert_eq!(identity.lnurl_base_url.as_deref(), expected);
+        }
+        for domain in [
+            "",
+            "localhost",
+            "127.0.0.1",
+            "https://pay.example",
+            "pay.example/path",
+            "user@pay.example",
+        ] {
+            service.domain = domain.into();
+            assert!(service.receive_identity().domain.is_none());
         }
     }
 

@@ -12,13 +12,13 @@ import Button from '@mui/material/Button';
 import { Alert, Typography, InputAdornment } from '@mui/material';
 
 import { npub } from 'src/utils/nostr';
-import { displayLnAddress } from 'src/utils/lnurl';
 import { handleActionError } from 'src/utils/errors';
+import { encodeLNURL, displayLnAddress } from 'src/utils/lnurl';
 
-import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { useAccountContext } from 'src/contexts/account';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 import { zUpdateLnAddressRequest } from 'src/lib/swissknife/zod.gen';
 import { type LnAddress, updateAccountAddress, deleteAccountAddress } from 'src/lib/swissknife';
 
@@ -34,8 +34,10 @@ type Props = {
 };
 
 export function SettingsLnAddress({ lnAddress, onSuccess }: Props) {
+  const receiveIdentity = useReceiveIdentity();
   const { t } = useTranslate();
   const { activeWalletId } = useAccountContext();
+  const discovery = encodeLNURL(lnAddress.username, receiveIdentity.lnurl_base_url);
   const confirm = useBoolean();
   const isDeleting = useBoolean();
 
@@ -113,16 +115,21 @@ export function SettingsLnAddress({ lnAddress, onSuccess }: Props) {
                 },
               }}
             >
-              <QRCode
-                value={displayLnAddress(lnAddress!.username)}
-                size={300} // Base size, will be overridden by CSS
-                logoImage="/logo/logo_square_negative.svg"
-                removeQrCodeBehindLogo
-                logoPaddingStyle="circle"
-                eyeRadius={5}
-                logoPadding={3}
-              />
-              <Typography variant="subtitle1">{displayLnAddress(lnAddress!.username)}</Typography>
+              {discovery && (
+                <QRCode
+                  value={discovery}
+                  size={300} // Base size, will be overridden by CSS
+                  logoImage="/logo/logo_square_negative.svg"
+                  removeQrCodeBehindLogo
+                  logoPaddingStyle="circle"
+                  eyeRadius={5}
+                  logoPadding={3}
+                />
+              )}
+              <Typography variant="subtitle1">
+                {displayLnAddress(lnAddress.username, receiveIdentity.domain) ||
+                  t('identity_view.domain_needed')}
+              </Typography>
             </Box>
 
             <Field.Switch
@@ -158,7 +165,11 @@ export function SettingsLnAddress({ lnAddress, onSuccess }: Props) {
                 label={t('settings_ln_address.username')}
                 slotProps={{
                   input: {
-                    endAdornment: <InputAdornment position="end">@{CONFIG.domain}</InputAdornment>,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        {receiveIdentity.domain ? `@${receiveIdentity.domain}` : undefined}
+                      </InputAdornment>
+                    ),
                   },
                 }}
               />

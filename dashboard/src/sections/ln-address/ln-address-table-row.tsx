@@ -23,6 +23,7 @@ import { fDate, fTime } from 'src/utils/format-time';
 import { truncateText } from 'src/utils/format-string';
 
 import { useTranslate } from 'src/locales';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -40,6 +41,7 @@ type Props = {
 };
 
 export function LnAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: Props) {
+  const receiveIdentity = useReceiveIdentity();
   const { t } = useTranslate();
   const { id, wallet_id, username, created_at, updated_at, active, nostr_pubkey, allows_nostr } =
     row;
@@ -157,7 +159,9 @@ export function LnAddressTableRow({ row, selected, onSelectRow, onDeleteRow }: P
             {t('view')}
           </MenuItem>
 
-          <CopyMenuItem value={displayLnAddress(username)} />
+          {receiveIdentity.domain && (
+            <CopyMenuItem value={displayLnAddress(username, receiveIdentity.domain)} />
+          )}
           {nostr_pubkey && <CopyMenuItem value={npub(nostr_pubkey)} title="Copy Nostr npub" />}
 
           <Divider sx={{ borderStyle: 'dashed' }} />

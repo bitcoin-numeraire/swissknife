@@ -42,6 +42,37 @@ async fn register_address(app: &TestApp, token: &str, label: &str, nostr_pubkey:
 mod lnurl {
     use super::*;
 
+    #[tokio::test]
+    async fn configured_receive_identity_resolves_the_registered_address() {
+        let app = TestApp::isolated(
+            "public-identity",
+            &[
+                ("SWISSKNIFE_DOMAIN", "wallet.example".into()),
+                ("SWISSKNIFE_HOST", "https://service.example/".into()),
+            ],
+        )
+        .await;
+        let token = app.admin_token().await;
+        let (_, address) = register_address(&app, token, "identity", None).await;
+        let res = app.api().get("/v1/system/receive-identity", Auth::None).await;
+        assert_status(&res, StatusCode::OK);
+        let identity = res.parse::<swissknife_types::ReceiveIdentity>();
+        assert_eq!(identity.domain.as_deref(), Some("wallet.example"));
+        let base = reqwest::Url::parse(identity.lnurl_base_url.as_deref().unwrap()).unwrap();
+        assert_eq!(base.host_str(), Some("service.example"));
+        let res = app
+            .api()
+            .get(&format!("{}{}", base.path(), address.username), Auth::None)
+            .await;
+        assert_status(&res, StatusCode::OK);
+        let pay = res.parse::<LnURLPayRequest>();
+        assert_eq!(
+            pay.callback,
+            format!("https://service.example/lnurlp/{}/callback", address.username)
+        );
+        assert!(pay.metadata.contains(&format!("{}@wallet.example", address.username)));
+    }
+
     /// Follow the advertised LNURL `callback` URL exactly as an external wallet
     /// would, rather than reconstructing the path — so a wrong or unreachable
     /// advertised callback would be caught.

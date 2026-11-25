@@ -38,6 +38,7 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { useAccountContext } from 'src/contexts/account';
 import { useActiveWallet } from 'src/actions/account-wallet';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -113,6 +114,7 @@ function txDisplayTitle(tx: ITransaction, t: (key: string) => string) {
 // ----------------------------------------------------------------------
 
 export function WalletView() {
+  const receiveIdentity = useReceiveIdentity();
   const router = useRouter();
   const sendDrawer = useBoolean();
   const receiveDrawer = useBoolean();
@@ -182,7 +184,7 @@ export function WalletView() {
   const fiatValueAvailable = (prices[state.currency] ?? 0) > 0;
   const balancesHidden = state.hideBalances ?? false;
   const lnAddressDisplay = wallet?.ln_address?.username
-    ? displayLnAddress(wallet.ln_address.username)
+    ? displayLnAddress(wallet.ln_address.username, receiveIdentity.domain)
     : '';
   const needsActionCount = failedPayments.length + expiredInvoices.length;
   const inProgressCount = pendingInvoices.length + pendingPayments.length;

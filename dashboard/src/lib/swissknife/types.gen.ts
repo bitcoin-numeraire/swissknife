@@ -1092,6 +1092,20 @@ export const Protocol = { BITCOIN: 'bitcoin', TAPROOT_ASSETS: 'taproot_assets' }
 export type Protocol = (typeof Protocol)[keyof typeof Protocol];
 
 /**
+ * Public receiving identity advertised by this instance.
+ */
+export type ReceiveIdentity = {
+  /**
+   * Domain used for Lightning Addresses and local recipient recognition.
+   */
+  domain?: string | null;
+  /**
+   * Base URL for LNURL-pay discovery. Append the URL-encoded username.
+   */
+  lnurl_base_url?: string | null;
+};
+
+/**
  * Register Lightning Address Request
  */
 export type RegisterLnAddressRequest = {
@@ -5024,6 +5038,22 @@ export type ReadinessCheckResponses = {
 };
 
 export type ReadinessCheckResponse = ReadinessCheckResponses[keyof ReadinessCheckResponses];
+
+export type ReceiveIdentityData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/system/receive-identity';
+};
+
+export type ReceiveIdentityResponses = {
+  /**
+   * Public receiving identity
+   */
+  200: ReceiveIdentity;
+};
+
+export type ReceiveIdentityResponse = ReceiveIdentityResponses[keyof ReceiveIdentityResponses];
 
 export type SetupCheckData = {
   body?: never;

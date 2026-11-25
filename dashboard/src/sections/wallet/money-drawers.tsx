@@ -50,6 +50,7 @@ import { useTranslate } from 'src/locales';
 import { useListWallets } from 'src/actions/wallet';
 import { useAccountContext } from 'src/contexts/account';
 import { useListBtcAddresses } from 'src/actions/btc-addresses';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 import {
   useActiveWallet,
   useGetWalletInvoice,
@@ -321,7 +322,7 @@ function isBech32BitcoinAddress(value: string) {
   }
 }
 
-function detectRecipientKind(input: string): RecipientKind {
+function detectRecipientKind(input: string, domain?: string | null): RecipientKind {
   const value = input.trim();
   const bitcoinUri = parseBitcoinUri(value);
   const paymentRequest = bitcoinUri.lightning ?? value;
@@ -347,7 +348,7 @@ function detectRecipientKind(input: string): RecipientKind {
   if (isLnurlPayload(value)) return 'lnurl';
   if (isBitcoinAddress(extractBitcoinInput(value))) return 'bitcoin';
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-    return value.split('@')[1].toLowerCase() === CONFIG.domain.toLowerCase()
+    return value.split('@')[1].toLowerCase() === domain?.toLowerCase()
       ? 'internal'
       : 'lightning-address';
   }
@@ -581,6 +582,7 @@ function AmountEntryField({
 }
 
 function WalletPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const receiveIdentity = useReceiveIdentity();
   const { t } = useTranslate();
   const { wallets, walletsError, walletsLoading } = useListWallets();
 
@@ -609,7 +611,7 @@ function WalletPicker({ value, onChange }: { value: string; onChange: (value: st
           <li key={key} {...optionProps}>
             <Stack sx={{ minWidth: 0 }}>
               <Typography variant="subtitle2" noWrap>
-                {walletDisplayName(wallet)}
+                {walletDisplayName(wallet, receiveIdentity.domain)}
               </Typography>
               <Typography variant="caption" color="text.secondary" noWrap>
                 {wallet.account_id}
@@ -629,8 +631,9 @@ function WalletPicker({ value, onChange }: { value: string; onChange: (value: st
   );
 }
 
-function walletDisplayName(wallet: Wallet) {
-  if (wallet.ln_address?.username) return displayLnAddress(wallet.ln_address.username);
+function walletDisplayName(wallet: Wallet, domain?: string | null) {
+  if (domain && wallet.ln_address?.username)
+    return displayLnAddress(wallet.ln_address.username, domain);
 
   return wallet.label ?? wallet.account_id;
 }
@@ -669,6 +672,7 @@ export function SendMoneyDrawer({
   walletId,
   initialInput,
 }: SendMoneyDrawerProps) {
+  const receiveIdentity = useReceiveIdentity();
   const { t } = useTranslate();
   const { state } = useSettingsContext();
   const scanQR = useBoolean();
@@ -684,7 +688,10 @@ export function SendMoneyDrawer({
   const [nowMs, setNowMs] = useState(0);
   const [selectedWalletId, setSelectedWalletId] = useState(walletId ?? '');
 
-  const kind = useMemo(() => detectRecipientKind(input), [input]);
+  const kind = useMemo(
+    () => detectRecipientKind(input, receiveIdentity.domain),
+    [input, receiveIdentity.domain]
+  );
   const bolt11Details = useMemo(() => decodedBolt11Details(input), [input]);
   const bolt11Amount = bolt11Details.amountSats;
   const bitcoinRequest = useMemo(() => parseBitcoinUri(input), [input]);
@@ -1505,6 +1512,7 @@ export function ReceiveMoneyDrawer({
   walletId,
   initialPayload,
 }: ReceiveMoneyDrawerProps) {
+  const receiveIdentity = useReceiveIdentity();
   const router = useRouter();
   const { t } = useTranslate();
   const { state } = useSettingsContext();
@@ -1555,8 +1563,12 @@ export function ReceiveMoneyDrawer({
   const bolt11 = invoiceMatchesRequest ? invoice?.ln_invoice?.bolt11 : undefined;
   const invoiceExpiresAt = invoice?.ln_invoice?.expires_at ?? null;
   const invoiceExpiryMs = invoiceExpiresAt ? new Date(invoiceExpiresAt).getTime() : null;
-  const identityAddress = lnAddress ? displayLnAddress(lnAddress.username) : '';
-  const identityLnurl = lnAddress ? encodeLNURL(lnAddress.username) : '';
+  const identityAddress = lnAddress
+    ? displayLnAddress(lnAddress.username, receiveIdentity.domain)
+    : '';
+  const identityLnurl = lnAddress
+    ? encodeLNURL(lnAddress.username, receiveIdentity.lnurl_base_url)
+    : '';
   const selectedPayload = activePayload;
   const selectedLightningInvoice = selectedPayload === 'unified' || selectedPayload === 'lightning';
   const requestNeedsGeneration = selectedPayload !== 'identity';
@@ -2168,7 +2180,7 @@ export function ReceiveMoneyDrawer({
           </Box>
         )}
 
-        {lnAddress && selectedPayload !== 'onchain' && (
+        {identityAddress && selectedPayload !== 'onchain' && (
           <Box
             sx={[
               (theme) => ({
@@ -2186,10 +2198,10 @@ export function ReceiveMoneyDrawer({
                   {t('receive_money.identity')}
                 </Typography>
                 <Typography variant="subtitle2" noWrap>
-                  {displayLnAddress(lnAddress.username)}
+                  {identityAddress}
                 </Typography>
               </Stack>
-              <CopyButton value={displayLnAddress(lnAddress.username)} title={t('copy')} />
+              <CopyButton value={identityAddress} title={t('copy')} />
             </Stack>
           </Box>
         )}

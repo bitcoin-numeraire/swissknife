@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Share Lightning addresses and LNURL QR codes using the public domain and API origin configured on the instance.
+
 - The all-in-one image opens its local wallet and API by default.
 
 ## [0.3.5] - 2026-11-21

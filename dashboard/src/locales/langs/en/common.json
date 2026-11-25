@@ -477,6 +477,7 @@
     "copy_transaction_id": "Copy transaction ID"
   },
   "identity_view": {
+    "domain_needed": "Ask your administrator to configure the public Lightning address domain for this installation.",
     "title": "Identity hub",
     "hero_title": "Your public receive layer",
     "hero_subheader": "Keep reusable identities separate from one-time payment requests. Share the human address, keep the current unused on-chain address until it receives funds, and connect Nostr only when you want public verification.",

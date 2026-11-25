@@ -573,6 +573,14 @@ export const zAsset = z.object({
 });
 
 /**
+ * Public receiving identity advertised by this instance.
+ */
+export const zReceiveIdentity = z.object({
+  domain: z.string().nullish(),
+  lnurl_base_url: z.string().nullish(),
+});
+
+/**
  * Register Lightning Address Request
  */
 export const zRegisterLnAddressRequest = z.object({
@@ -1765,6 +1773,11 @@ export const zMarkWelcomeCompleteResponse = z.void();
  * No Content on success
  */
 export const zReadinessCheckResponse = z.void();
+
+/**
+ * Public receiving identity
+ */
+export const zReceiveIdentityResponse = zReceiveIdentity;
 
 /**
  * OK
