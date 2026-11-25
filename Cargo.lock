@@ -5019,6 +5019,7 @@ dependencies = [
  "serde_with",
  "strum",
  "strum_macros",
+ "swissknife-l402",
  "swissknife-mcp",
  "swissknife-types",
  "tempfile",

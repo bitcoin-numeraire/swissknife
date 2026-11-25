@@ -11,6 +11,7 @@ mod cln_payments;
 mod events;
 mod guards;
 mod invoices;
+mod l402;
 mod lightning;
 mod ln_addresses;
 mod lnurl_send;

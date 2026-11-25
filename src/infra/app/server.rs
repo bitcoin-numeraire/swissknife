@@ -24,8 +24,13 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(adapters: AppAdapters, services: Arc<AppServices>, dashboard_dir: Option<&str>) -> Self {
+    pub fn new(
+        adapters: AppAdapters,
+        services: Arc<AppServices>,
+        config: &crate::application::composition::AppConfig,
+    ) -> Result<Self, WebServerError> {
         let router = Router::new()
+            .merge(crate::infra::l402::router(config.l402.as_ref(), services.clone())?)
             .nest("/.well-known", Self::well_known_router())
             .nest("/v1/system", system::router())
             .nest("/lnurlp", lnurl::router())
@@ -43,7 +48,7 @@ impl Server {
             .nest("/v1/bitcoin/addresses", bitcoin::router())
             .merge(Scalar::with_url("/docs", merged_openapi()));
 
-        let router = match dashboard_dir {
+        let router = match config.dashboard_dir.as_deref() {
             Some(dir) => router
                 .fallback_service(ServeDir::new(dir).not_found_service(ServeFile::new(format!("{}/404.html", dir)))),
             None => router,
@@ -55,7 +60,7 @@ impl Server {
             .layer(CorsLayer::permissive())
             .with_state(services);
 
-        Self { router }
+        Ok(Self { router })
     }
 
     pub async fn start(

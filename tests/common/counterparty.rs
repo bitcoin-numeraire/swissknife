@@ -250,6 +250,17 @@ impl Counterparty {
         }
     }
 
+    pub fn pay_for_preimage(&self, bolt11: &str) -> String {
+        let result = match self.kind {
+            Kind::Lnd => self.run_json(&["lncli", "--network=regtest", "payinvoice", "--json", "--force", bolt11]),
+            Kind::Cln | Kind::ClnOffers => self.cln_rpc("pay", json!({"bolt11": bolt11})),
+        };
+        result["payment_preimage"]
+            .as_str()
+            .expect("settled invoice preimage")
+            .to_owned()
+    }
+
     /// Pay a bolt11 from the counterparty (so the SUT receives).
     pub fn pay(&self, bolt11: &str) {
         match self.kind {

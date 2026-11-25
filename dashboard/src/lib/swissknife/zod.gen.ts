@@ -993,6 +993,17 @@ export const zWellKnownNostrQuery = z.object({
  */
 export const zWellKnownNostrResponse = zNostrNip05Response;
 
+export const zGetPaidResourcePath = z.object({
+  name: z.string(),
+});
+
+/**
+ * Paid resource
+ */
+export const zGetPaidResourceResponse = z.array(
+  z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+);
+
 export const zVerifyLnurlInvoicePath = z.object({
   token: z.uuid(),
 });
