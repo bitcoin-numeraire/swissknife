@@ -132,6 +132,7 @@ test-unit:
 # the regtest stack up first (idempotent); override the cell via
 # ITEST_DATABASE / ITEST_PROVIDER (e.g. `make test-integration ITEST_PROVIDER=cln_grpc`).
 # Narrow to a suite/test with TEST=... and pass runner flags with TESTARGS=...
+test-integration: export RUST_TEST_THREADS ?= 1
 test-integration: itest-up
 	@$(ITEST_ENV) $(CARGO_TEST) --features itest --test api $(TEST) -- $(TESTARGS)
 
