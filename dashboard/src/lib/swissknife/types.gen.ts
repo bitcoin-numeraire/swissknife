@@ -1378,6 +1378,31 @@ export type SignUpRequest = {
 };
 
 /**
+ * Account-wide limits, including fees. Amounts are decimal millisatoshi strings.
+ * Omitted limits are unrestricted. Zero blocks positive payments.
+ */
+export type SpendingLimits = {
+  daily_msat?: string | null;
+  monthly_msat?: string | null;
+  per_payment_msat?: string | null;
+  weekly_msat?: string | null;
+};
+
+export type SpendingPolicy = {
+  limits: SpendingLimits;
+  usage: SpendingUsage;
+};
+
+/**
+ * Consumption in the current UTC day, ISO week and calendar month.
+ */
+export type SpendingUsage = {
+  daily_msat: string;
+  monthly_msat: string;
+  weekly_msat: string;
+};
+
+/**
  * Accept an external Lightning or Bitcoin payment for durable execution.
  */
 export type SubmitPaymentRequest = {
@@ -1909,6 +1934,69 @@ export type CreateAccountResponses = {
 };
 
 export type CreateAccountResponse = CreateAccountResponses[keyof CreateAccountResponses];
+
+export type DisableAccountSpendingPolicyData = {
+  body?: never;
+  path: {
+    account_id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{account_id}/spending-policy';
+};
+
+export type DisableAccountSpendingPolicyErrors = {
+  403: unknown;
+};
+
+export type DisableAccountSpendingPolicyResponses = {
+  204: void;
+};
+
+export type DisableAccountSpendingPolicyResponse =
+  DisableAccountSpendingPolicyResponses[keyof DisableAccountSpendingPolicyResponses];
+
+export type GetAccountSpendingPolicyData = {
+  body?: never;
+  path: {
+    account_id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{account_id}/spending-policy';
+};
+
+export type GetAccountSpendingPolicyErrors = {
+  403: unknown;
+  404: unknown;
+};
+
+export type GetAccountSpendingPolicyResponses = {
+  200: SpendingPolicy;
+};
+
+export type GetAccountSpendingPolicyResponse =
+  GetAccountSpendingPolicyResponses[keyof GetAccountSpendingPolicyResponses];
+
+export type ReplaceAccountSpendingPolicyData = {
+  body: SpendingLimits;
+  path: {
+    account_id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{account_id}/spending-policy';
+};
+
+export type ReplaceAccountSpendingPolicyErrors = {
+  403: unknown;
+  404: unknown;
+  422: unknown;
+};
+
+export type ReplaceAccountSpendingPolicyResponses = {
+  204: void;
+};
+
+export type ReplaceAccountSpendingPolicyResponse =
+  ReplaceAccountSpendingPolicyResponses[keyof ReplaceAccountSpendingPolicyResponses];
 
 export type DeleteAccountByIdData = {
   body?: never;

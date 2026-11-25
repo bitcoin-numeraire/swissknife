@@ -594,6 +594,119 @@
         }
       }
     },
+    "/v1/accounts/{account_id}/spending-policy": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Read the active spending limits and current calendar-period usage.",
+        "operationId": "get_account_spending_policy",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendingPolicy"
+                }
+              }
+            }
+          },
+          "403": {},
+          "404": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Apply limits to future outgoing payments from every wallet owned by the account.",
+        "operationId": "replace_account_spending_policy",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpendingLimits"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "403": {},
+          "404": {},
+          "422": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Disable enforcement while retaining consumption already admitted under the policy.",
+        "operationId": "disable_account_spending_policy",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "403": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
     "/v1/accounts/{id}": {
       "get": {
         "tags": [
@@ -12042,6 +12155,73 @@
             "type": "string",
             "description": "Owner username, normalized to lowercase. Use 3 to 64 ASCII letters,\ndigits, dots, underscores, or hyphens.",
             "example": "admin"
+          }
+        }
+      },
+      "SpendingLimits": {
+        "type": "object",
+        "description": "Account-wide limits, including fees. Amounts are decimal millisatoshi strings.\nOmitted limits are unrestricted. Zero blocks positive payments.",
+        "properties": {
+          "daily_msat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "monthly_msat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "per_payment_msat": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "50000"
+          },
+          "weekly_msat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "SpendingPolicy": {
+        "type": "object",
+        "required": [
+          "limits",
+          "usage"
+        ],
+        "properties": {
+          "limits": {
+            "$ref": "#/components/schemas/SpendingLimits"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/SpendingUsage"
+          }
+        }
+      },
+      "SpendingUsage": {
+        "type": "object",
+        "description": "Consumption in the current UTC day, ISO week and calendar month.",
+        "required": [
+          "daily_msat",
+          "weekly_msat",
+          "monthly_msat"
+        ],
+        "properties": {
+          "daily_msat": {
+            "type": "string"
+          },
+          "monthly_msat": {
+            "type": "string"
+          },
+          "weekly_msat": {
+            "type": "string"
           }
         }
       },

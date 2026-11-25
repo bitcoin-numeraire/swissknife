@@ -41,6 +41,7 @@ mod m20261125_180048_add_withdrawal_command;
 mod m20261125_182846_wallet_bolt12_offers;
 mod m20261125_185129_retain_payable_offer_owners;
 mod m20261125_191409_wallet_agent_keys;
+mod m20261125_193225_account_spending_policy;
 
 pub struct Migrator;
 
@@ -89,6 +90,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261125_182846_wallet_bolt12_offers::Migration),
             Box::new(m20261125_185129_retain_payable_offer_owners::Migration),
             Box::new(m20261125_191409_wallet_agent_keys::Migration),
+            Box::new(m20261125_193225_account_spending_policy::Migration),
         ]
     }
 }

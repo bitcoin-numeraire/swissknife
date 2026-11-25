@@ -1575,3 +1575,76 @@ async fn offer_receipt_cursor_credit_history_and_event_commit_once_across_worker
     assert_eq!(balance(&db, owner).await, (123, 0));
     assert_eq!(repo.cursor("cln:test").await.unwrap(), Some(2));
 }
+
+#[tokio::test]
+async fn spending_policy_serializes_two_wallets_and_retains_usage_across_payment_outcomes() {
+    use super::spending_policy_repository::SeaOrmSpendingPolicyRepository;
+    use crate::domains::agent::SpendingPolicyRepository;
+    use swissknife_types::SpendingLimits;
+
+    let conn = connect().await;
+    let first_wallet = seed_wallet(&conn, 500_000).await;
+    let account = account_id(&conn, first_wallet).await;
+    let asset = SeaOrmAssetRepository::new(conn.clone())
+        .find_native_btc_by_network(BtcNetwork::Regtest)
+        .await
+        .unwrap()
+        .unwrap();
+    let wallets = SeaOrmWalletRepository::new(conn.clone());
+    let second_wallet = wallets.upsert(account, asset.id).await.unwrap().id;
+    assert_ne!(first_wallet, second_wallet);
+    wallets.credit(second_wallet, 500_000).await.unwrap();
+    let policy = SeaOrmSpendingPolicyRepository(conn.clone());
+    let limits = SpendingLimits {
+        daily_msat: Some(100_000),
+        ..Default::default()
+    };
+    policy.replace(account, limits.clone()).await.unwrap();
+
+    let operations: Vec<_> = (0..8)
+        .map(|index| {
+            let worker = uow(&conn);
+            let wallet = if index % 2 == 0 { first_wallet } else { second_wallet };
+            async move { worker.reserve(pending_payment(wallet, 80_000, 0), 82_000).await }
+        })
+        .collect();
+    let results = futures_util::future::join_all(operations).await;
+    let mut admitted = vec![];
+    for result in results {
+        match result {
+            Ok(payment) => admitted.push(payment),
+            Err(ApplicationError::Data(DataError::Validation(reason))) => {
+                assert!(reason.contains("daily spending limit"))
+            }
+            Err(other) => panic!("unexpected denial: {other}"),
+        }
+    }
+    assert_eq!(admitted.len(), 1);
+    let mut payment = admitted.pop().unwrap();
+    let usage = policy.get(account).await.unwrap().unwrap().usage;
+    assert_eq!(
+        (usage.daily_msat, usage.weekly_msat, usage.monthly_msat),
+        (82_000, 82_000, 82_000)
+    );
+
+    payment.status = PaymentStatus::Failed;
+    uow(&conn).fail(payment.clone()).await.unwrap();
+    uow(&conn).fail(payment.clone()).await.unwrap();
+    assert_eq!(policy.get(account).await.unwrap().unwrap().usage.daily_msat, 0);
+    assert_eq!(balance(&conn, payment.wallet_id).await, (500_000, 0));
+    // A node may confirm payment after a premature failure. Book the truth even if
+    // the operator has since lowered or disabled the policy.
+    policy.disable(account).await.unwrap();
+    payment.status = PaymentStatus::Settled;
+    payment.fee_msat = Some(501);
+    uow(&conn).settle(payment.clone()).await.unwrap();
+    uow(&conn).settle(payment.clone()).await.unwrap();
+    policy.replace(account, limits).await.unwrap();
+    assert_eq!(policy.get(account).await.unwrap().unwrap().usage.daily_msat, 80_501);
+    assert_eq!(balance(&conn, payment.wallet_id).await, (419_499, 0));
+    super::models::payment::Entity::delete_by_id(payment.id)
+        .exec(&conn)
+        .await
+        .unwrap();
+    assert_eq!(policy.get(account).await.unwrap().unwrap().usage.monthly_msat, 80_501);
+}

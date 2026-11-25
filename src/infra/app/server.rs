@@ -30,6 +30,7 @@ impl Server {
             .nest("/v1/system", system::router())
             .nest("/lnurlp", lnurl::router())
             .merge(crate::domains::agent::router())
+            .merge(crate::domains::agent::spending_policy_handler::router())
             .merge(crate::domains::offer::router())
             .nest("/v1/invoices", invoice::router())
             .nest("/v1/payments", payment::router())

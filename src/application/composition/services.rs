@@ -21,6 +21,7 @@ pub struct AppServices {
     pub notification: Box<dyn crate::domains::notification::NotificationUseCases>,
     pub invoice: Box<dyn InvoiceUseCases>,
     pub agent_keys: Box<dyn crate::domains::agent::AgentKeyUseCases>,
+    pub spending_policies: Box<dyn crate::domains::agent::SpendingPolicyUseCases>,
     pub offer: Box<dyn crate::domains::offer::OfferUseCases>,
     pub payment: Box<dyn PaymentsUseCases>,
     pub wallet: Box<dyn WalletUseCases>,
@@ -58,6 +59,7 @@ impl AppServices {
         } = adapters;
 
         let agent_keys = crate::domains::agent::AgentKeyService(store.agent_keys.clone());
+        let spending_policies = crate::domains::agent::SpendingPolicyService(store.spending_policies.clone());
         let offer =
             crate::domains::offer::OfferService::new(store.clone(), ln_client.clone(), bitcoin_wallet.network());
         let event = Arc::new(EventService::new(store.clone()));
@@ -109,6 +111,7 @@ impl AppServices {
             payment_command_available: tokio::sync::Notify::new(),
             invoice: Box::new(invoices),
             agent_keys: Box::new(agent_keys),
+            spending_policies: Box::new(spending_policies),
             offer: Box::new(offer),
             payment: Box::new(payments),
             wallet: Box::new(wallet),
@@ -136,6 +139,7 @@ pub struct MockAppServicesBuilder {
     pub notification: crate::domains::notification::MockNotificationUseCases,
     pub invoice: crate::domains::invoice::MockInvoiceUseCases,
     pub agent_keys: crate::domains::agent::MockAgentKeyUseCases,
+    pub spending_policies: crate::domains::agent::MockSpendingPolicyUseCases,
     pub offer: crate::domains::offer::MockOfferUseCases,
     pub payment: crate::domains::payment::MockPaymentsUseCases,
     pub wallet: crate::domains::wallet::MockWalletUseCases,
@@ -157,6 +161,7 @@ impl MockAppServicesBuilder {
         Self {
             invoice: crate::domains::invoice::MockInvoiceUseCases::new(),
             agent_keys: crate::domains::agent::MockAgentKeyUseCases::new(),
+            spending_policies: crate::domains::agent::MockSpendingPolicyUseCases::new(),
             offer: crate::domains::offer::MockOfferUseCases::new(),
             payment: crate::domains::payment::MockPaymentsUseCases::new(),
             wallet: crate::domains::wallet::MockWalletUseCases::new(),
@@ -179,6 +184,7 @@ impl MockAppServicesBuilder {
             payment_command_available: tokio::sync::Notify::new(),
             invoice: Box::new(self.invoice),
             agent_keys: Box::new(self.agent_keys),
+            spending_policies: Box::new(self.spending_policies),
             offer: Box::new(self.offer),
             payment: Box::new(self.payment),
             wallet: Box::new(self.wallet),

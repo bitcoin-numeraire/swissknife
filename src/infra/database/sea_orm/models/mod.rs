@@ -20,6 +20,8 @@ pub mod offer_cursor;
 pub mod offer_receipt;
 pub mod payment;
 pub mod payment_command;
+pub mod spending_entry;
+pub mod spending_policy;
 pub mod wallet;
 pub mod wallet_agent_key;
 pub mod wallet_offer;

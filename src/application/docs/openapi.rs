@@ -38,6 +38,7 @@ pub fn merged_openapi() -> OpenApi {
     let mut openapi = ApiDoc::openapi();
 
     openapi.merge(crate::domains::agent::AgentKeyHandler::openapi());
+    openapi.merge(crate::domains::agent::spending_policy_handler::SpendingPolicyHandler::openapi());
     openapi.merge(AuthHandler::openapi());
     openapi.merge(AccountHandler::openapi());
     openapi.merge(AccountWalletHandler::openapi());

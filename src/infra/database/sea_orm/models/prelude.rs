@@ -17,6 +17,8 @@ pub use super::offer_cursor::Entity as OfferCursor;
 pub use super::offer_receipt::Entity as OfferReceipt;
 pub use super::payment::Entity as Payment;
 pub use super::payment_command::Entity as PaymentCommand;
+pub use super::spending_entry::Entity as SpendingEntry;
+pub use super::spending_policy::Entity as SpendingPolicy;
 pub use super::wallet::Entity as Wallet;
 pub use super::wallet_agent_key::Entity as WalletAgentKey;
 pub use super::wallet_offer::Entity as WalletOffer;
