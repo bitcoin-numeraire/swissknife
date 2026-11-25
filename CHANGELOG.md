@@ -8,6 +8,10 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Added
+
+- Operators can create encrypted ledger snapshots and restore them to a fresh SQLite file or PostgreSQL database.
+
 ## [0.3.5] - 2026-11-21
 
 ### Fixed
