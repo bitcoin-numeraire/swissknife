@@ -1,5 +1,6 @@
 mod agent_key_repository;
 mod config;
+mod l402_request_meter;
 mod models;
 mod offer_repository;
 mod payment_command;
