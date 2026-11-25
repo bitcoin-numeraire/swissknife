@@ -6,7 +6,8 @@ use crate::{
 use axum::{extract::State, http::StatusCode, routing::get, Router};
 use std::sync::Arc;
 use swissknife_types::{
-    SpendingInterval, SpendingLimits, SpendingPolicy, SpendingReportQuery, SpendingReportRow, SpendingUsage,
+    AgentSpendingHours, SpendingInterval, SpendingLimits, SpendingPolicy, SpendingReportQuery, SpendingReportRow,
+    SpendingUsage,
 };
 use utoipa::OpenApi;
 use uuid::Uuid;
@@ -14,18 +15,34 @@ use uuid::Uuid;
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        get_agent_spending_hours,
+        set_agent_spending_hours,
+        clear_agent_spending_hours,
         get_account_spending_policy,
         get_account_spending_report,
         export_account_spending_report,
         replace_account_spending_policy,
         disable_account_spending_policy
     ),
-    components(schemas(SpendingLimits, SpendingPolicy, SpendingUsage, SpendingReportRow, SpendingInterval))
+    components(schemas(
+        AgentSpendingHours,
+        SpendingLimits,
+        SpendingPolicy,
+        SpendingUsage,
+        SpendingReportRow,
+        SpendingInterval
+    ))
 )]
 pub struct SpendingPolicyHandler;
 
 pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
+        .route(
+            "/v1/accounts/{account_id}/agent-spending-hours",
+            get(get_agent_spending_hours)
+                .put(set_agent_spending_hours)
+                .delete(clear_agent_spending_hours),
+        )
         .route(
             "/v1/accounts/{account_id}/spending-report",
             get(get_account_spending_report),
@@ -40,6 +57,43 @@ pub fn router() -> Router<Arc<AppServices>> {
                 .put(replace_account_spending_policy)
                 .delete(disable_account_spending_policy),
         )
+}
+
+/// Inspect the UTC window for delegated payments.
+#[utoipa::path(get,path="/v1/accounts/{account_id}/agent-spending-hours",tag="Accounts",security(("jwt"=[]),("api_key"=[])),params(("account_id"=Uuid,Path)),responses((status=200,body=AgentSpendingHours),(status=403),(status=404)))]
+async fn get_agent_spending_hours(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(account): Path<Uuid>,
+) -> Result<Json<AgentSpendingHours>, ApplicationError> {
+    user.check_permission(Permission::ReadAccount)?;
+    Ok(Json(services.spending_policies.hours(account).await?))
+}
+
+/// Restrict new payments authorized by a wallet credential to selected UTC weekdays and times.
+#[utoipa::path(put,path="/v1/accounts/{account_id}/agent-spending-hours",tag="Accounts",security(("jwt"=[]),("api_key"=[])),params(("account_id"=Uuid,Path)),request_body=AgentSpendingHours,responses((status=204),(status=403),(status=404),(status=422)))]
+async fn set_agent_spending_hours(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(account): Path<Uuid>,
+    Json(hours): Json<AgentSpendingHours>,
+) -> Result<StatusCode, ApplicationError> {
+    user.check_permission(Permission::WriteAccount)?;
+    services.account.get(account).await?;
+    services.spending_policies.set_hours(account, Some(hours)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Remove the UTC admission window while preserving amount budgets and payment history.
+#[utoipa::path(delete,path="/v1/accounts/{account_id}/agent-spending-hours",tag="Accounts",security(("jwt"=[]),("api_key"=[])),params(("account_id"=Uuid,Path)),responses((status=204),(status=403)))]
+async fn clear_agent_spending_hours(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(account): Path<Uuid>,
+) -> Result<StatusCode, ApplicationError> {
+    user.check_permission(Permission::WriteAccount)?;
+    services.spending_policies.set_hours(account, None).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Read the active spending limits and current calendar-period usage.

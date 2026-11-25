@@ -3,13 +3,16 @@ use async_trait::async_trait;
 use chrono::{Datelike, Days, NaiveDate};
 use std::sync::Arc;
 use swissknife_types::{
-    SpendingInterval, SpendingLimits, SpendingPolicy, SpendingReportQuery, SpendingReportRow, SpendingUsage,
+    AgentSpendingHours, SpendingInterval, SpendingLimits, SpendingPolicy, SpendingReportQuery, SpendingReportRow,
+    SpendingUsage,
 };
 use uuid::Uuid;
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait SpendingPolicyRepository: Send + Sync {
+    async fn hours(&self, account: Uuid) -> Result<Option<AgentSpendingHours>, DatabaseError>;
+    async fn set_hours(&self, account: Uuid, hours: Option<AgentSpendingHours>) -> Result<(), DatabaseError>;
     async fn report(&self, account: Uuid, range: SpendingReportRange) -> Result<Vec<SpendingReportRow>, DatabaseError>;
     async fn get(&self, account: Uuid) -> Result<Option<SpendingPolicy>, DatabaseError>;
     async fn replace(&self, account: Uuid, limits: SpendingLimits) -> Result<(), DatabaseError>;
@@ -19,6 +22,8 @@ pub trait SpendingPolicyRepository: Send + Sync {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait SpendingPolicyUseCases: Send + Sync {
+    async fn hours(&self, account: Uuid) -> Result<AgentSpendingHours, ApplicationError>;
+    async fn set_hours(&self, account: Uuid, hours: Option<AgentSpendingHours>) -> Result<(), ApplicationError>;
     async fn report(
         &self,
         account: Uuid,
@@ -41,6 +46,18 @@ pub struct SpendingPolicyService(pub Arc<dyn SpendingPolicyRepository>);
 
 #[async_trait]
 impl SpendingPolicyUseCases for SpendingPolicyService {
+    async fn hours(&self, account: Uuid) -> Result<AgentSpendingHours, ApplicationError> {
+        self.0
+            .hours(account)
+            .await?
+            .ok_or_else(|| DataError::NotFound("No delegated spending hours configured".into()).into())
+    }
+    async fn set_hours(&self, account: Uuid, mut hours: Option<AgentSpendingHours>) -> Result<(), ApplicationError> {
+        if let Some(ref mut window) = hours {
+            super::spending_hours::validate_hours(window)?;
+        }
+        Ok(self.0.set_hours(account, hours).await?)
+    }
     async fn report(
         &self,
         account: Uuid,

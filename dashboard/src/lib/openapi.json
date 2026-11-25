@@ -594,6 +594,119 @@
         }
       }
     },
+    "/v1/accounts/{account_id}/agent-spending-hours": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Inspect the UTC window for delegated payments.",
+        "operationId": "get_agent_spending_hours",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSpendingHours"
+                }
+              }
+            }
+          },
+          "403": {},
+          "404": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Restrict new payments authorized by a wallet credential to selected UTC weekdays and times.",
+        "operationId": "set_agent_spending_hours",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentSpendingHours"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "403": {},
+          "404": {},
+          "422": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Remove the UTC admission window while preserving amount budgets and payment history.",
+        "operationId": "clear_agent_spending_hours",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "403": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
     "/v1/accounts/{account_id}/spending-policy": {
       "get": {
         "tags": [
@@ -10352,6 +10465,39 @@
             "format": "uuid"
           }
         }
+      },
+      "AgentSpendingHours": {
+        "type": "object",
+        "description": "UTC window for new payments submitted with a delegated wallet credential.",
+        "required": [
+          "weekdays",
+          "start_minute",
+          "end_minute"
+        ],
+        "properties": {
+          "end_minute": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Excluded UTC minute of day, from 0 to 1440. An earlier end crosses midnight.",
+            "minimum": 0
+          },
+          "start_minute": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Included UTC minute of day, from 0 to 1439.",
+            "minimum": 0
+          },
+          "weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "description": "ISO weekdays on which the window starts (1 = Monday, 7 = Sunday)."
+          }
+        },
+        "additionalProperties": false
       },
       "ApiKey": {
         "type": "object",

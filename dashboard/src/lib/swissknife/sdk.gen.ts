@@ -93,6 +93,9 @@ import type {
   ChangePasswordData,
   ChangePasswordErrors,
   ChangePasswordResponses,
+  ClearAgentSpendingHoursData,
+  ClearAgentSpendingHoursErrors,
+  ClearAgentSpendingHoursResponses,
   CreateAccountApiKeyData,
   CreateAccountApiKeyErrors,
   CreateAccountApiKeyResponses,
@@ -210,6 +213,9 @@ import type {
   GetAddressData,
   GetAddressErrors,
   GetAddressResponses,
+  GetAgentSpendingHoursData,
+  GetAgentSpendingHoursErrors,
+  GetAgentSpendingHoursResponses,
   GetApiKeyData,
   GetApiKeyErrors,
   GetApiKeyResponses,
@@ -365,6 +371,9 @@ import type {
   RevokeData,
   RevokeErrors,
   RevokeResponses,
+  SetAgentSpendingHoursData,
+  SetAgentSpendingHoursErrors,
+  SetAgentSpendingHoursResponses,
   SetupCheckData,
   SetupCheckErrors,
   SetupCheckResponses,
@@ -535,6 +544,67 @@ export const createAccount = <ThrowOnError extends boolean = false>(
     responseTransformer: createAccountResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/accounts',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+/**
+ * Remove the UTC admission window while preserving amount budgets and payment history.
+ */
+export const clearAgentSpendingHours = <ThrowOnError extends boolean = false>(
+  options: Options<ClearAgentSpendingHoursData, ThrowOnError>
+): RequestResult<ClearAgentSpendingHoursResponses, ClearAgentSpendingHoursErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    ClearAgentSpendingHoursResponses,
+    ClearAgentSpendingHoursErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/agent-spending-hours',
+    ...options,
+  });
+
+/**
+ * Inspect the UTC window for delegated payments.
+ */
+export const getAgentSpendingHours = <ThrowOnError extends boolean = false>(
+  options: Options<GetAgentSpendingHoursData, ThrowOnError>
+): RequestResult<GetAgentSpendingHoursResponses, GetAgentSpendingHoursErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetAgentSpendingHoursResponses,
+    GetAgentSpendingHoursErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/agent-spending-hours',
+    ...options,
+  });
+
+/**
+ * Restrict new payments authorized by a wallet credential to selected UTC weekdays and times.
+ */
+export const setAgentSpendingHours = <ThrowOnError extends boolean = false>(
+  options: Options<SetAgentSpendingHoursData, ThrowOnError>
+): RequestResult<SetAgentSpendingHoursResponses, SetAgentSpendingHoursErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    SetAgentSpendingHoursResponses,
+    SetAgentSpendingHoursErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/agent-spending-hours',
     ...options,
     headers: {
       'Content-Type': 'application/json',

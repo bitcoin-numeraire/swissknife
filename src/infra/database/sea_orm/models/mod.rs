@@ -5,6 +5,7 @@ pub mod prelude;
 pub mod account;
 pub mod account_notification;
 pub mod account_preference;
+pub mod agent_spending_hours;
 pub mod api_key;
 pub mod asset;
 pub mod auth_identity;

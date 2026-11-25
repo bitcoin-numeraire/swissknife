@@ -12,6 +12,23 @@ export const zAccountPreferences = z.object({
 });
 
 /**
+ * UTC window for new payments submitted with a delegated wallet credential.
+ */
+export const zAgentSpendingHours = z.object({
+  end_minute: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+  start_minute: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+  weekdays: z.array(
+    z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+  ),
+});
+
+/**
  * Authentication provider namespace.
  */
 export const zAuthProvider = z.enum(['jwt', 'oauth2']);
@@ -1087,6 +1104,26 @@ export const zCreateAccountBody = zCreateAccountRequest;
  * Created
  */
 export const zCreateAccountResponse = zAccount;
+
+export const zClearAgentSpendingHoursPath = z.object({
+  account_id: z.uuid(),
+});
+
+export const zClearAgentSpendingHoursResponse = z.void();
+
+export const zGetAgentSpendingHoursPath = z.object({
+  account_id: z.uuid(),
+});
+
+export const zGetAgentSpendingHoursResponse = zAgentSpendingHours;
+
+export const zSetAgentSpendingHoursBody = zAgentSpendingHours;
+
+export const zSetAgentSpendingHoursPath = z.object({
+  account_id: z.uuid(),
+});
+
+export const zSetAgentSpendingHoursResponse = z.void();
 
 export const zDisableAccountSpendingPolicyPath = z.object({
   account_id: z.uuid(),
