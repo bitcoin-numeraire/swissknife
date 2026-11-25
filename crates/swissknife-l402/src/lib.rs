@@ -68,12 +68,25 @@ pub async fn require_payment(
         .duration_since(UNIX_EPOCH)
         .map_err(|_| GateError::Unavailable)?
         .as_secs();
-    if let Some(grant) = request
-        .headers()
-        .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|value| route.bakery.verify(&route.scope, value, now).ok())
-    {
+    let grant = match payment_header(request.headers()) {
+        Ok(Some(header)) => route.bakery.inspect(&route.scope, &header, now),
+        Ok(None) => Ok(None),
+        Err(error) => Err(error),
+    };
+    let grant = match grant {
+        Ok(grant) => grant,
+        Err(_) => {
+            return Ok((
+                StatusCode::UNAUTHORIZED,
+                [
+                    (header::WWW_AUTHENTICATE, "L402"),
+                    (header::CACHE_CONTROL, "private, no-store"),
+                ],
+            )
+                .into_response())
+        }
+    };
+    if let Some(grant) = grant {
         if route.gate.redeem(&grant).await? {
             request.headers_mut().remove(header::AUTHORIZATION);
             request.extensions_mut().insert(grant.clone());
@@ -107,6 +120,29 @@ pub async fn require_payment(
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("private, no-store"));
     Ok(response)
+}
+
+// HTTP authentication schemes are case-insensitive. Normalize the supported
+// schemes for the protocol parser and leave other authentication schemes alone.
+fn payment_header(headers: &axum::http::HeaderMap) -> Result<Option<String>, InvalidCredential> {
+    let mut values = headers.get_all(header::AUTHORIZATION).iter();
+    let Some(header) = values.next() else {
+        return Ok(None);
+    };
+    if values.next().is_some() {
+        return Err(InvalidCredential);
+    }
+    let bytes = header.as_bytes().trim_ascii();
+    let scheme_end = bytes.iter().position(u8::is_ascii_whitespace).unwrap_or(bytes.len());
+    let scheme = &bytes[..scheme_end];
+    if !scheme.eq_ignore_ascii_case(b"L402") && !scheme.eq_ignore_ascii_case(b"LSAT") {
+        return Ok(None);
+    }
+    if bytes.len() > 8192 {
+        return Err(InvalidCredential);
+    }
+    let value = std::str::from_utf8(bytes[scheme_end..].trim_ascii()).map_err(|_| InvalidCredential)?;
+    Ok(Some(format!("L402 {value}")))
 }
 
 #[cfg(test)]

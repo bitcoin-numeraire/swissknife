@@ -48,6 +48,11 @@ impl Bakery {
     }
 
     pub fn verify(&self, scope: &str, header: &str, now: u64) -> Result<PaidGrant, InvalidCredential> {
+        self.inspect(scope, header, now)?.ok_or(InvalidCredential)
+    }
+
+    // None is a genuine payment for expired or different route terms.
+    pub(crate) fn inspect(&self, scope: &str, header: &str, now: u64) -> Result<Option<PaidGrant>, InvalidCredential> {
         if header.len() > 8192 {
             return Err(InvalidCredential);
         }
@@ -61,31 +66,44 @@ impl Bakery {
             return Err(InvalidCredential);
         }
 
-        let required = format!("scope={scope}");
-        let has = |test: &dyn Fn(&[u8]) -> bool| {
-            macaroon
-                .caveats()
-                .iter()
-                .any(|c| matches!(c, Caveat::FirstParty(c) if test(c.predicate())))
-        };
-        let valid_expiry = move |p: &[u8]| {
-            p.strip_prefix(b"expires=")
-                .and_then(|s| std::str::from_utf8(s).ok())
-                .and_then(|s| s.parse::<u64>().ok())
-                .is_some_and(|expiry| now < expiry)
-        };
-        if !has(&|p| p == required.as_bytes()) || !has(&valid_expiry) {
+        let mut verifier = Verifier::default();
+        let mut has_scope = false;
+        let mut has_expiry = false;
+        let mut applies = true;
+        for caveat in macaroon.caveats() {
+            let Caveat::FirstParty(caveat) = caveat else {
+                return Err(InvalidCredential);
+            };
+            let predicate = caveat.predicate();
+            if let Some(value) = predicate.strip_prefix(b"scope=") {
+                has_scope = true;
+                applies &= value == scope.as_bytes();
+            } else if let Some(value) = predicate.strip_prefix(b"expires=") {
+                let expiry = std::str::from_utf8(value)
+                    .ok()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .ok_or(InvalidCredential)?;
+                has_expiry = true;
+                applies &= now < expiry;
+            } else {
+                return Err(InvalidCredential);
+            }
+            // Verify the signature over every recognized caveat before deciding
+            // whether the authentic credential authorizes or needs renewal.
+            verifier.satisfy_exact(predicate);
+        }
+        if !has_scope || !has_expiry {
             return Err(InvalidCredential);
         }
-        let mut verifier = Verifier::default();
-        verifier.satisfy_exact(required.as_bytes());
-        verifier.satisfy_general(valid_expiry);
         verifier
             .verify(&macaroon, &self.root, &[])
             .map_err(|_| InvalidCredential)?;
-        Ok(PaidGrant {
+        if !applies {
+            return Ok(None);
+        }
+        Ok(Some(PaidGrant {
             payment_hash,
             token_id: id[34..].try_into().map_err(|_| InvalidCredential)?,
-        })
+        }))
     }
 }

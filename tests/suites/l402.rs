@@ -48,6 +48,15 @@ async fn a_real_invoice_unlocks_only_the_selected_merchant_resource() {
         http.post(&address).send().await.unwrap().status(),
         StatusCode::METHOD_NOT_ALLOWED
     );
+    // Invalid payment proofs do not consume this route's one invoice per minute.
+    let denied = http
+        .get(&address)
+        .header(header::AUTHORIZATION, "L402 malformed")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(denied.headers()[header::WWW_AUTHENTICATE], "L402");
     let challenge = http.get(&address).send().await.unwrap();
     assert_eq!(challenge.status(), StatusCode::PAYMENT_REQUIRED);
     let (macaroon, invoice) = challenge.headers()[header::WWW_AUTHENTICATE]
