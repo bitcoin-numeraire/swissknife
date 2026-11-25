@@ -63,12 +63,10 @@ hex = "0.4.3"
 anyhow = "1.0.104"
 futures-util = "0.3.34"
 humantime = "2.4.0"
-rust_socketio = { version = "0.6.0", features = ["async"] }
 migration = { path = "crates/migration" }
 swissknife-types = { path = "crates/swissknife-types" }
 utoipa = { version = "6.0.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-scalar = { version = "0.4.0", features = ["axum"] }
-native-tls = "0.2.18"
 nostr-sdk = "0.45.6"
 rand = "0.10.4"
 base64 = "0.23.1"

@@ -65,7 +65,7 @@ RUN --mount=type=cache,target=/app/dashboard/.next/cache \
 
 # Use debian:trixie-slim as minimal runtime base
 # Trixie = Debian 13
-# Match the builder's Debian release for GLIBC and OpenSSL compatibility.
+# Match the builder's Debian release for glibc compatibility.
 FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS runtime-base
 
 # Install minimal runtime dependencies

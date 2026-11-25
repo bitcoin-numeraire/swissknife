@@ -14,7 +14,7 @@ use crate::{
     },
     domains::bitcoin::BitcoinWallet,
     infra::lightning::{
-        cln::{ClnGrpcListener, ClnWebsocketListener},
+        cln::{ClnGrpcListener, ClnRestListener},
         lnd::{LndGrpcListener, LndRestListener},
         EventsListener,
     },
@@ -32,6 +32,7 @@ const LISTENER_STABLE_THRESHOLD: Duration = Duration::from_secs(60);
 pub struct EventListener {
     listener: Arc<dyn EventsListener>,
     services: Arc<AppServices>,
+    reconnect_delays: (Duration, Duration),
 }
 
 impl EventListener {
@@ -40,6 +41,7 @@ impl EventListener {
         bitcoin_wallet: Arc<dyn BitcoinWallet>,
         services: Arc<AppServices>,
     ) -> Result<Self, ApplicationError> {
+        let mut reconnect_delays = (LISTENER_MIN_RECONNECT_DELAY, LISTENER_MAX_RECONNECT_DELAY);
         let listener = match config.ln_provider {
             LightningProvider::ClnGrpc => {
                 let cln_config = config
@@ -57,7 +59,9 @@ impl EventListener {
                     .clone()
                     .ok_or_else(|| ConfigError::MissingLightningProviderConfig(config.ln_provider.to_string()))?;
 
-                let listener = ClnWebsocketListener::new(cln_config, services.clone(), bitcoin_wallet).await?;
+                let min = cln_config.ws_min_reconnect_delay.max(Duration::from_millis(100));
+                reconnect_delays = (min, cln_config.ws_max_reconnect_delay.max(min));
+                let listener = ClnRestListener::new(cln_config, services.clone()).await?;
 
                 Arc::new(listener) as Arc<dyn EventsListener>
             }
@@ -83,14 +87,19 @@ impl EventListener {
             }
         };
 
-        Ok(Self { listener, services })
+        Ok(Self {
+            listener,
+            services,
+            reconnect_delays,
+        })
     }
 
     pub async fn start(&self) -> Result<(), ApplicationError> {
         let listener = self.listener.clone();
         let services = self.services.clone();
+        let (min_delay, max_delay) = self.reconnect_delays;
         tokio::spawn(async move {
-            let mut backoff = LISTENER_MIN_RECONNECT_DELAY;
+            let mut backoff = min_delay;
             let mut replay_before_listen = false;
 
             loop {
@@ -98,7 +107,7 @@ impl EventListener {
                     if let Err(err) = Self::sync_offchain_state(&services).await {
                         error!(%err, ?backoff, "Lightning listener replay sync failed; retrying");
                         sleep(backoff).await;
-                        backoff = (backoff * 2).min(LISTENER_MAX_RECONNECT_DELAY);
+                        backoff = backoff.saturating_mul(2).min(max_delay);
                         continue;
                     }
                 }
@@ -117,9 +126,9 @@ impl EventListener {
                 sleep(backoff).await;
                 replay_before_listen = true;
                 backoff = if uptime >= LISTENER_STABLE_THRESHOLD {
-                    LISTENER_MIN_RECONNECT_DELAY
+                    min_delay
                 } else {
-                    (backoff * 2).min(LISTENER_MAX_RECONNECT_DELAY)
+                    backoff.saturating_mul(2).min(max_delay)
                 };
             }
         });
@@ -185,6 +194,7 @@ mod tests {
         let event_listener = EventListener {
             listener: Arc::new(listener),
             services,
+            reconnect_delays: (LISTENER_MIN_RECONNECT_DELAY, LISTENER_MAX_RECONNECT_DELAY),
         };
 
         event_listener.start().await.unwrap();

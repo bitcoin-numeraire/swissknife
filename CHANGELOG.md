@@ -8,6 +8,10 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Changed
+
+- Core Lightning REST uses indexed HTTPS requests for invoice, payment and on-chain updates. Restricted runes need access to `wait`, `listinvoices`, `listsendpays` and `listchainmoves`. Existing reconnect delay settings still apply.
+
 ### Fixed
 
 - LND REST invoices and confirmed deposits use the same TLS trust settings as ordinary node requests on macOS and Linux.

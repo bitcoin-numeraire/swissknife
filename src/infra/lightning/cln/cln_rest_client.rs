@@ -65,8 +65,7 @@ pub struct ClnRestClientConfig {
 }
 
 pub struct ClnRestClient {
-    client: Client,
-    base_url: String,
+    rpc: ClnRestRpc,
     node_id: String,
     maxfee: Option<u64>,
     retry_for: Option<u32>,
@@ -75,8 +74,14 @@ pub struct ClnRestClient {
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
 
-impl ClnRestClient {
-    pub async fn new(config: ClnRestClientConfig) -> Result<Self, LightningError> {
+pub(super) struct ClnRestRpc {
+    client: Client,
+    base_url: String,
+    timeout: Duration,
+}
+
+impl ClnRestRpc {
+    pub(super) async fn new(config: &ClnRestClientConfig) -> Result<Self, LightningError> {
         let mut headers = HeaderMap::new();
         let mut rune_header =
             HeaderValue::from_str(&config.rune).map_err(|e| LightningError::ParseConfig(e.to_string()))?;
@@ -86,7 +91,6 @@ impl ClnRestClient {
         let mut client_builder = Client::builder()
             .user_agent(USER_AGENT)
             .connect_timeout(config.connect_timeout)
-            .timeout(config.timeout)
             .connection_verbose(config.connection_verbose)
             .default_headers(headers)
             .danger_accept_invalid_certs(config.accept_invalid_certs);
@@ -108,20 +112,11 @@ impl ClnRestClient {
             .build()
             .map_err(|e| LightningError::ParseConfig(format!("{e:?}")))?;
 
-        let mut cln_client = Self {
+        Ok(Self {
             client,
             base_url: config.endpoint.clone(),
-            node_id: String::new(),
-            maxfee: config.maxfee,
-            retry_for: Some(config.payment_timeout.as_secs() as u32),
-            network: BtcNetwork::default(),
-        };
-
-        let node = cln_client.node_info().await?;
-        cln_client.network = parse_network(&node.network);
-        cln_client.node_id = node.id;
-
-        Ok(cln_client)
+            timeout: config.timeout,
+        })
     }
 
     async fn read_ca(path: &str) -> anyhow::Result<Certificate> {
@@ -131,14 +126,35 @@ impl ClnRestClient {
         Ok(ca_certificate)
     }
 
-    async fn post_request<T: DeserializeOwned>(&self, endpoint: &str, payload: &impl Serialize) -> anyhow::Result<T> {
-        let response = self
-            .client
-            .post(format!("{}/v1/{}", self.base_url, endpoint))
-            .json(payload)
-            .send()
-            .await?;
+    pub(super) async fn post<T: DeserializeOwned>(&self, method: &str, payload: &impl Serialize) -> anyhow::Result<T> {
+        Self::response(self.request(method, payload).timeout(self.timeout)).await
+    }
 
+    /// The node holds an indexed wait open until a new event arrives.
+    pub(super) async fn wait(&self, subsystem: &str, index: &str, next: u64) -> anyhow::Result<u64> {
+        let payload = serde_json::json!({ "subsystem": subsystem, "indexname": index, "nextvalue": next });
+        let request = self.request("wait", &payload);
+        let request = if next == 0 {
+            request.timeout(self.timeout)
+        } else {
+            request
+        };
+        let result: serde_json::Value = Self::response(request).await?;
+        result
+            .get(index)
+            .and_then(serde_json::Value::as_u64)
+            .filter(|value| *value >= next)
+            .ok_or_else(|| anyhow::anyhow!("CLN returned an invalid {subsystem} {index} index"))
+    }
+
+    fn request(&self, method: &str, payload: &impl Serialize) -> reqwest::RequestBuilder {
+        self.client
+            .post(format!("{}/v1/{}", self.base_url, method))
+            .json(payload)
+    }
+
+    async fn response<T: DeserializeOwned>(request: reqwest::RequestBuilder) -> anyhow::Result<T> {
+        let response = request.send().await?;
         let status = response.status();
         if status.is_client_error() || status.is_server_error() {
             let error_text = response.text().await?;
@@ -152,9 +168,28 @@ impl ClnRestClient {
         let result = response.json::<T>().await?;
         Ok(result)
     }
+}
+
+impl ClnRestClient {
+    pub async fn new(config: ClnRestClientConfig) -> Result<Self, LightningError> {
+        let mut cln_client = Self {
+            rpc: ClnRestRpc::new(&config).await?,
+            node_id: String::new(),
+            maxfee: config.maxfee,
+            retry_for: Some(config.payment_timeout.as_secs() as u32),
+            network: BtcNetwork::default(),
+        };
+
+        let node = cln_client.node_info().await?;
+        cln_client.network = parse_network(&node.network);
+        cln_client.node_id = node.id;
+
+        Ok(cln_client)
+    }
 
     async fn node_info(&self) -> Result<GetinfoResponse, LightningError> {
-        self.post_request("getinfo", &GetinfoRequest {})
+        self.rpc
+            .post("getinfo", &GetinfoRequest {})
             .await
             .map_err(|e| LightningError::NodeInfo(e.to_string()))
     }
@@ -175,7 +210,8 @@ impl LnClient for ClnRestClient {
         options: LnInvoiceOptions,
     ) -> Result<Invoice, LightningError> {
         let response: InvoiceResponse = self
-            .post_request(
+            .rpc
+            .post(
                 "invoice",
                 &InvoiceRequest {
                     description,
@@ -197,7 +233,8 @@ impl LnClient for ClnRestClient {
     async fn estimate_fee(&self, target: LnPaymentTarget) -> Result<u64, LightningError> {
         let fee_limit_msat = self.fee_limit_msat(target.amount_msat);
         let response: GetRoutesResponse = self
-            .post_request(
+            .rpc
+            .post(
                 "getroutes",
                 &GetRoutesRequest {
                     source: self.node_id.clone(),
@@ -238,7 +275,8 @@ impl LnClient for ClnRestClient {
         label: String,
     ) -> Result<Payment, LightningError> {
         let response: XpayResponse = self
-            .post_request(
+            .rpc
+            .post(
                 "xpay",
                 &XpayRequest {
                     invstring: bolt11,
@@ -256,7 +294,8 @@ impl LnClient for ClnRestClient {
 
     async fn invoice_by_hash(&self, payment_hash: String) -> Result<Option<Invoice>, LightningError> {
         let response: ListInvoicesResponse = self
-            .post_request(
+            .rpc
+            .post(
                 "listinvoices",
                 &ListInvoicesRequest {
                     payment_hash: Some(payment_hash),
@@ -273,7 +312,8 @@ impl LnClient for ClnRestClient {
 
     async fn payment_by_hash(&self, payment_hash: String) -> Result<Option<Payment>, LightningError> {
         let response = self
-            .post_request::<ListPaysResponse>(
+            .rpc
+            .post::<ListPaysResponse>(
                 "listpays",
                 &ListPaysRequest {
                     payment_hash: Some(payment_hash.clone()),
@@ -327,22 +367,24 @@ impl LnClient for ClnRestClient {
     }
 
     async fn cancel_invoice(&self, _payment_hash: String, label: String) -> Result<(), LightningError> {
-        self.post_request::<DelInvoiceResponse>(
-            "delinvoice",
-            &DelInvoiceRequest {
-                label,
-                status: "unpaid".to_string(),
-                desconly: None,
-            },
-        )
-        .await
-        .map_err(|e| LightningError::CancelInvoice(e.to_string()))?;
+        self.rpc
+            .post::<DelInvoiceResponse>(
+                "delinvoice",
+                &DelInvoiceRequest {
+                    label,
+                    status: "unpaid".to_string(),
+                    desconly: None,
+                },
+            )
+            .await
+            .map_err(|e| LightningError::CancelInvoice(e.to_string()))?;
 
         Ok(())
     }
 
     async fn health(&self) -> Result<HealthStatus, LightningError> {
-        self.post_request::<GetinfoResponse>("getinfo", &GetinfoRequest {})
+        self.rpc
+            .post::<GetinfoResponse>("getinfo", &GetinfoRequest {})
             .await
             .map_err(|e| LightningError::HealthCheck(e.to_string()))?;
 
@@ -360,7 +402,8 @@ impl BitcoinWallet for ClnRestClient {
         };
 
         let response: NewAddrResponse = self
-            .post_request(
+            .rpc
+            .post(
                 "newaddr",
                 &NewAddrRequest {
                     addresstype: Some(address_type_param.to_string()),
@@ -382,7 +425,8 @@ impl BitcoinWallet for ClnRestClient {
         fee_rate_sat_vb: Option<u32>,
     ) -> Result<BtcPreparedTransaction, BitcoinError> {
         let response: TxPrepareResponse = self
-            .post_request(
+            .rpc
+            .post(
                 "txprepare",
                 &TxPrepareRequest {
                     outputs: vec![TxPrepareOutput {
@@ -396,7 +440,8 @@ impl BitcoinWallet for ClnRestClient {
             .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
 
         let set_psbt_version_response: SetPsbtVersionResponse = self
-            .post_request(
+            .rpc
+            .post(
                 "setpsbtversion",
                 &SetPsbtVersionRequest {
                     psbt: response.psbt.clone(),
@@ -418,21 +463,23 @@ impl BitcoinWallet for ClnRestClient {
     }
 
     async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError> {
-        self.post_request::<TxSendResponse>(
-            "txsend",
-            &TxSendRequest {
-                txid: prepared.txid.clone(),
-            },
-        )
-        .await
-        .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?;
+        self.rpc
+            .post::<TxSendResponse>(
+                "txsend",
+                &TxSendRequest {
+                    txid: prepared.txid.clone(),
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?;
 
         Ok(None)
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
         let _response: TxDiscardResponse = self
-            .post_request(
+            .rpc
+            .post(
                 "txdiscard",
                 &TxDiscardRequest {
                     txid: prepared.txid.clone(),
@@ -446,7 +493,8 @@ impl BitcoinWallet for ClnRestClient {
 
     async fn get_transaction(&self, txid: &str) -> Result<Option<BtcTransaction>, BitcoinError> {
         let response: ListTransactionsResponse = self
-            .post_request("listtransactions", &ListTransactionsRequest {})
+            .rpc
+            .post("listtransactions", &ListTransactionsRequest {})
             .await
             .map_err(|e| BitcoinError::GetTransaction(e.to_string()))?;
 
@@ -501,7 +549,8 @@ impl BitcoinWallet for ClnRestClient {
         };
 
         let response: ListChainMovesResponse = self
-            .post_request(
+            .rpc
+            .post(
                 "listchainmoves",
                 &ListChainMovesRequest {
                     index: Some("created".to_string()),
@@ -526,7 +575,8 @@ impl BitcoinWallet for ClnRestClient {
 
         let outputs_by_outpoint = if has_deposits {
             let funds: ListFundsResponse = self
-                .post_request("listfunds", &ListFundsRequest { spent: Some(true) })
+                .rpc
+                .post("listfunds", &ListFundsRequest { spent: Some(true) })
                 .await
                 .map_err(|e| BitcoinError::Synchronize(e.to_string()))?;
 
@@ -605,7 +655,8 @@ impl BitcoinWallet for ClnRestClient {
         include_spent: bool,
     ) -> Result<Option<BtcOutput>, BitcoinError> {
         let response: ListFundsResponse = self
-            .post_request(
+            .rpc
+            .post(
                 "listfunds",
                 &ListFundsRequest {
                     spent: Some(include_spent),
