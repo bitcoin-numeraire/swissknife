@@ -88,6 +88,24 @@ export type AgentKey = {
 };
 
 /**
+ * UTC window for new payments submitted with a delegated wallet credential.
+ */
+export type AgentSpendingHours = {
+  /**
+   * Excluded UTC minute of day, from 0 to 1440. An earlier end crosses midnight.
+   */
+  end_minute: number;
+  /**
+   * Included UTC minute of day, from 0 to 1439.
+   */
+  start_minute: number;
+  /**
+   * ISO weekdays on which the window starts (1 = Monday, 7 = Sunday).
+   */
+  weekdays: Array<number>;
+};
+
+/**
  * API Key
  */
 export type ApiKey = {
@@ -1953,6 +1971,69 @@ export type CreateAccountResponses = {
 };
 
 export type CreateAccountResponse = CreateAccountResponses[keyof CreateAccountResponses];
+
+export type ClearAgentSpendingHoursData = {
+  body?: never;
+  path: {
+    account_id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{account_id}/agent-spending-hours';
+};
+
+export type ClearAgentSpendingHoursErrors = {
+  403: unknown;
+};
+
+export type ClearAgentSpendingHoursResponses = {
+  204: void;
+};
+
+export type ClearAgentSpendingHoursResponse =
+  ClearAgentSpendingHoursResponses[keyof ClearAgentSpendingHoursResponses];
+
+export type GetAgentSpendingHoursData = {
+  body?: never;
+  path: {
+    account_id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{account_id}/agent-spending-hours';
+};
+
+export type GetAgentSpendingHoursErrors = {
+  403: unknown;
+  404: unknown;
+};
+
+export type GetAgentSpendingHoursResponses = {
+  200: AgentSpendingHours;
+};
+
+export type GetAgentSpendingHoursResponse =
+  GetAgentSpendingHoursResponses[keyof GetAgentSpendingHoursResponses];
+
+export type SetAgentSpendingHoursData = {
+  body: AgentSpendingHours;
+  path: {
+    account_id: string;
+  };
+  query?: never;
+  url: '/v1/accounts/{account_id}/agent-spending-hours';
+};
+
+export type SetAgentSpendingHoursErrors = {
+  403: unknown;
+  404: unknown;
+  422: unknown;
+};
+
+export type SetAgentSpendingHoursResponses = {
+  204: void;
+};
+
+export type SetAgentSpendingHoursResponse =
+  SetAgentSpendingHoursResponses[keyof SetAgentSpendingHoursResponses];
 
 export type DisableAccountSpendingPolicyData = {
   body?: never;
