@@ -475,3 +475,199 @@ async fn merchant_revenue_counts_only_settled_attributed_invoices_for_the_owned_
     assert_eq!(empty.body, json!([]));
     app.stop();
 }
+
+#[tokio::test]
+async fn two_merchants_publish_independent_routes_and_honor_passes_during_a_sales_pause() {
+    use crate::common::Auth;
+    use serde_json::json;
+    let setup = TestApp::isolated("merchant-catalog", &[]).await;
+    let admin = setup.admin_token().await;
+    let a = setup.create_account_with_wallet(admin, "publisher-a").await;
+    let b = setup.create_account_with_wallet(admin, "publisher-b").await;
+    let inactive = setup
+        .api()
+        .get(
+            &format!("/v1/me/wallets/{}/l402/routes", a.wallet.id),
+            Auth::ApiKey(&a.key),
+        )
+        .await;
+    assert_eq!(inactive.status, StatusCode::OK);
+    assert_eq!(inactive.body, json!({"origins":[],"routes":[]}));
+    let upstream = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/daily"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("daily report"))
+        .mount(&upstream)
+        .await;
+    let origin = format!("{}/daily?account=private", upstream.uri());
+    let env = [
+        ("SWISSKNIFE_L402__ROOT_KEY", hex::encode([24u8; 32])),
+        ("SWISSKNIFE_L402__ORIGINS__DATA__WALLET_ID", a.wallet.id.to_string()),
+        ("SWISSKNIFE_L402__ORIGINS__DATA__TARGET", origin.clone()),
+        ("SWISSKNIFE_L402__ORIGINS__DATA__PRICE_SATS", "50".into()),
+        ("SWISSKNIFE_L402__ORIGINS__DATA__ACCESS_SECONDS", "600".into()),
+        ("SWISSKNIFE_L402__ORIGINS__ARCHIVE__WALLET_ID", a.wallet.id.to_string()),
+        ("SWISSKNIFE_L402__ORIGINS__ARCHIVE__TARGET", origin.clone()),
+        ("SWISSKNIFE_L402__ORIGINS__ARCHIVE__PRICE_SATS", "100".into()),
+        ("SWISSKNIFE_L402__ORIGINS__ARCHIVE__ACCESS_SECONDS", "600".into()),
+        ("SWISSKNIFE_L402__ORIGINS__FORECAST__WALLET_ID", b.wallet.id.to_string()),
+        ("SWISSKNIFE_L402__ORIGINS__FORECAST__TARGET", origin),
+        ("SWISSKNIFE_L402__ORIGINS__FORECAST__PRICE_SATS", "100".into()),
+        ("SWISSKNIFE_L402__ORIGINS__FORECAST__ACCESS_SECONDS", "600".into()),
+    ];
+    let app = setup.restart("publish", &env).await;
+    let api = app.api();
+    let own_a = Auth::ApiKey(&a.key);
+    let own_b = Auth::ApiKey(&b.key);
+    let path_a = format!("/v1/me/wallets/{}/l402/routes", a.wallet.id);
+    let path_b = format!("/v1/me/wallets/{}/l402/routes", b.wallet.id);
+    let sale_a = format!("{path_a}/daily");
+    let sale_b = format!("{path_b}/daily");
+    let terms = |origin: &str, price: u64, enabled: bool| json!({"origin":origin,"price_msat":price.to_string(),"enabled":enabled});
+    assert_eq!(api.get(&path_a, Auth::None).await.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(api.get(&path_a, own_b).await.status, StatusCode::NOT_FOUND);
+    let delegated = api.post(
+        &format!("/v1/me/wallets/{}/agent-keys", a.wallet.id),
+        own_a,
+        json!({"name":"merchant reader","capabilities":{"read":true,"receive":true},"expires_at":chrono::Utc::now()+chrono::Duration::hours(1)}),
+    ).await.parse::<swissknife_types::IssuedAgentKey>();
+    let grant = Auth::WalletKey(&delegated.key);
+    assert_eq!(api.get(&path_a, grant).await.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        api.put(&sale_a, grant, terms("data", 1000, true)).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    for invalid in ["UpperCase".to_string(), "x".repeat(58)] {
+        assert_eq!(
+            api.put(&format!("{path_a}/{invalid}"), own_a, terms("data", 1000, true))
+                .await
+                .status,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+    let catalog = api.get(&path_a, own_a).await;
+    assert_eq!(catalog.status, StatusCode::OK);
+    assert_eq!(catalog.body["origins"].as_array().unwrap().len(), 2);
+    assert!(!catalog.body.to_string().contains("private") && !catalog.body.to_string().contains("forecast"));
+    assert_eq!(
+        api.put(&sale_a, own_b, terms("data", 1000, true)).await.status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        api.put(&sale_a, own_a, terms("forecast", 1000, true)).await.status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        api.put(&sale_a, own_a, terms("data", 50001, true)).await.status,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let mut arbitrary = terms("data", 1000, true);
+    arbitrary["target"] = json!("http://example.invalid");
+    assert!(!api.put(&sale_a, own_a, arbitrary).await.status.is_success());
+    assert_eq!(
+        api.put(&sale_a, own_a, terms("data", 11111, true)).await.status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        api.put(&sale_b, own_b, terms("forecast", 32000, true)).await.status,
+        StatusCode::NO_CONTENT
+    );
+    let race = format!("{path_a}/stable-origin");
+    let (left, right) = tokio::join!(
+        api.put(&race, own_a, terms("data", 3000, true)),
+        api.put(&race, own_a, terms("archive", 4000, true))
+    );
+    let mut statuses = [left.status.as_u16(), right.status.as_u16()];
+    statuses.sort();
+    assert_eq!(statuses, [204, 409]);
+    let http = Client::new();
+    let url = |app: &TestApp, wallet: uuid::Uuid| format!("{}/l402/w/{wallet}/daily", app.base_url);
+    let initial = http.get(url(&app, a.wallet.id)).send().await.unwrap();
+    assert_eq!(initial.status(), StatusCode::PAYMENT_REQUIRED);
+    let (macaroon, invoice) = initial.headers()[header::WWW_AUTHENTICATE]
+        .to_str()
+        .unwrap()
+        .strip_prefix("L402 macaroon=\"")
+        .unwrap()
+        .strip_suffix('"')
+        .unwrap()
+        .split_once("\", invoice=\"")
+        .unwrap();
+    assert_eq!(
+        invoice
+            .parse::<lightning_invoice::Bolt11Invoice>()
+            .unwrap()
+            .amount_milli_satoshis(),
+        Some(11111)
+    );
+    assert_eq!(
+        api.put(&sale_a, own_a, terms("data", 22000, false)).await.status,
+        StatusCode::NO_CONTENT
+    );
+    let preimage = Counterparty::for_provider(&app.provider).pay_for_preimage(invoice);
+    let proof = format!("L402 {macaroon}:{preimage}");
+    let app = app.restart("published-restart", &env).await;
+    assert_eq!(
+        http.get(url(&app, a.wallet.id)).send().await.unwrap().status(),
+        StatusCode::NOT_FOUND
+    );
+    let crossed = http
+        .get(url(&app, b.wallet.id))
+        .header(header::AUTHORIZATION, &proof)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(crossed.status(), StatusCode::PAYMENT_REQUIRED);
+    assert!(upstream.received_requests().await.unwrap().is_empty());
+    let paid = http
+        .get(url(&app, a.wallet.id))
+        .header(header::AUTHORIZATION, &proof)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(paid.status(), StatusCode::OK);
+    assert_eq!(paid.text().await.unwrap(), "daily report");
+    let api = app.api();
+    assert_eq!(
+        api.put(&sale_a, own_a, terms("data", 22000, true)).await.status,
+        StatusCode::NO_CONTENT
+    );
+    let next = http.get(url(&app, a.wallet.id)).send().await.unwrap();
+    let invoice = next.headers()[header::WWW_AUTHENTICATE]
+        .to_str()
+        .unwrap()
+        .split_once("invoice=\"")
+        .unwrap()
+        .1
+        .trim_end_matches('"');
+    assert_eq!(
+        invoice
+            .parse::<lightning_invoice::Bolt11Invoice>()
+            .unwrap()
+            .amount_milli_satoshis(),
+        Some(22000)
+    );
+    wait_until(
+        Duration::from_secs(40),
+        "wallet sale credited to the right merchant",
+        || async {
+            app.wallet_balance(app.admin_token().await, a.wallet.id)
+                .await
+                .available_msat
+                == 11111
+        },
+    )
+    .await;
+    assert_eq!(
+        app.wallet_balance(app.admin_token().await, b.wallet.id)
+            .await
+            .available_msat,
+        0
+    );
+    let revenue = api
+        .get(&format!("/v1/me/wallets/{}/l402/revenue", a.wallet.id), own_a)
+        .await;
+    assert_eq!(revenue.body[0]["route"], "wallet/daily");
+    assert_eq!(revenue.body[0]["received_msat"], "11111");
+    app.stop();
+}

@@ -6,6 +6,8 @@
 //! annotations so the wire shape lives with the type; behaviour stays in the
 //! app's use cases.
 
+mod merchant;
+pub use merchant::{MerchantOrigin, MerchantSaleTerms, WalletMerchantCatalog, WalletMerchantRoute};
 mod account;
 mod agent;
 mod spending_policy;

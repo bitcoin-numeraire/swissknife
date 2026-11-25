@@ -17,6 +17,7 @@ pub mod invoice;
 pub mod l402_usage;
 pub mod ln_address;
 pub mod local_credential;
+pub mod merchant_route;
 pub mod offer_cursor;
 pub mod offer_receipt;
 pub mod payment;

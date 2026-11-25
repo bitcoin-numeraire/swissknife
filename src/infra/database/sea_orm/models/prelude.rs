@@ -13,6 +13,7 @@ pub use super::config::Entity as Config;
 pub use super::invoice::Entity as Invoice;
 pub use super::ln_address::Entity as LnAddress;
 pub use super::local_credential::Entity as LocalCredential;
+pub use super::merchant_route::Entity as MerchantRoute;
 pub use super::offer_cursor::Entity as OfferCursor;
 pub use super::offer_receipt::Entity as OfferReceipt;
 pub use super::payment::Entity as Payment;

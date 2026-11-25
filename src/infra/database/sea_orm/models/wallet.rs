@@ -51,6 +51,8 @@ pub enum Relation {
     Invoice,
     #[sea_orm(has_one = "super::ln_address::Entity")]
     LnAddress,
+    #[sea_orm(has_many = "super::merchant_route::Entity")]
+    MerchantRoute,
     #[sea_orm(has_many = "super::payment::Entity")]
     Payment,
 }
@@ -88,6 +90,12 @@ impl Related<super::invoice::Entity> for Entity {
 impl Related<super::ln_address::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::LnAddress.def()
+    }
+}
+
+impl Related<super::merchant_route::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::MerchantRoute.def()
     }
 }
 

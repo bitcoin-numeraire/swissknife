@@ -42,6 +42,9 @@ impl SeaOrmStore {
                 db_conn.clone(),
             )),
             Arc::new(super::l402_request_meter::SeaOrmRequestMeter(db_conn.clone())),
+            Arc::new(super::merchant_route_repository::SeaOrmMerchantRouteRepository(
+                db_conn.clone(),
+            )),
             Arc::new(super::offer_repository::SeaOrmOfferRepository(db_conn.clone())),
             Arc::new(SeaOrmWalletRepository::new(db_conn.clone())),
             Arc::new(SeaOrmAccountRepository::new(db_conn.clone())),

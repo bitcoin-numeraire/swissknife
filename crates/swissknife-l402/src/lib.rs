@@ -21,6 +21,8 @@ pub struct ChallengeInvoice {
 
 #[derive(Debug, thiserror::Error)]
 pub enum GateError {
+    #[error("Resource is unavailable for new sales")]
+    Closed,
     #[error("Payment service unavailable")]
     Unavailable,
     #[error("Too many outstanding payment requests")]
@@ -50,6 +52,7 @@ pub struct PaidRoute {
 impl IntoResponse for GateError {
     fn into_response(self) -> Response {
         let status = match self {
+            Self::Closed => StatusCode::NOT_FOUND,
             Self::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
             Self::Busy => StatusCode::TOO_MANY_REQUESTS,
         };
