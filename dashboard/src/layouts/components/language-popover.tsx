@@ -30,7 +30,7 @@ export type LanguagePopoverProps = IconButtonProps & {
 export function LanguagePopover({ data = [], sx, ...other }: LanguagePopoverProps) {
   const { open, anchorEl, onClose, onOpen } = usePopover();
 
-  const { onChangeLang, currentLang } = useTranslate();
+  const { t, onChangeLang, currentLang } = useTranslate();
 
   const handleChangeLang = useCallback(
     (newLang: LanguageValue) => {
@@ -49,7 +49,7 @@ export function LanguagePopover({ data = [], sx, ...other }: LanguagePopoverProp
             selected={option.value === currentLang.value}
             onClick={() => handleChangeLang(option.value as LanguageValue)}
           >
-            <FlagIcon code={option.countryCode} />
+            <FlagIcon code={option.countryCode} aria-hidden="true" />
             {option.label}
           </MenuItem>
         ))}
@@ -64,7 +64,7 @@ export function LanguagePopover({ data = [], sx, ...other }: LanguagePopoverProp
         whileTap={varTap(0.96)}
         whileHover={varHover(1.04)}
         transition={transitionTap()}
-        aria-label="Languages button"
+        aria-label={t('select_language')}
         onClick={onOpen}
         sx={[
           (theme) => ({

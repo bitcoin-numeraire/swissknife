@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- The dashboard supports German, Spanish, Italian and European Portuguese, including localized dates and numbers.
+
 - Operators can review and confirm an opening credit during setup or add credit from a wallet’s administration page.
 
 - Authorized operators can post an opening credit or top up a wallet in its own asset units. Every credit records its operator, reason, and settled adjustment activity.

@@ -1,8 +1,6 @@
-import type { LanguageValue } from './locales-config';
-
 import { cookies as getCookies } from 'next/headers';
 
-import { cookieName, fallbackLng } from './locales-config';
+import { languages, cookieName, fallbackLng } from './locales-config';
 
 // ----------------------------------------------------------------------
 
@@ -19,5 +17,5 @@ export async function detectLanguage() {
 
   const language = cookies.get(cookieName)?.value ?? fallbackLng;
 
-  return language as LanguageValue;
+  return languages.find((supported) => supported === language) ?? fallbackLng;
 }

@@ -1,0 +1,51 @@
+{
+  "preview": {
+    "eyebrow": "{{appName}} configuração",
+    "title": "Configurar sua carteira de Bitcoin",
+    "content": "Esta carteira executa no seu servidor. Você controla os fundos, então a configuração começa com acesso, backups e algumas verificações antes que o dinheiro se mova.",
+    "wallet_title": "Configuração da carteira",
+    "wallet_caption": "Vazio até você financiá-la",
+    "setup_label": "Antes de adicionar sats",
+    "setup_title": "Backups primeiro",
+    "setup_content": "Salve seu material de recuperação da nó e carteira, depois teste com um pequeno pagamento antes de confiar nesta carteira.",
+    "backup_check": "Backup salvo",
+    "access_check": "Acesso protegido",
+    "test_check": "Teste pequeno primeiro",
+    "lightning": "Pagamentos Lightning",
+    "onchain": "Endereços Bitcoin",
+    "identity": "Endereço Lightning",
+    "node": "Prontidão do servidor"
+  },
+  "welcome": {
+    "title": "Sua carteira para Bitcoin do dia a dia",
+    "content": "{{appName}} traz pagamentos Lightning, endereços Bitcoin e um endereço Lightning reutilizável num só lugar, para que você possa receber, pagar e ver o que precisa de atenção.",
+    "point_one": "Receba pagamentos com faturas, endereços ou o seu Endereço Lightning.",
+    "point_two": "Pague da mesma carteira quando uma solicitação de pagamento chegar.",
+    "point_three": "Veja montantes, status e próximas ações sem trocar de ferramentas."
+  },
+  "custody": {
+    "title": "As chaves estão nas suas mãos",
+    "content": "{{appName}} não detém os seus bitcoins nem mantém uma cópia extra dos seus segredos. Antes de financiar a carteira, certifique-se de que os seus backups são reais e acessíveis.",
+    "point_one": "Escolha uma palavra-passe forte para este painel.",
+    "point_two": "Mantenha o material de recuperação em algum lugar offline que você possa encontrar depois.",
+    "point_three": "Teste a carteira com uma pequena quantia antes de adicionar mais."
+  },
+  "accessibility": {
+    "title": "Mantenha o seu servidor pronto",
+    "content": "O Lightning funciona melhor quando o servidor da carteira está online e acessível. Uma configuração estável ajuda as faturas, pagamentos e aplicações conectadas a funcionarem quando você precisar.",
+    "point_one": "Confirme que o servidor está acessível antes de receber pagamentos reais.",
+    "point_two": "Mantenha o servidor acessível pelos apps que o utilizam.",
+    "point_three": "Use fundos de teste primeiro após alterar o alojamento ou configurações do nó."
+  },
+  "multi_user": {
+    "title": "Decida quem pode usá-la",
+    "content": "Comece com a conta do proprietário, depois conecte apenas as pessoas, apps e serviços que devem ser capazes de pagar ou receber desta carteira.",
+    "point_one": "Dê a cada app conectado apenas o acesso que ele necessita.",
+    "point_two": "Revise o acesso regularmente, especialmente em servidores partilhados.",
+    "point_three": "Adicione mais contas quando o seu deployment o suportar."
+  },
+  "step": "Passo {{current}} de {{total}}",
+  "back": "Voltar",
+  "continue": "Continuar",
+  "get_started": "Escolher palavra-passe"
+}

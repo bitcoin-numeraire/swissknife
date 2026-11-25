@@ -3,7 +3,7 @@ import { CONFIG } from 'src/global-config';
 // ----------------------------------------------------------------------
 
 export const fallbackLng = 'en';
-export const languages = ['en', 'fr'];
+export const languages = ['en', 'fr', 'de', 'es', 'it', 'pt'] as const;
 export const defaultNS = 'common';
 export const cookieName = 'i18next';
 
@@ -19,7 +19,7 @@ export function i18nOptions(lng = fallbackLng, ns = defaultNS) {
     ns,
     defaultNS,
     fallbackNS: defaultNS,
-    supportedLngs: languages,
+    supportedLngs: [...languages],
     interpolation: {
       escapeValue: false,
       defaultVariables: { appName: CONFIG.appName },

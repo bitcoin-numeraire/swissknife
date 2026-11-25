@@ -2,7 +2,6 @@
 
 import type { LanguageValue } from './locales-config';
 
-import dayjs from 'dayjs';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -27,16 +26,12 @@ export function useTranslate(ns?: string) {
       try {
         await i18n.changeLanguage(newLang);
 
-        if (currentLang) {
-          dayjs.locale(currentLang.adapterLocale);
-        }
-
         router.refresh();
       } catch (error) {
         console.error(error);
       }
     },
-    [currentLang, i18n, router]
+    [i18n, router]
   );
 
   return {

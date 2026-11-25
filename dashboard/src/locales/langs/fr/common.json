@@ -1,4 +1,5 @@
 {
+  "select_language": "Choisir la langue",
   "wallet_credit": {
     "asset_units": "unités de l’actif",
     "opening": "Crédit initial",
@@ -23,6 +24,7 @@
     "invitation": "Vous pouvez attribuer un solde initial à l’un de vos portefeuilles lors de la configuration."
   },
   "statement": {"action": "Exporter le relevé", "title": "Relevé du portefeuille", "wallet": "Portefeuille {{wallet}}", "from": "Du (UTC)", "through": "Au (UTC)", "csv": "Télécharger le CSV"},
+  "important": "Important",
   "overview": "Aperçu",
   "money": "Portefeuille",
   "activity": "Activité",
@@ -542,6 +544,7 @@
     "quick_transfer": "Transfert rapide"
   },
   "wallet_list": {
+    "updated": "Mis à jour",
     "user": "Utilisateur",
     "account": "Compte",
     "ln_address": "Addresse LN",
@@ -765,7 +768,6 @@
     "amount_requested": "Montant demandé",
     "amount_received": "Montant reçu",
     "fees": "Frais",
-    "channel_opening_fees": "Frais",
     "is_lnurl": "LNURL?",
     "expiration_date": "Date d'expiration",
     "min_final_cltv_delta": "Delta CLTV final minimum",
