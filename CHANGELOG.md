@@ -8,6 +8,10 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Added
+
+- Authenticated clients can discover available wallet assets through `GET /v1/assets`.
+
 ## [0.3.5] - 2026-11-21
 
 ### Fixed

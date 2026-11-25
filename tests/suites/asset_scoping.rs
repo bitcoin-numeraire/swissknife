@@ -5,11 +5,40 @@
 use reqwest::StatusCode;
 
 use swissknife_types::{
-    Balance, BtcNetwork, CreateWalletRequest, Invoice, NewInvoiceRequest, SendPaymentRequest, Wallet, WalletOverview,
+    Asset, Balance, BtcNetwork, CreateWalletRequest, Invoice, NewInvoiceRequest, SendPaymentRequest, Wallet,
+    WalletOverview,
 };
 
 use crate::common::fixtures::{mainnet_btc_asset_id, signet_btc_asset_id};
 use crate::common::{app, assert_error, assert_status, Auth};
+
+#[tokio::test]
+async fn lists_catalog_assets_for_authenticated_accounts_without_wallet_permissions() {
+    let app = app().await;
+    let admin = app.admin_token().await;
+    let account = app.create_account(admin, "catalog").await;
+    let key = app.account_api_key(admin, account.id, vec![]).await;
+    let response = app.api().get("/v1/assets", Auth::ApiKey(&key)).await;
+    assert_status(&response, StatusCode::OK);
+    let assets = response.parse::<Vec<Asset>>();
+    assert!(assets
+        .iter()
+        .any(|asset| asset.id == mainnet_btc_asset_id() && asset.display_ticker == "BTC"));
+    assert!(assets
+        .iter()
+        .any(|asset| asset.id == signet_btc_asset_id() && asset.network == BtcNetwork::Signet));
+    let order: Vec<_> = assets
+        .iter()
+        .map(|a| (&a.code, a.protocol.to_string(), a.network.to_string(), &a.asset_ref))
+        .collect();
+    assert!(order.is_sorted());
+}
+
+#[tokio::test]
+async fn rejects_unauthenticated_asset_discovery() {
+    let app = app().await;
+    assert_error(&app.api().get("/v1/assets", Auth::None).await, StatusCode::UNAUTHORIZED);
+}
 
 #[tokio::test]
 async fn keeps_balances_resources_and_aggregates_separate_across_bitcoin_networks() {

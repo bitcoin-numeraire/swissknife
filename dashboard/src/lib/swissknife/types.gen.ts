@@ -2299,6 +2299,35 @@ export type GetApiKeyResponses = {
 
 export type GetApiKeyResponse = GetApiKeyResponses[keyof GetApiKeyResponses];
 
+export type ListAssetsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/assets';
+};
+
+export type ListAssetsErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Database unavailable
+   */
+  500: ErrorResponse;
+};
+
+export type ListAssetsError = ListAssetsErrors[keyof ListAssetsErrors];
+
+export type ListAssetsResponses = {
+  /**
+   * Catalog assets
+   */
+  200: Array<Asset>;
+};
+
+export type ListAssetsResponse = ListAssetsResponses[keyof ListAssetsResponses];
+
 export type ChangePasswordData = {
   body: ChangePasswordRequest;
   path?: never;

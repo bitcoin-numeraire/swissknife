@@ -28,6 +28,7 @@ import type {
   ListAccountWalletsResponse,
   ListAddressesResponse,
   ListApiKeysResponse,
+  ListAssetsResponse,
   ListBtcAddressesResponse,
   ListContactsResponse,
   ListInvoicesResponse,
@@ -261,6 +262,11 @@ export const createApiKeyResponseTransformer = async (data: any): Promise<Create
 
 export const getApiKeyResponseTransformer = async (data: any): Promise<GetApiKeyResponse> => {
   data = apiKeySchemaResponseTransformer(data);
+  return data;
+};
+
+export const listAssetsResponseTransformer = async (data: any): Promise<ListAssetsResponse> => {
+  data = data.map((item: any) => assetSchemaResponseTransformer(item));
   return data;
 };
 

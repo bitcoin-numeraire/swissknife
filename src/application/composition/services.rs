@@ -4,6 +4,7 @@ use crate::{
     application::composition::{AppAdapters, AppConfig},
     domains::{
         account::{AccountService, AccountUseCases, ApiKeyService, ApiKeyUseCases, AuthService, AuthUseCases},
+        asset::{AssetService, AssetUseCases},
         bitcoin::{BitcoinService, BitcoinUseCases},
         event::{ClientEventService, ClientEventUseCases, EventService, EventUseCases},
         invoice::{InvoiceService, InvoiceUseCases},
@@ -17,6 +18,7 @@ use crate::{
 };
 
 pub struct AppServices {
+    pub asset: Box<dyn AssetUseCases>,
     pub invoice: Box<dyn InvoiceUseCases>,
     pub payment: Box<dyn PaymentsUseCases>,
     pub wallet: Box<dyn WalletUseCases>,
@@ -98,6 +100,7 @@ impl AppServices {
         );
 
         AppServices {
+            asset: Box::new(AssetService::new(store.asset.clone())),
             invoice: Box::new(invoices),
             payment: Box::new(payments),
             wallet: Box::new(wallet),
@@ -121,6 +124,7 @@ impl AppServices {
 /// `AppServices` suitable for handler unit tests.
 #[cfg(test)]
 pub struct MockAppServicesBuilder {
+    pub asset: crate::domains::asset::MockAssetUseCases,
     pub invoice: crate::domains::invoice::MockInvoiceUseCases,
     pub payment: crate::domains::payment::MockPaymentsUseCases,
     pub wallet: crate::domains::wallet::MockWalletUseCases,
@@ -140,6 +144,7 @@ pub struct MockAppServicesBuilder {
 impl MockAppServicesBuilder {
     pub fn new() -> Self {
         Self {
+            asset: crate::domains::asset::MockAssetUseCases::new(),
             invoice: crate::domains::invoice::MockInvoiceUseCases::new(),
             payment: crate::domains::payment::MockPaymentsUseCases::new(),
             wallet: crate::domains::wallet::MockWalletUseCases::new(),
@@ -158,6 +163,7 @@ impl MockAppServicesBuilder {
 
     pub fn build(self) -> AppServices {
         AppServices {
+            asset: Box::new(self.asset),
             invoice: Box::new(self.invoice),
             payment: Box::new(self.payment),
             wallet: Box::new(self.wallet),
