@@ -163,17 +163,19 @@ impl From<PaymentModel> for Payment {
             raw_success_action: serde_json::from_value(model.raw_success_action.clone().unwrap_or_default()).ok(),
         });
 
-        let bitcoin = (ledger == Ledger::Onchain).then(|| BtcPayment {
-            address: model
+        let bitcoin = if ledger == Ledger::Onchain {
+            model
                 .btc_address
                 .clone()
-                .expect("destination address should exist for On-chain payment"),
-            txid: model
-                .payment_hash
-                .clone()
-                .expect("payment_hash (txid) should exist for On-chain payment"),
-            block_height: model.btc_block_height.map(|h| h as u32),
-        });
+                .zip(model.payment_hash.clone())
+                .map(|(address, txid)| BtcPayment {
+                    address,
+                    txid,
+                    block_height: model.btc_block_height.map(|h| h as u32),
+                })
+        } else {
+            None
+        };
 
         let internal = (ledger == Ledger::Internal).then(|| InternalPayment {
             ln_address: model.ln_address.clone(),

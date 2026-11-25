@@ -33,18 +33,14 @@ export function NotificationItem({ item, wallet, busy, change, onClose }: Props)
   const { t, currentLang } = useTranslate();
   const { state } = useSettingsContext();
   const lang = currentLang.numberFormat.code;
-  if (
-    item.event_type === ClientEventType.PAYMENT_ACCEPTED ||
-    item.event_type === ClientEventType.PAYMENT_PROCESSING
-  ) {
-    return null;
-  }
-  const title = {
+  const titles = {
     [ClientEventType.INVOICE_PAID]: 'notification_inbox.received',
     [ClientEventType.PAYMENT_SETTLED]: 'notification_inbox.sent',
     [ClientEventType.PAYMENT_FAILED]: 'notification_inbox.failed',
     [ClientEventType.INVOICE_PENDING]: 'notification_inbox.pending',
-  }[item.event_type];
+  } as const;
+  if (!Object.hasOwn(titles, item.event_type)) return null;
+  const title = titles[item.event_type as keyof typeof titles];
   const amount =
     item.amount_msat == null
       ? undefined

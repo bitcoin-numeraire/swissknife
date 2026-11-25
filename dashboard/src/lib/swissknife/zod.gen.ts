@@ -144,6 +144,10 @@ export const zClientEventType = z.enum([
   'invoice.paid',
   'payment.accepted',
   'payment.processing',
+  'withdrawal.processing',
+  'withdrawal.waiting',
+  'withdrawal.reconciling',
+  'withdrawal.broadcast',
   'payment.settled',
   'payment.failed',
 ]);

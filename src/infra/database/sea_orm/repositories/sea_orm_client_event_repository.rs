@@ -110,11 +110,7 @@ impl SeaOrmClientEventRepository<&DatabaseTransaction> {
             payload: Set(event.data),
             ..Default::default()
         })
-        .on_conflict(
-            OnConflict::columns([Column::EventType, Column::ResourceId])
-                .do_nothing()
-                .to_owned(),
-        )
+        .on_conflict(OnConflict::new().do_nothing().to_owned())
         .try_insert()
         .exec(self.db)
         .await

@@ -23,6 +23,10 @@ import { notificationPreferences } from './notification-preferences';
 const eventKinds = {
   [ClientEventType.PAYMENT_ACCEPTED]: undefined,
   [ClientEventType.PAYMENT_PROCESSING]: undefined,
+  [ClientEventType.WITHDRAWAL_PROCESSING]: undefined,
+  [ClientEventType.WITHDRAWAL_WAITING]: undefined,
+  [ClientEventType.WITHDRAWAL_RECONCILING]: undefined,
+  [ClientEventType.WITHDRAWAL_BROADCAST]: undefined,
   [ClientEventType.INVOICE_PENDING]: 'pending',
   [ClientEventType.INVOICE_PAID]: 'received',
   [ClientEventType.PAYMENT_SETTLED]: 'sent',
