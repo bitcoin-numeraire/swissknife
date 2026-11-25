@@ -12,7 +12,6 @@ pub struct Model {
     pub actor_account_id: Uuid,
     pub api_key_id: Option<Uuid>,
     pub target_account_id: Uuid,
-    #[sea_orm(unique)]
     pub wallet_id: Uuid,
     pub asset_id: Uuid,
     pub amount_units: i64,
