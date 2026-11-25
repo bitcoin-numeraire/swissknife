@@ -36,13 +36,13 @@ pub struct SpendingLimits {
 pub struct SpendingUsage {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub daily_msat: u64,
+    pub daily_msat: u128,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub weekly_msat: u64,
+    pub weekly_msat: u128,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub monthly_msat: u64,
+    pub monthly_msat: u128,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

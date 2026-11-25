@@ -45,6 +45,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Account spending totals remain exact when repeated payments take calendar usage above the amount a single wallet payment can hold.
+
 - Keep wallet and account ownership intact until the original node has disabled each receive offer and SwissKnife has replayed its accepted payments.
 
 - Existing pending LND withdrawals are reconciled against confirmed transactions using their original unsigned PSBT IDs.
