@@ -4865,6 +4865,42 @@ export type DisableWalletOfferResponses = {
 export type DisableWalletOfferResponse =
   DisableWalletOfferResponses[keyof DisableWalletOfferResponses];
 
+export type GetWalletOfferData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/offers/{id}';
+};
+
+export type GetWalletOfferErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Insufficient permission
+   */
+  403: ErrorResponse;
+  /**
+   * Offer not found
+   */
+  404: ErrorResponse;
+};
+
+export type GetWalletOfferError = GetWalletOfferErrors[keyof GetWalletOfferErrors];
+
+export type GetWalletOfferResponses = {
+  /**
+   * Offer and current lifecycle state
+   */
+  200: WalletOffer;
+};
+
+export type GetWalletOfferResponse = GetWalletOfferResponses[keyof GetWalletOfferResponses];
+
 export type DeleteFailedPaymentsData = {
   body?: never;
   path: {
@@ -5323,6 +5359,41 @@ export type DisableOfferResponses = {
 };
 
 export type DisableOfferResponse = DisableOfferResponses[keyof DisableOfferResponses];
+
+export type GetOfferData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: '/v1/offers/{id}';
+};
+
+export type GetOfferErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Insufficient permission
+   */
+  403: ErrorResponse;
+  /**
+   * Offer not found
+   */
+  404: ErrorResponse;
+};
+
+export type GetOfferError = GetOfferErrors[keyof GetOfferErrors];
+
+export type GetOfferResponses = {
+  /**
+   * Offer and current lifecycle state
+   */
+  200: WalletOffer;
+};
+
+export type GetOfferResponse = GetOfferResponses[keyof GetOfferResponses];
 
 export type DeletePaymentsData = {
   body?: never;

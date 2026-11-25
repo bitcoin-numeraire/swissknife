@@ -34,9 +34,11 @@ import {
   getBtcAddressResponseTransformer,
   getInvoiceResponseTransformer,
   getLocalLoginResponseTransformer,
+  getOfferResponseTransformer,
   getPaymentResponseTransformer,
   getPaymentSubmissionResponseTransformer,
   getWalletInvoiceResponseTransformer,
+  getWalletOfferResponseTransformer,
   getWalletPaymentResponseTransformer,
   getWalletPaymentSubmissionResponseTransformer,
   getWalletResponseTransformer,
@@ -206,6 +208,9 @@ import type {
   GetLocalLoginData,
   GetLocalLoginErrors,
   GetLocalLoginResponses,
+  GetOfferData,
+  GetOfferErrors,
+  GetOfferResponses,
   GetPaymentData,
   GetPaymentErrors,
   GetPaymentResponses,
@@ -220,6 +225,9 @@ import type {
   GetWalletInvoiceData,
   GetWalletInvoiceErrors,
   GetWalletInvoiceResponses,
+  GetWalletOfferData,
+  GetWalletOfferErrors,
+  GetWalletOfferResponses,
   GetWalletPaymentData,
   GetWalletPaymentErrors,
   GetWalletPaymentResponses,
@@ -1630,6 +1638,19 @@ export const disableWalletOffer = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Read a BOLT12 offer by its stable SwissKnife ID.
+ */
+export const getWalletOffer = <ThrowOnError extends boolean = false>(
+  options: Options<GetWalletOfferData, ThrowOnError>
+): RequestResult<GetWalletOfferResponses, GetWalletOfferErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetWalletOfferResponses, GetWalletOfferErrors, ThrowOnError>({
+    responseTransformer: getWalletOfferResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/offers/{id}',
+    ...options,
+  });
+
+/**
  * Delete failed payments for a wallet.
  */
 export const deleteFailedPayments = <ThrowOnError extends boolean = false>(
@@ -1809,6 +1830,19 @@ export const disableOffer = <ThrowOnError extends boolean = false>(
 ): RequestResult<DisableOfferResponses, DisableOfferErrors, ThrowOnError> =>
   (options.client ?? client).delete<DisableOfferResponses, DisableOfferErrors, ThrowOnError>({
     responseTransformer: disableOfferResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/offers/{id}',
+    ...options,
+  });
+
+/**
+ * Read a BOLT12 offer by its stable SwissKnife ID.
+ */
+export const getOffer = <ThrowOnError extends boolean = false>(
+  options: Options<GetOfferData, ThrowOnError>
+): RequestResult<GetOfferResponses, GetOfferErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetOfferResponses, GetOfferErrors, ThrowOnError>({
+    responseTransformer: getOfferResponseTransformer,
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/offers/{id}',
     ...options,

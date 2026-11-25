@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Expose individual wallet-owned BOLT12 offers and their current state for publication integrations.
+
 - Core Lightning wallets can review and pay DNSSEC-verified BIP353 names beginning with ₿, with protection against an offer changing after review.
 
 - The receive drawer creates and shares BOLT12 offers and displays paid offer details in wallet history.
