@@ -18,5 +18,6 @@ pub use super::offer_receipt::Entity as OfferReceipt;
 pub use super::payment::Entity as Payment;
 pub use super::payment_command::Entity as PaymentCommand;
 pub use super::wallet::Entity as Wallet;
+pub use super::wallet_agent_key::Entity as WalletAgentKey;
 pub use super::wallet_offer::Entity as WalletOffer;
 pub use super::withdrawal_command::Entity as WithdrawalCommand;

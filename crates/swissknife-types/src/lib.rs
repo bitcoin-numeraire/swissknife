@@ -7,7 +7,9 @@
 //! app's use cases.
 
 mod account;
+mod agent;
 mod api_key;
+pub use agent::*;
 mod auth;
 mod bitcoin;
 mod error;

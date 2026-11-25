@@ -13,6 +13,7 @@ pub enum Auth<'a> {
     /// bytes), and the middleware base64-decodes the `api-key` header, so it is
     /// sent verbatim rather than re-encoded.
     ApiKey(&'a str),
+    WalletKey(&'a str),
 }
 
 /// A decoded HTTP response: status plus the parsed JSON body (`Null` when the
@@ -68,6 +69,7 @@ impl ApiClient {
             Auth::None => req,
             Auth::Bearer(token) => req.bearer_auth(token),
             Auth::ApiKey(key) => req.header("api-key", key),
+            Auth::WalletKey(key) => req.header("wallet-key", key),
         };
         if let Some(body) = body {
             req = req.json(&body);
@@ -87,6 +89,7 @@ impl ApiClient {
             Auth::None => req,
             Auth::Bearer(token) => req.bearer_auth(token),
             Auth::ApiKey(key) => req.header("api-key", key),
+            Auth::WalletKey(key) => req.header("wallet-key", key),
         };
         if let Some(last_event_id) = last_event_id {
             req = req.header("last-event-id", last_event_id);

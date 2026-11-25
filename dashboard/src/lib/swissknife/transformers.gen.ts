@@ -33,6 +33,7 @@ import type {
   GetWalletPaymentResponse,
   GetWalletPaymentSubmissionResponse,
   GetWalletResponse,
+  IssueResponse,
   ListAccountApiKeysResponse,
   ListAccountNotificationsResponse,
   ListAccountsResponse,
@@ -44,6 +45,7 @@ import type {
   ListInvoicesResponse,
   ListOffersResponse,
   ListPaymentsResponse,
+  ListResponse,
   ListWalletBtcAddressesResponse,
   ListWalletInvoicesResponse,
   ListWalletOffersResponse,
@@ -468,6 +470,27 @@ export const getAccountWalletResponseTransformer = async (
   data: any
 ): Promise<GetAccountWalletResponse> => {
   data = walletSchemaResponseTransformer(data);
+  return data;
+};
+
+const agentKeySchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  data.expires_at = new Date(data.expires_at);
+  return data;
+};
+
+export const listResponseTransformer = async (data: any): Promise<ListResponse> => {
+  data = data.map((item: any) => agentKeySchemaResponseTransformer(item));
+  return data;
+};
+
+const issuedAgentKeySchemaResponseTransformer = (data: any) => {
+  data = agentKeySchemaResponseTransformer(data);
+  return data;
+};
+
+export const issueResponseTransformer = async (data: any): Promise<IssueResponse> => {
+  data = issuedAgentKeySchemaResponseTransformer(data);
   return data;
 };
 
