@@ -59,6 +59,31 @@ jobs:
         run: npm exec --yes --package=@tauri-apps/cli@2.12.6 -- tauri build ${{ matrix.flags }} --bundles ${{ matrix.bundles }} -- --locked
         env:
           NO_STRIP: 'true'
+      - name: Open the packaged Linux wallet
+        if: runner.os == 'Linux'
+        run: |
+          dpkg-deb --extract target/release/bundle/deb/*.deb "$RUNNER_TEMP/swissknife-deb"
+          xvfb-run -a python3 tests/launch.py "$RUNNER_TEMP/swissknife-deb/usr/bin/swissknife-desktop"
+      - name: Open the packaged macOS wallet
+        if: runner.os == 'macOS'
+        run: |
+          image=(target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          mount="$RUNNER_TEMP/swissknife-dmg"
+          hdiutil verify "${image[0]}"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "${image[0]}"
+          trap 'hdiutil detach "$mount"' EXIT
+          executable="$mount/SwissKnife.app/Contents/MacOS/swissknife-desktop"
+          lipo -verify_arch x86_64 arm64 "$executable"
+          python3 tests/launch.py "$executable"
+      - name: Install and open the Windows wallet
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem target/release/bundle/nsis/*.exe -ErrorAction Stop).FullName
+          $installDir = Join-Path $env:RUNNER_TEMP SwissKnifeDesktop
+          $result = Start-Process -FilePath $installer -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
+          if ($result.ExitCode -ne 0) { throw "NSIS exited with $($result.ExitCode)" }
+          python tests/launch.py (Join-Path $installDir swissknife-desktop.exe)
       - name: Upload installable packages
         uses: actions/upload-artifact@v7.0.2
         with:
