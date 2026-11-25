@@ -32,6 +32,7 @@ import { ReceiveMoneyDrawer } from 'src/sections/wallet/money-drawers';
 import { TransactionType } from 'src/types/transaction';
 
 import { TransactionList } from '../transaction-list';
+import { MerchantRevenueDialog } from '../merchant-revenue-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -91,6 +92,7 @@ export function InvoiceListView() {
   const { t } = useTranslate();
   const theme = useTheme();
   const newInvoice = useBoolean();
+  const revenue = useBoolean();
 
   const { invoices, invoicesLoading, invoicesError, invoicesMutate } = useListWalletInvoices();
   const { wallet, walletLoading, walletError } = useActiveWallet();
@@ -122,7 +124,10 @@ export function InvoiceListView() {
               },
             ]}
             action={
-              <Stack direction="row" spacing={1}>
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                <Button variant="outlined" onClick={revenue.onTrue} disabled={!wallet?.id}>
+                  {t('merchant_revenue.title')}
+                </Button>
                 <Tooltip title={t('invoice_list.clean_expired_invoices')} placement="top" arrow>
                   <Box>
                     <CleanTransactionsButton
@@ -163,6 +168,9 @@ export function InvoiceListView() {
             href={paths.activityInvoice}
           />
 
+          {revenue.value && wallet?.id && (
+            <MerchantRevenueDialog key={wallet.id} walletId={wallet.id} onClose={revenue.onFalse} />
+          )}
           <ReceiveMoneyDrawer
             fiatPrices={fiatPrices!}
             open={newInvoice.value}
