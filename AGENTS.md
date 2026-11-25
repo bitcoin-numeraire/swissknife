@@ -4,7 +4,7 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## Project Overview
 
-SwissKnife is a self-custodial Bitcoin wallet and transaction orchestrator supporting Lightning Network, LNURL, Lightning Addresses, and Nostr protocols. It consists of a Rust backend API and a Next.js dashboard.
+SwissKnife is an account-based Bitcoin wallet and transaction orchestrator supporting Lightning Network, LNURL, Lightning Addresses, and Nostr protocols. A wallet represents an account’s balance for one asset and network. The instance operator controls the ledger and the configured provider. A personal installation can place both under its user’s control. It consists of a Rust backend API and a Next.js dashboard.
 
 ### Liquidity Providers and Wallet Balances
 

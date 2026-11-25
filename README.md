@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://numeraire.fra1.cdn.digitaloceanspaces.com/development/LOGO_FULL_PNG_color_dark_9d58514132.png" height="200"/>
   <h1>SwissKnife</h1>
-  <h3>A self-custodial wallet & transaction orchestrator for Lightning, Nostr and Smart contract protocols on Bitcoin</h3>
+  <h3>An account-based Bitcoin wallet and transaction orchestrator for Lightning, Nostr and smart contract integrations</h3>
 </div>
 
 # SwissKnife
@@ -12,6 +12,12 @@
 If you like what we do, consider starring, sharing and contributing!
 
 > Check the documentation [here](https://docs.numeraire.tech/swissknife).
+
+## Who controls a wallet?
+
+An account can own several wallets. Each wallet records the balance and transaction history for one asset on a particular network. The instance authenticates the account, keeps the ledger and sends external payments through its configured node. An administrator with transaction-write permission can issue invoices and submit payments for a selected wallet.
+
+In a personal installation, the person running SwissKnife and the node controls both systems and their backups. In a hosted installation, the operator controls those systems. Customers sign in to the instance to access their wallets from the dashboard or desktop client. Recovering an installation requires the SwissKnife database and the provider’s wallet and channel recovery material.
 
 ## Features
 
