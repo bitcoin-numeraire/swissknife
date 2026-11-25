@@ -8,13 +8,14 @@ use async_trait::async_trait;
 use swissknife_l402::{ChallengeInvoice, GateError, InvoiceGate, PaidGrant};
 use uuid::Uuid;
 
+use super::pricing::Price;
 use crate::application::composition::AppServices;
 
 pub(super) struct Merchant {
     pub services: Arc<AppServices>,
     pub name: String,
     pub wallet_id: Uuid,
-    pub price_msat: u64,
+    pub price: Price,
     pub requests_per_payment: Option<NonZeroU32>,
     pub invoice_seconds: u32,
     pub challenges: ChallengeLimit,
@@ -52,6 +53,7 @@ impl ChallengeLimit {
 impl InvoiceGate for Merchant {
     async fn invoice(&self) -> Result<ChallengeInvoice, GateError> {
         self.challenges.take()?;
+        let price_msat = self.price.quote().await?;
         let description = match self.requests_per_payment {
             Some(n) => format!("L402 access to {} (up to {n} requests)", self.name),
             None => format!("L402 access to {}", self.name),
@@ -61,7 +63,7 @@ impl InvoiceGate for Merchant {
             .invoice
             .invoice(
                 self.wallet_id,
-                self.price_msat,
+                price_msat,
                 Some(description),
                 Some(self.invoice_seconds),
             )

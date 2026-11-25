@@ -33,6 +33,7 @@ pub struct MerchantRoute {
     pub wallet_id: Uuid,
     pub target: String,
     pub price_sats: u64,
+    pub quote_url: Option<String>,
     pub access_seconds: u32,
     pub requests_per_payment: Option<NonZeroU32>,
     #[serde(default = "default_issue_limit")]
@@ -43,8 +44,21 @@ fn default_issue_limit() -> NonZeroU32 {
     NonZeroU32::new(30).unwrap_or(NonZeroU32::MIN)
 }
 
+fn merchant_url(value: &str) -> Result<Url, &'static str> {
+    let url = Url::parse(value).map_err(|_| "invalid L402 merchant URL")?;
+    if !matches!(url.scheme(), "http" | "https")
+        || url.host().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.fragment().is_some()
+    {
+        return Err("L402 merchant URLs must be HTTP(S) URLs without userinfo or fragments");
+    }
+    Ok(url)
+}
+
 impl MerchantRoute {
-    pub fn validate(&self, name: &str) -> Result<(Url, u64), &'static str> {
+    pub fn validate(&self, name: &str) -> Result<(Url, u64, Option<Url>), &'static str> {
         if name.is_empty()
             || name.len() > 64
             || !name
@@ -53,15 +67,8 @@ impl MerchantRoute {
         {
             return Err("L402 route names must contain 1–64 lowercase letters, digits or hyphens");
         }
-        let url = Url::parse(&self.target).map_err(|_| "invalid L402 target URL")?;
-        if !matches!(url.scheme(), "http" | "https")
-            || url.host().is_none()
-            || !url.username().is_empty()
-            || url.password().is_some()
-            || url.fragment().is_some()
-        {
-            return Err("L402 targets must be HTTP(S) URLs without userinfo or fragments");
-        }
+        let url = merchant_url(&self.target)?;
+        let quote = self.quote_url.as_deref().map(merchant_url).transpose()?;
         let price = self
             .price_sats
             .checked_mul(1000)
@@ -70,7 +77,7 @@ impl MerchantRoute {
         if self.access_seconds < 2 {
             return Err("L402 access_seconds must be at least two seconds");
         }
-        Ok((url, price))
+        Ok((url, price, quote))
     }
 }
 
@@ -99,6 +106,9 @@ mod tests {
         ] {
             let mut invalid = route.clone();
             invalid.target = url.into();
+            assert!(invalid.validate("report").is_err());
+            let mut invalid = route.clone();
+            invalid.quote_url = Some(url.into());
             assert!(invalid.validate("report").is_err());
         }
         for price in [0, u64::MAX] {
