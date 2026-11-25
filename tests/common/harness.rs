@@ -198,6 +198,24 @@ impl TestApp {
         }
     }
 
+    /// Suspend only this test instance while its Lightning node keeps handling payments.
+    #[cfg(unix)]
+    pub fn with_process_suspended(&self, run: impl FnOnce()) {
+        struct Resume(u32);
+        impl Drop for Resume {
+            fn drop(&mut self) {
+                let _ = Command::new("kill").args(["-CONT", &self.0.to_string()]).status();
+            }
+        }
+        assert!(Command::new("kill")
+            .args(["-STOP", &self.process_id.to_string()])
+            .status()
+            .unwrap()
+            .success());
+        let _resume = Resume(self.process_id);
+        run();
+    }
+
     /// Stop this process without removing its database, for recovery scenarios.
     pub fn stop(&self) {
         let child = {

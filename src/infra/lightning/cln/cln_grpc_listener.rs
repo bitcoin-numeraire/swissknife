@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 use async_trait::async_trait;
 use tonic::transport::Channel;
@@ -8,11 +11,11 @@ use super::{
     cln::{
         listchainmoves_chainmoves::ListchainmovesChainmovesPrimaryTag,
         listchainmoves_request::ListchainmovesIndex,
+        listinvoices_invoices::ListinvoicesInvoicesStatus,
+        listinvoices_request::ListinvoicesIndex,
         node_client::NodeClient,
-        wait_invoices::WaitInvoicesStatus,
         wait_request::{WaitIndexname, WaitSubsystem},
-        waitinvoice_response::WaitinvoiceStatus,
-        ListchainmovesRequest, WaitRequest, WaitinvoiceRequest,
+        ListchainmovesRequest, ListinvoicesRequest, WaitRequest,
     },
     cln_grpc_client::{ClnClientConfig, ClnGrpcClient},
 };
@@ -25,7 +28,10 @@ use crate::{
     infra::lightning::EventsListener,
 };
 
+const INVOICE_BATCH_SIZE: u32 = 100;
+
 pub struct ClnGrpcListener {
+    next_invoice_update: AtomicU64,
     client: NodeClient<Channel>,
     services: Arc<AppServices>,
     wallet: Arc<dyn BitcoinWallet>,
@@ -37,71 +43,72 @@ impl ClnGrpcListener {
         services: Arc<AppServices>,
         wallet: Arc<dyn BitcoinWallet>,
     ) -> Result<Self, LightningError> {
-        let client = ClnGrpcClient::connect(&config).await?;
+        let mut client = ClnGrpcClient::connect(&config).await?;
+        // Establish the live boundary before the supervisor reconciles stored invoices.
+        // Reconnects retain this position; a process restart gets a fresh snapshot and replay.
+        let latest = Self::wait_for_invoice_update(&mut client, 0).await?;
 
         Ok(Self {
+            next_invoice_update: AtomicU64::new(latest.saturating_add(1)),
             client,
             services,
             wallet,
         })
     }
 
+    async fn wait_for_invoice_update(client: &mut NodeClient<Channel>, nextvalue: u64) -> Result<u64, LightningError> {
+        client
+            .wait(WaitRequest {
+                subsystem: WaitSubsystem::Invoices as i32,
+                indexname: WaitIndexname::Updated as i32,
+                nextvalue,
+            })
+            .await
+            .map_err(|e| LightningError::Listener(e.to_string()))?
+            .into_inner()
+            .updated
+            .ok_or_else(|| LightningError::Listener("CLN omitted the updated invoice index".into()))
+    }
+
     async fn listen_invoices(&self) -> Result<(), LightningError> {
-        let mut next_index = 0_u64;
-
+        let mut client = self.client.clone();
         loop {
-            trace!(next_index, "Waiting for invoice update...");
-
-            let response = self
-                .client
-                .clone()
-                .wait(WaitRequest {
-                    subsystem: WaitSubsystem::Invoices as i32,
-                    indexname: WaitIndexname::Updated as i32,
-                    nextvalue: next_index,
+            let start = self.next_invoice_update.load(Ordering::Relaxed);
+            let latest = Self::wait_for_invoice_update(&mut client, start).await?;
+            // wait is a wake-up, and can skip indexes or omit its event payload.
+            let page = client
+                .list_invoices(ListinvoicesRequest {
+                    index: Some(ListinvoicesIndex::Updated as i32),
+                    start: Some(start),
+                    limit: Some(INVOICE_BATCH_SIZE),
+                    ..Default::default()
                 })
                 .await
                 .map_err(|e| LightningError::Listener(e.to_string()))?
-                .into_inner();
-
-            let updated_index = response.updated;
-
-            if let Some(invoices) = response.invoices {
-                match invoices.status() {
-                    WaitInvoicesStatus::Paid => {
-                        let Some(label) = invoices.label.clone() else {
-                            warn!("Invoice update missing label");
-                            if let Some(index) = updated_index {
-                                next_index = index.saturating_add(1);
-                            }
-                            continue;
-                        };
-
-                        let invoice = self
-                            .client
-                            .clone()
-                            .wait_invoice(WaitinvoiceRequest { label })
-                            .await
-                            .map_err(|e| LightningError::Listener(e.to_string()))?
-                            .into_inner();
-
-                        match invoice.status() {
-                            WaitinvoiceStatus::Paid => {
-                                if let Err(err) = self.services.event.invoice_paid(invoice.clone().into()).await {
-                                    return Err(LightningError::EventProcessing(err.to_string()));
-                                }
-                            }
-                            WaitinvoiceStatus::Expired => {}
-                        }
-                    }
-                    WaitInvoicesStatus::Expired | WaitInvoicesStatus::Unpaid => {}
+                .into_inner()
+                .invoices;
+            let last_page = page.len() < INVOICE_BATCH_SIZE as usize;
+            let mut next = start;
+            for invoice in page {
+                let updated = invoice
+                    .updated_index
+                    .filter(|index| *index >= next)
+                    .ok_or_else(|| LightningError::Listener("CLN returned an unordered invoice update".into()))?;
+                if invoice.status() == ListinvoicesInvoicesStatus::Paid {
+                    self.services
+                        .event
+                        .invoice_paid(invoice.try_into()?)
+                        .await
+                        .map_err(|e| LightningError::EventProcessing(e.to_string()))?;
                 }
-            } else if next_index != 0 {
-                warn!("Invoice wait response missing invoice details");
+                next = updated.saturating_add(1);
+                self.next_invoice_update.store(next, Ordering::Relaxed);
             }
-
-            if let Some(index) = updated_index {
-                next_index = index.saturating_add(1);
+            // Deleted entries leave gaps. Only a short page establishes that all
+            // remaining entries through the observed high-water mark were considered.
+            if last_page {
+                self.next_invoice_update
+                    .store(next.max(latest.saturating_add(1)), Ordering::Relaxed);
             }
         }
     }

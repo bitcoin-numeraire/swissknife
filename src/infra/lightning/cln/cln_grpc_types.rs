@@ -4,7 +4,7 @@ use serde_bolt::bitcoin::hashes::{sha256, Hash};
 use std::str::FromStr;
 
 use crate::{
-    application::composition::Ledger,
+    application::{composition::Ledger, errors::LightningError},
     domains::{
         bitcoin::BtcOutputStatus,
         event::LnInvoicePaidEvent,
@@ -14,9 +14,7 @@ use crate::{
     infra::lightning::cln::cln::listfunds_outputs::ListfundsOutputsStatus,
 };
 
-use super::cln::{
-    listinvoices_invoices::ListinvoicesInvoicesStatus, ListinvoicesInvoices, WaitinvoiceResponse, XpayResponse,
-};
+use super::cln::{listinvoices_invoices::ListinvoicesInvoicesStatus, ListinvoicesInvoices, XpayResponse};
 
 impl From<XpayResponse> for Payment {
     fn from(val: XpayResponse) -> Self {
@@ -67,14 +65,24 @@ impl From<ListinvoicesInvoices> for Invoice {
     }
 }
 
-impl From<WaitinvoiceResponse> for LnInvoicePaidEvent {
-    fn from(val: WaitinvoiceResponse) -> Self {
-        LnInvoicePaidEvent {
-            payment_hash: hex::encode(&val.payment_hash),
-            amount_received_msat: val.amount_received_msat.as_ref().unwrap().msat,
+impl TryFrom<ListinvoicesInvoices> for LnInvoicePaidEvent {
+    type Error = LightningError;
+
+    fn try_from(invoice: ListinvoicesInvoices) -> Result<Self, Self::Error> {
+        let amount = invoice
+            .amount_received_msat
+            .ok_or_else(|| LightningError::Listener("CLN paid invoice is missing the amount received".into()))?;
+        let time = invoice
+            .paid_at
+            .and_then(|value| i64::try_from(value).ok())
+            .and_then(|seconds| Utc.timestamp_opt(seconds, 0).single())
+            .ok_or_else(|| LightningError::Listener("CLN paid invoice has no valid settlement time".into()))?;
+        Ok(LnInvoicePaidEvent {
+            payment_hash: hex::encode(invoice.payment_hash),
+            amount_received_msat: amount.msat,
             fee_msat: 0,
-            payment_time: Utc.timestamp_opt(val.paid_at() as i64, 0).unwrap(),
-        }
+            payment_time: time,
+        })
     }
 }
 
