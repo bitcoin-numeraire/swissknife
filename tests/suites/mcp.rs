@@ -139,6 +139,7 @@ async fn stdio_discovers_tools_and_resources_and_settles_an_approved_payment_onc
     for name in [
         "get_balance",
         "create_invoice",
+        "get_invoice",
         "decode_invoice",
         "send_payment",
         "get_payment",
@@ -252,6 +253,85 @@ async fn stdio_discovers_tools_and_resources_and_settles_an_approved_payment_onc
         .await;
     assert!(denied["error"].is_object());
     mcp.close().await;
+}
+
+#[tokio::test]
+async fn stdio_invoice_receipt_confirms_payment_only_for_the_authorized_wallet() {
+    let app = TestApp::isolated("mcp-invoice-receipt", &[]).await;
+    let admin = app.admin_token().await;
+    let owner = app.create_account_with_wallet(admin, "mcp-invoice-owner").await;
+    let other = app.create_account_with_wallet(admin, "mcp-invoice-other").await;
+    let api = app.api();
+
+    async fn connect(
+        app: &TestApp,
+        owner: &crate::common::fixtures::TestAccount,
+        name: &str,
+        capabilities: Value,
+    ) -> (StdioWallet, IssuedAgentKey) {
+        let issued: IssuedAgentKey = app
+            .api()
+            .post(
+                &format!("/v1/me/wallets/{}/agent-keys", owner.wallet.id),
+                Auth::ApiKey(&owner.key),
+                json!({"name":name, "capabilities":capabilities, "expires_at":Utc::now()+ChronoDuration::hours(1)}),
+            )
+            .await
+            .parse();
+        (StdioWallet::start(app, owner.wallet.id, &issued.key).await, issued)
+    }
+
+    let (mut issuer, _) = connect(&app, &owner, "issuer", json!({"receive":true})).await;
+    let (mut reader, read_key) = connect(&app, &owner, "reader", json!({"read":true})).await;
+    let (mut foreign, _) = connect(&app, &other, "foreign", json!({"read":true})).await;
+    let created = issuer
+        .tool(
+            "create_invoice",
+            json!({"amount_msat":"101001","description":"MCP receipt"}),
+        )
+        .await;
+    let invoice = &created["structuredContent"];
+    let lookup = json!({"id":invoice["id"].as_str().expect("issued invoice id")});
+    assert_eq!(issuer.tool("get_invoice", lookup.clone()).await["isError"], true);
+    assert_eq!(foreign.tool("get_invoice", lookup.clone()).await["isError"], true);
+    assert_eq!(
+        reader.tool("get_invoice", json!({"id":"invalid"})).await["isError"],
+        true
+    );
+    let pending = reader.tool("get_invoice", lookup.clone()).await;
+    assert_eq!(pending["structuredContent"]["status"], "Pending");
+    assert_eq!(pending["structuredContent"]["amount_msat"], "101001");
+
+    Counterparty::for_provider(&app.provider).pay(invoice["ln_invoice"]["bolt11"].as_str().unwrap());
+    let settled = timeout(Duration::from_secs(40), async {
+        loop {
+            let answer = reader.tool("get_invoice", lookup.clone()).await;
+            assert_ne!(answer["isError"], true, "{answer}");
+            if answer["structuredContent"]["status"] == "Settled" {
+                break answer["structuredContent"].clone();
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    })
+    .await
+    .expect("the MCP receipt must observe provider settlement");
+    assert_eq!(settled["id"], invoice["id"]);
+    assert_eq!(settled["amount_received_msat"], "101001");
+    assert!(settled["payment_time"].is_string());
+    assert!(settled.get("ln_invoice").is_none());
+    assert_eq!(
+        reader.tool("get_invoice", lookup.clone()).await["structuredContent"],
+        settled
+    );
+    let path = format!("/v1/me/wallets/{}/agent-keys/{}", owner.wallet.id, read_key.metadata.id);
+    assert_status(
+        &api.delete(&path, Auth::ApiKey(&owner.key)).await,
+        StatusCode::NO_CONTENT,
+    );
+    assert_eq!(reader.tool("get_invoice", lookup).await["isError"], true);
+    issuer.close().await;
+    reader.close().await;
+    foreign.close().await;
 }
 
 #[tokio::test]

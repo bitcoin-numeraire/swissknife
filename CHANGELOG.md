@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Look up an incoming invoice and its settled amount from a wallet-scoped MCP connection.
+
 - MCP clients can inspect L402 merchant challenges and build a private access credential from a matching settled wallet payment.
 
 - Connect remote MCP clients to a selected wallet over authenticated Streamable HTTP behind a TLS proxy or through a private tunnel.
