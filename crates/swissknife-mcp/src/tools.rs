@@ -66,6 +66,12 @@ struct NewInvoice {
 }
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+struct InvoiceId {
+    /// SwissKnife invoice UUID returned by create_invoice.
+    id: String,
+}
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct PaymentDetails {
     /// SwissKnife payment UUID.
     id: String,
@@ -328,6 +334,28 @@ impl WalletServer {
                         json!({"amount_msat":principal,"description":args.description,"expiry":args.expiry_seconds}),
                     )
                     .await
+            }
+            .await,
+        )
+    }
+
+    #[tool(
+        description = "Look up an incoming invoice in the selected wallet by its SwissKnife UUID. Returns its current status, requested and received millisatoshis, ledger and settlement time. Requires read permission.",
+        annotations(read_only_hint = true)
+    )]
+    async fn get_invoice(&self, Parameters(args): Parameters<InvoiceId>) -> CallToolResult {
+        result(
+            async {
+                let id = Uuid::parse_str(&args.id).context("Invalid invoice UUID")?;
+                let receipt = self.wallet.get(&format!("invoices/{id}")).await?;
+                Ok(json!({
+                    "id": receipt["id"],
+                    "status": receipt["status"],
+                    "ledger": receipt["ledger"],
+                    "amount_msat": receipt["amount_msat"],
+                    "amount_received_msat": receipt["amount_received_msat"],
+                    "payment_time": receipt["payment_time"],
+                }))
             }
             .await,
         )
