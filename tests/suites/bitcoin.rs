@@ -34,6 +34,7 @@ async fn post_address(
 
 mod generate {
     use super::*;
+    use swissknife_types::{Invoice, InvoiceStatus};
 
     #[tokio::test]
     async fn dedicated_addresses_are_unique_and_excluded_from_ordinary_receive() {
@@ -71,6 +72,33 @@ mod generate {
             app.wallet_balance(admin, account.wallet.id).await.available_msat == 25_000_000
         })
         .await;
+        let excluded = api
+            .delete(
+                &format!(
+                    "/v1/invoices?wallet_id={}&bitcoin_address={}",
+                    account.wallet.id, second.address
+                ),
+                Auth::Bearer(admin),
+            )
+            .await;
+        assert_status(&excluded, StatusCode::OK);
+        assert_eq!(excluded.parse::<u64>(), 0);
+        let invoices_path = format!("/v1/me/wallets/{}/invoices", account.wallet.id);
+        for (address, count) in [(&first.address, 1), (&second.address, 0), (&ordinary.address, 0)] {
+            let res = api
+                .get(
+                    &format!("{invoices_path}?bitcoin_address={address}"),
+                    Auth::ApiKey(&account.key),
+                )
+                .await;
+            assert_status(&res, StatusCode::OK);
+            let invoices = res.parse::<Vec<Invoice>>();
+            assert_eq!(invoices.len(), count);
+            if let Some(invoice) = invoices.first() {
+                assert_eq!(invoice.bitcoin_output.as_ref().unwrap().address, *address);
+                assert_eq!(invoice.status, InvoiceStatus::Settled);
+            }
+        }
         let other = app.create_account_with_wallet(admin, "dedicated-other").await;
         let denied = api.post(&path, Auth::ApiKey(&other.key), &body).await;
         assert_error(&denied, StatusCode::NOT_FOUND);

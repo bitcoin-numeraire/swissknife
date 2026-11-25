@@ -2,7 +2,7 @@ use crate::{
     application::{composition::Ledger, errors::DatabaseError},
     domains::invoice::{Invoice, InvoiceFilter, InvoiceOrderBy, InvoiceRepository, InvoiceStatus},
     infra::database::sea_orm::models::{
-        btc_output::Model as BtcOutputModel,
+        btc_output::{Column as BtcOutputColumn, Model as BtcOutputModel},
         invoice::{ActiveModel, Column, Model as InvoiceModel},
         prelude::{BtcOutput, Invoice as InvoiceEntity},
     },
@@ -88,6 +88,9 @@ where
         let models = InvoiceEntity::find()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
+            .apply_if(filter.bitcoin_address, |q, address| {
+                q.filter(BtcOutputColumn::Address.eq(address))
+            })
             .apply_if(filter.lnurl_verify_token, |q, token| {
                 q.filter(Column::LnurlVerifyToken.eq(token))
             })
@@ -220,6 +223,17 @@ where
         let result = InvoiceEntity::delete_many()
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
+            .apply_if(filter.bitcoin_address, |q, address| {
+                q.filter(
+                    Column::BtcOutputId.in_subquery(
+                        BtcOutput::find()
+                            .select_only()
+                            .column(BtcOutputColumn::Id)
+                            .filter(BtcOutputColumn::Address.eq(address))
+                            .into_query(),
+                    ),
+                )
+            })
             .apply_if(filter.lnurl_verify_token, |q, token| {
                 q.filter(Column::LnurlVerifyToken.eq(token))
             })

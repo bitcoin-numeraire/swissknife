@@ -67,6 +67,7 @@ export const paths = {
   },
   wallet: {
     root: '/wallet',
+    pos: '/wallet/pos',
     payments: '/wallet/payments',
     payment: (id: string) => `/wallet/payments?id=${id}`,
     invoices: '/wallet/invoices',

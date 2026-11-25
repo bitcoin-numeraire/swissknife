@@ -74,3 +74,14 @@ from the repository root with `make openapi`.
 The dashboard consumes account settlement events at `/v1/me/events` and
 revalidates its REST state. Its stream requires a proxy that permits streaming
 responses; REST remains authoritative after reconnects and cursor expiry.
+
+### Merchant checkout on regtest
+
+Start the repository regtest services and a disposable SwissKnife instance using
+`config/itest.toml`. Start the dashboard with local JWT authentication and
+`NEXT_PUBLIC_SERVER_URL` pointing to that instance. Set
+`SWISSKNIFE_POS_REGTEST_API` and `SWISSKNIFE_POS_REGTEST_DASHBOARD` to their
+respective `http://127.0.0.1` origins. Run `yarn playwright test merchant-regtest`
+from the dashboard directory. Set `SWISSKNIFE_ITEST_PROVIDER` to the instance's
+provider to exercise LND's unconfirmed deposit notification. The test creates a
+local owner on a fresh instance and pays a sale using the regtest miner wallet.

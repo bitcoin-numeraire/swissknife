@@ -1019,5 +1019,32 @@
     "display_name": "Display name (optional)",
     "display_name_help": "How you would like to be greeted. You can change this in Settings.",
     "reset_display_name_help": "Leave blank to keep your current display name. Your assigned username stays the same."
+  },
+  "pos": {
+    "title": "Point of sale",
+    "amount": "Amount in sats",
+    "reference": "Description or order reference (optional)",
+    "sound": "Sound",
+    "haptics": "Vibration",
+    "start": "Create payment request",
+    "previous": "Last completed sale",
+    "issue_error": "Neither payment method is available. Try again.",
+    "waiting": "Waiting for payment",
+    "incoming": "Payment detected",
+    "partial": "Partial payment",
+    "expired": "Request expired",
+    "paid": "Payment received",
+    "pending_amount": "{{amount}} sats awaiting confirmation",
+    "received": "{{amount}} sats received",
+    "unified": "Bitcoin or Lightning",
+    "onchain": "On-chain Bitcoin",
+    "lightning": "Lightning",
+    "receipt": "Open payment details",
+    "next": "Next sale",
+    "cancel": "Stop checkout",
+    "stop_note": "A Bitcoin address can still receive funds after you close the checkout. Late payments appear in wallet activity.",
+    "sync_error": "Reconnecting to payment history. Check wallet activity before completing the sale.",
+    "back": "Back to wallet",
+    "select_bitcoin": "Select a Bitcoin wallet to start a checkout."
   }
 }
