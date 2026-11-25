@@ -1,4 +1,5 @@
 pub mod account;
+pub mod agent;
 pub mod asset;
 pub mod bitcoin;
 pub mod event;

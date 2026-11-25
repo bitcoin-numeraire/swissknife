@@ -1,6 +1,7 @@
 //! One module per API domain. Add new domains here as suites are written.
 
 mod accounts;
+mod agent_keys;
 mod api_keys;
 mod asset_scoping;
 mod auth;

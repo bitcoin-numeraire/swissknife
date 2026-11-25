@@ -5698,7 +5698,148 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
+      }
+    },
+    "/v1/me/wallets/{wallet_id}/agent-keys": {
+      "get": {
+        "tags": [
+          "Agent credentials"
+        ],
+        "operationId": "list",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgentKey"
+                  }
+                }
+              }
+            }
+          },
+          "404": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Agent credentials"
+        ],
+        "operationId": "issue",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentKey"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedAgentKey"
+                }
+              }
+            }
+          },
+          "404": {},
+          "422": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/me/wallets/{wallet_id}/agent-keys/{key_id}": {
+      "delete": {
+        "tags": [
+          "Agent credentials"
+        ],
+        "operationId": "revoke",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "404": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
       }
     },
     "/v1/me/wallets/{wallet_id}/balance": {
@@ -5763,7 +5904,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
       }
     },
     "/v1/me/wallets/{wallet_id}/bitcoin/addresses": {
@@ -6122,7 +6274,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
       }
     },
     "/v1/me/wallets/{wallet_id}/invoices": {
@@ -6308,7 +6471,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -6403,7 +6577,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -6553,7 +6738,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
       }
     },
     "/v1/me/wallets/{wallet_id}/offers": {
@@ -7133,7 +7329,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -7390,7 +7597,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
       }
     },
     "/v1/me/wallets/{wallet_id}/payments/submissions": {
@@ -7459,7 +7677,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
       }
     },
     "/v1/me/wallets/{wallet_id}/payments/submissions/{id}": {
@@ -7510,7 +7739,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -7653,7 +7893,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
       }
     },
     "/v1/offers": {
@@ -9749,6 +10000,41 @@
           }
         }
       },
+      "AgentKey": {
+        "type": "object",
+        "required": [
+          "id",
+          "wallet_id",
+          "name",
+          "capabilities",
+          "expires_at",
+          "created_at"
+        ],
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/WalletCapabilities"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "wallet_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "ApiKey": {
         "type": "object",
         "description": "API Key",
@@ -10265,6 +10551,28 @@
           }
         }
       },
+      "CreateAgentKey": {
+        "type": "object",
+        "required": [
+          "name",
+          "capabilities",
+          "expires_at"
+        ],
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/WalletCapabilities"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC expiry, up to one year from issuance."
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateApiKeyRequest": {
         "type": "object",
         "description": "Create API Key Request",
@@ -10632,6 +10940,25 @@
           "Pending",
           "Settled",
           "Expired"
+        ]
+      },
+      "IssuedAgentKey": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AgentKey"
+          },
+          {
+            "type": "object",
+            "required": [
+              "key"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Secret shown once at creation. Send it in the Wallet-Key header."
+              }
+            }
+          }
         ]
       },
       "Ledger": {
@@ -12000,6 +12327,22 @@
           }
         }
       },
+      "WalletCapabilities": {
+        "type": "object",
+        "description": "Independent permissions for a single wallet.",
+        "properties": {
+          "read": {
+            "type": "boolean"
+          },
+          "receive": {
+            "type": "boolean"
+          },
+          "spend": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "WalletOffer": {
         "type": "object",
         "required": [
@@ -12220,9 +12563,19 @@
       }
     },
     "securitySchemes": {
+      "api_key": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Api-Key"
+      },
       "jwt": {
         "type": "http",
         "scheme": "bearer"
+      },
+      "wallet_key": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Wallet-Key"
       }
     }
   },
@@ -12232,6 +12585,10 @@
     }
   ],
   "tags": [
+    {
+      "name": "Agent credentials",
+      "description": "Owner-managed access to a single wallet."
+    },
     {
       "name": "Authentication",
       "description": "Some endpoints are public, but some require authentication. We provide all the required endpoints to create an account and authorize yourself."

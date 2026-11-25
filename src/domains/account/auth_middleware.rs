@@ -27,6 +27,9 @@ impl User {
         headers: &HeaderMap,
         services: &AppServices,
     ) -> Result<Self, ApplicationError> {
+        if headers.contains_key("wallet-key") {
+            return Err(AuthenticationError::InvalidCredentials.into());
+        }
         if let Some(Authorization(bearer)) = headers.typed_get::<Authorization<Bearer>>() {
             let user = services.auth.authenticate_jwt(bearer.token()).await?;
             Ok(user)

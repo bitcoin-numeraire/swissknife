@@ -16,7 +16,7 @@ use crate::{
 };
 use utoipa::{
     openapi::{
-        security::{Http, HttpAuthScheme, SecurityScheme},
+        security::{ApiKey, ApiKeyValue, Http, HttpAuthScheme, SecurityScheme},
         Components, OpenApi,
     },
     Modify, OpenApi as OpenApiDoc,
@@ -37,6 +37,7 @@ struct ApiDoc;
 pub fn merged_openapi() -> OpenApi {
     let mut openapi = ApiDoc::openapi();
 
+    openapi.merge(crate::domains::agent::AgentKeyHandler::openapi());
     openapi.merge(AuthHandler::openapi());
     openapi.merge(AccountHandler::openapi());
     openapi.merge(AccountWalletHandler::openapi());
@@ -108,6 +109,14 @@ struct SecurityAddon;
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut OpenApi) {
         let components: &mut Components = openapi.components.as_mut().unwrap(); // we can unwrap safely since there already is components registered.
+        components.add_security_scheme(
+            "wallet_key",
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("Wallet-Key"))),
+        );
+        components.add_security_scheme(
+            "api_key",
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("Api-Key"))),
+        );
         components.add_security_scheme("jwt", SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)));
     }
 }

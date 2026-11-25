@@ -78,6 +78,15 @@ export type AccountPreferences = {
   updated_at?: Date | null;
 };
 
+export type AgentKey = {
+  capabilities: WalletCapabilities;
+  created_at: Date;
+  expires_at: Date;
+  id: string;
+  name: string;
+  wallet_id: string;
+};
+
 /**
  * API Key
  */
@@ -459,6 +468,15 @@ export type CreateAccountRequest = {
   permissions?: Array<Permission>;
 };
 
+export type CreateAgentKey = {
+  capabilities: WalletCapabilities;
+  /**
+   * UTC expiry, up to one year from issuance.
+   */
+  expires_at: Date;
+  name: string;
+};
+
 /**
  * Create API Key Request
  */
@@ -689,6 +707,13 @@ export const InvoiceStatus = {
  * Lifecycle status of an invoice.
  */
 export type InvoiceStatus = (typeof InvoiceStatus)[keyof typeof InvoiceStatus];
+
+export type IssuedAgentKey = AgentKey & {
+  /**
+   * Secret shown once at creation. Send it in the Wallet-Key header.
+   */
+  key: string;
+};
 
 /**
  * The ledger a transaction settles on.
@@ -1505,6 +1530,15 @@ export type Wallet = {
    * Date of update in database
    */
   updated_at?: Date | null;
+};
+
+/**
+ * Independent permissions for a single wallet.
+ */
+export type WalletCapabilities = {
+  read?: boolean;
+  receive?: boolean;
+  spend?: boolean;
 };
 
 export type WalletOffer = {
@@ -4343,6 +4377,65 @@ export type GetAccountWalletResponses = {
 };
 
 export type GetAccountWalletResponse = GetAccountWalletResponses[keyof GetAccountWalletResponses];
+
+export type ListData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/agent-keys';
+};
+
+export type ListErrors = {
+  404: unknown;
+};
+
+export type ListResponses = {
+  200: Array<AgentKey>;
+};
+
+export type ListResponse = ListResponses[keyof ListResponses];
+
+export type IssueData = {
+  body: CreateAgentKey;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/agent-keys';
+};
+
+export type IssueErrors = {
+  404: unknown;
+  422: unknown;
+};
+
+export type IssueResponses = {
+  201: IssuedAgentKey;
+};
+
+export type IssueResponse = IssueResponses[keyof IssueResponses];
+
+export type RevokeData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+    key_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/agent-keys/{key_id}';
+};
+
+export type RevokeErrors = {
+  404: unknown;
+};
+
+export type RevokeResponses = {
+  204: void;
+};
+
+export type RevokeResponse = RevokeResponses[keyof RevokeResponses];
 
 export type GetWalletBalanceData = {
   body?: never;

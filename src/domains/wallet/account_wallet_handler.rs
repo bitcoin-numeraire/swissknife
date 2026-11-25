@@ -1,3 +1,4 @@
+use crate::domains::agent::{WalletActor, WalletCapability};
 use std::{collections::VecDeque, convert::Infallible, sync::Arc, time::Duration};
 
 use axum::{
@@ -490,6 +491,7 @@ async fn create_account_wallet(
 /// Get one account wallet.
 #[utoipa::path(
     get,
+    security(("jwt" = []), ("api_key" = []), ("wallet_key" = [])),
     path = "/wallets/{wallet_id}",
     tag = "Me",
     context_path = CONTEXT_PATH,
@@ -502,12 +504,11 @@ async fn create_account_wallet(
 )]
 async fn get_account_wallet(
     State(services): State<Arc<AppServices>>,
-    user: User,
+    actor: WalletActor,
     Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<Wallet>, ApplicationError> {
-    Ok(Json(
-        services.wallet.get_by_account_id(user.account_id, wallet_id).await?,
-    ))
+    let account_id = actor.account_for(&services, wallet_id, WalletCapability::Read).await?;
+    Ok(Json(services.wallet.get_by_account_id(account_id, wallet_id).await?))
 }
 
 /// Generate a new Bitcoin address for a wallet.
@@ -569,11 +570,12 @@ async fn list_wallet_btc_addresses(
 }
 
 /// Reserve wallet funds and accept an external Lightning or Bitcoin payment.
-#[utoipa::path(post, path = "/wallets/{wallet_id}/payments/submissions", context_path = CONTEXT_PATH, tag = "Me", request_body = SubmitPaymentRequest,
+#[utoipa::path(post,
+    security(("jwt" = []), ("api_key" = []), ("wallet_key" = [])), path = "/wallets/{wallet_id}/payments/submissions", context_path = CONTEXT_PATH, tag = "Me", request_body = SubmitPaymentRequest,
     params(("wallet_id" = Uuid, Path, description = "Owned wallet")), responses((status = 202, body = PaymentSubmission), (status = 404, body = ErrorResponse), (status = 409, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
 async fn submit_wallet_payment(
     State(services): State<Arc<AppServices>>,
-    user: User,
+    actor: WalletActor,
     Path(wallet_id): Path<Uuid>,
     Json(request): Json<SubmitPaymentRequest>,
 ) -> Result<
@@ -584,7 +586,8 @@ async fn submit_wallet_payment(
     ),
     ApplicationError,
 > {
-    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let account_id = actor.account_for(&services, wallet_id, WalletCapability::Spend).await?;
+    services.wallet.verify_ownership(account_id, wallet_id).await?;
     let base = format!("/v1/me/wallets/{wallet_id}/payments/submissions");
     let submission = services
         .payment
@@ -600,14 +603,16 @@ async fn submit_wallet_payment(
 }
 
 /// Read the authoritative execution and settlement state for a wallet submission.
-#[utoipa::path(get, path = "/wallets/{wallet_id}/payments/submissions/{id}", context_path = CONTEXT_PATH, tag = "Me",
+#[utoipa::path(get,
+    security(("jwt" = []), ("api_key" = []), ("wallet_key" = [])), path = "/wallets/{wallet_id}/payments/submissions/{id}", context_path = CONTEXT_PATH, tag = "Me",
     params(("wallet_id" = Uuid, Path, description = "Owned wallet"), ("id" = Uuid, Path, description = "Payment ID")), responses((status = 200, body = PaymentSubmission), (status = 404, body = ErrorResponse)))]
 async fn get_wallet_payment_submission(
     State(services): State<Arc<AppServices>>,
-    user: User,
+    actor: WalletActor,
     Path((wallet_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<PaymentSubmission>, ApplicationError> {
-    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let account_id = actor.account_for(&services, wallet_id, WalletCapability::Read).await?;
+    services.wallet.verify_ownership(account_id, wallet_id).await?;
     let base = format!("/v1/me/wallets/{wallet_id}/payments/submissions");
     Ok(Json(
         services.payment.submission(Some(wallet_id), id).await?.response(&base),
@@ -668,6 +673,7 @@ async fn wallet_pay(
 /// Estimate a payment fee for an account-owned wallet.
 #[utoipa::path(
     post,
+    security(("jwt" = []), ("api_key" = []), ("wallet_key" = [])),
     path = "/wallets/{wallet_id}/payments/fee-estimate",
     tag = "Me",
     context_path = CONTEXT_PATH,
@@ -683,11 +689,12 @@ async fn wallet_pay(
 )]
 async fn estimate_wallet_payment_fee(
     State(services): State<Arc<AppServices>>,
-    user: User,
+    actor: WalletActor,
     Path(wallet_id): Path<Uuid>,
     Json(payload): Json<SendPaymentRequest>,
 ) -> Result<Json<PaymentFeeEstimate>, ApplicationError> {
-    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let account_id = actor.account_for(&services, wallet_id, WalletCapability::Read).await?;
+    services.wallet.verify_ownership(account_id, wallet_id).await?;
     let estimate = services
         .payment
         .estimate_fee(payload.input, payload.amount_msat, payload.comment, wallet_id)
@@ -699,6 +706,7 @@ async fn estimate_wallet_payment_fee(
 /// Get wallet balance.
 #[utoipa::path(
     get,
+    security(("jwt" = []), ("api_key" = []), ("wallet_key" = [])),
     path = "/wallets/{wallet_id}/balance",
     tag = "Me",
     context_path = CONTEXT_PATH,
@@ -711,10 +719,11 @@ async fn estimate_wallet_payment_fee(
 )]
 async fn get_wallet_balance(
     State(services): State<Arc<AppServices>>,
-    user: User,
+    actor: WalletActor,
     Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<Balance>, ApplicationError> {
-    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let account_id = actor.account_for(&services, wallet_id, WalletCapability::Read).await?;
+    services.wallet.verify_ownership(account_id, wallet_id).await?;
 
     Ok(Json(services.wallet.get_balance(wallet_id).await?))
 }
@@ -722,6 +731,7 @@ async fn get_wallet_balance(
 /// Generate a new invoice for a wallet.
 #[utoipa::path(
     post,
+    security(("jwt" = []), ("api_key" = []), ("wallet_key" = [])),
     path = "/wallets/{wallet_id}/invoices",
     tag = "Me",
     context_path = CONTEXT_PATH,
@@ -737,11 +747,14 @@ async fn get_wallet_balance(
 )]
 async fn new_wallet_invoice(
     State(services): State<Arc<AppServices>>,
-    user: User,
+    actor: WalletActor,
     Path(wallet_id): Path<Uuid>,
     Json(payload): Json<NewInvoiceRequest>,
 ) -> Result<Json<Invoice>, ApplicationError> {
-    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let account_id = actor
+        .account_for(&services, wallet_id, WalletCapability::Receive)
+        .await?;
+    services.wallet.verify_ownership(account_id, wallet_id).await?;
 
     let invoice = services
         .invoice
@@ -881,6 +894,7 @@ async fn delete_account_address(State(services): State<Arc<AppServices>>, user: 
 /// List payments for a wallet.
 #[utoipa::path(
     get,
+    security(("jwt" = []), ("api_key" = []), ("wallet_key" = [])),
     path = "/wallets/{wallet_id}/payments",
     tag = "Me",
     context_path = CONTEXT_PATH,
@@ -895,11 +909,12 @@ async fn delete_account_address(State(services): State<Arc<AppServices>>, user: 
 )]
 async fn list_wallet_payments(
     State(services): State<Arc<AppServices>>,
-    user: User,
+    actor: WalletActor,
     Path(wallet_id): Path<Uuid>,
     Query(mut query_params): Query<PaymentFilter>,
 ) -> Result<Json<Vec<Payment>>, ApplicationError> {
-    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let account_id = actor.account_for(&services, wallet_id, WalletCapability::Read).await?;
+    services.wallet.verify_ownership(account_id, wallet_id).await?;
 
     query_params.wallet_id = Some(wallet_id);
     Ok(Json(services.payment.list(query_params).await?))
@@ -908,6 +923,7 @@ async fn list_wallet_payments(
 /// Get a wallet payment.
 #[utoipa::path(
     get,
+    security(("jwt" = []), ("api_key" = []), ("wallet_key" = [])),
     path = "/wallets/{wallet_id}/payments/{id}",
     tag = "Me",
     context_path = CONTEXT_PATH,
@@ -921,10 +937,11 @@ async fn list_wallet_payments(
 )]
 async fn get_wallet_payment(
     State(services): State<Arc<AppServices>>,
-    user: User,
+    actor: WalletActor,
     Path((wallet_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Payment>, ApplicationError> {
-    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let account_id = actor.account_for(&services, wallet_id, WalletCapability::Read).await?;
+    services.wallet.verify_ownership(account_id, wallet_id).await?;
 
     let payments = services
         .payment
@@ -946,6 +963,7 @@ async fn get_wallet_payment(
 /// List invoices for a wallet.
 #[utoipa::path(
     get,
+    security(("jwt" = []), ("api_key" = []), ("wallet_key" = [])),
     path = "/wallets/{wallet_id}/invoices",
     tag = "Me",
     context_path = CONTEXT_PATH,
@@ -960,11 +978,12 @@ async fn get_wallet_payment(
 )]
 async fn list_wallet_invoices(
     State(services): State<Arc<AppServices>>,
-    user: User,
+    actor: WalletActor,
     Path(wallet_id): Path<Uuid>,
     Query(mut query_params): Query<InvoiceFilter>,
 ) -> Result<Json<Vec<Invoice>>, ApplicationError> {
-    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let account_id = actor.account_for(&services, wallet_id, WalletCapability::Read).await?;
+    services.wallet.verify_ownership(account_id, wallet_id).await?;
 
     query_params.wallet_id = Some(wallet_id);
     Ok(Json(services.invoice.list(query_params).await?))
@@ -973,6 +992,7 @@ async fn list_wallet_invoices(
 /// Get a wallet invoice.
 #[utoipa::path(
     get,
+    security(("jwt" = []), ("api_key" = []), ("wallet_key" = [])),
     path = "/wallets/{wallet_id}/invoices/{id}",
     tag = "Me",
     context_path = CONTEXT_PATH,
@@ -986,10 +1006,11 @@ async fn list_wallet_invoices(
 )]
 async fn get_wallet_invoice(
     State(services): State<Arc<AppServices>>,
-    user: User,
+    actor: WalletActor,
     Path((wallet_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Invoice>, ApplicationError> {
-    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let account_id = actor.account_for(&services, wallet_id, WalletCapability::Read).await?;
+    services.wallet.verify_ownership(account_id, wallet_id).await?;
 
     let invoices = services
         .invoice
@@ -1011,6 +1032,7 @@ async fn get_wallet_invoice(
 /// List contacts for a wallet.
 #[utoipa::path(
     get,
+    security(("jwt" = []), ("api_key" = []), ("wallet_key" = [])),
     path = "/wallets/{wallet_id}/contacts",
     tag = "Me",
     context_path = CONTEXT_PATH,
@@ -1024,10 +1046,11 @@ async fn get_wallet_invoice(
 )]
 async fn list_contacts(
     State(services): State<Arc<AppServices>>,
-    user: User,
+    actor: WalletActor,
     Path(wallet_id): Path<Uuid>,
 ) -> Result<Json<Vec<Contact>>, ApplicationError> {
-    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let account_id = actor.account_for(&services, wallet_id, WalletCapability::Read).await?;
+    services.wallet.verify_ownership(account_id, wallet_id).await?;
 
     Ok(Json(services.wallet.list_contacts(wallet_id).await?))
 }
@@ -1447,7 +1470,7 @@ mod tests {
 
             let result = super::estimate_wallet_payment_fee(
                 State(Arc::new(builder.build())),
-                caller,
+                WalletActor::Owner(caller),
                 Path(wallet_id),
                 Json(payload),
             )
@@ -1477,7 +1500,7 @@ mod tests {
 
             let result = super::estimate_wallet_payment_fee(
                 State(Arc::new(builder.build())),
-                caller,
+                WalletActor::Owner(caller),
                 Path(wallet_id),
                 Json(payload),
             )

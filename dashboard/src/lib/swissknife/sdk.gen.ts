@@ -42,6 +42,7 @@ import {
   getWalletPaymentResponseTransformer,
   getWalletPaymentSubmissionResponseTransformer,
   getWalletResponseTransformer,
+  issueResponseTransformer,
   listAccountApiKeysResponseTransformer,
   listAccountNotificationsResponseTransformer,
   listAccountsResponseTransformer,
@@ -53,6 +54,7 @@ import {
   listInvoicesResponseTransformer,
   listOffersResponseTransformer,
   listPaymentsResponseTransformer,
+  listResponseTransformer,
   listWalletBtcAddressesResponseTransformer,
   listWalletInvoicesResponseTransformer,
   listWalletOffersResponseTransformer,
@@ -238,6 +240,9 @@ import type {
   HealthCheckData,
   HealthCheckErrors,
   HealthCheckResponses,
+  IssueData,
+  IssueErrors,
+  IssueResponses,
   ListAccountApiKeysData,
   ListAccountApiKeysErrors,
   ListAccountApiKeysResponses,
@@ -262,6 +267,8 @@ import type {
   ListContactsData,
   ListContactsErrors,
   ListContactsResponses,
+  ListData,
+  ListErrors,
   ListInvoicesData,
   ListInvoicesErrors,
   ListInvoicesResponses,
@@ -271,6 +278,7 @@ import type {
   ListPaymentsData,
   ListPaymentsErrors,
   ListPaymentsResponses,
+  ListResponses,
   ListWalletBtcAddressesData,
   ListWalletBtcAddressesErrors,
   ListWalletBtcAddressesResponses,
@@ -339,6 +347,9 @@ import type {
   RevokeApiKeysData,
   RevokeApiKeysErrors,
   RevokeApiKeysResponses,
+  RevokeData,
+  RevokeErrors,
+  RevokeResponses,
   SetupCheckData,
   SetupCheckErrors,
   SetupCheckResponses,
@@ -1455,8 +1466,54 @@ export const getAccountWallet = <ThrowOnError extends boolean = false>(
 ): RequestResult<GetAccountWalletResponses, GetAccountWalletErrors, ThrowOnError> =>
   (options.client ?? client).get<GetAccountWalletResponses, GetAccountWalletErrors, ThrowOnError>({
     responseTransformer: getAccountWalletResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
     url: '/v1/me/wallets/{wallet_id}',
+    ...options,
+  });
+
+export const list = <ThrowOnError extends boolean = false>(
+  options: Options<ListData, ThrowOnError>
+): RequestResult<ListResponses, ListErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListResponses, ListErrors, ThrowOnError>({
+    responseTransformer: listResponseTransformer,
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/me/wallets/{wallet_id}/agent-keys',
+    ...options,
+  });
+
+export const issue = <ThrowOnError extends boolean = false>(
+  options: Options<IssueData, ThrowOnError>
+): RequestResult<IssueResponses, IssueErrors, ThrowOnError> =>
+  (options.client ?? client).post<IssueResponses, IssueErrors, ThrowOnError>({
+    responseTransformer: issueResponseTransformer,
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/me/wallets/{wallet_id}/agent-keys',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+export const revoke = <ThrowOnError extends boolean = false>(
+  options: Options<RevokeData, ThrowOnError>
+): RequestResult<RevokeResponses, RevokeErrors, ThrowOnError> =>
+  (options.client ?? client).delete<RevokeResponses, RevokeErrors, ThrowOnError>({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/me/wallets/{wallet_id}/agent-keys/{key_id}',
     ...options,
   });
 
@@ -1467,7 +1524,11 @@ export const getWalletBalance = <ThrowOnError extends boolean = false>(
   options: Options<GetWalletBalanceData, ThrowOnError>
 ): RequestResult<GetWalletBalanceResponses, GetWalletBalanceErrors, ThrowOnError> =>
   (options.client ?? client).get<GetWalletBalanceResponses, GetWalletBalanceErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
     url: '/v1/me/wallets/{wallet_id}/balance',
     ...options,
   });
@@ -1518,7 +1579,11 @@ export const listContacts = <ThrowOnError extends boolean = false>(
 ): RequestResult<ListContactsResponses, ListContactsErrors, ThrowOnError> =>
   (options.client ?? client).get<ListContactsResponses, ListContactsErrors, ThrowOnError>({
     responseTransformer: listContactsResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
     url: '/v1/me/wallets/{wallet_id}/contacts',
     ...options,
   });
@@ -1551,7 +1616,11 @@ export const listWalletInvoices = <ThrowOnError extends boolean = false>(
     ThrowOnError
   >({
     responseTransformer: listWalletInvoicesResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
     url: '/v1/me/wallets/{wallet_id}/invoices',
     ...options,
   });
@@ -1564,7 +1633,11 @@ export const newWalletInvoice = <ThrowOnError extends boolean = false>(
 ): RequestResult<NewWalletInvoiceResponses, NewWalletInvoiceErrors, ThrowOnError> =>
   (options.client ?? client).post<NewWalletInvoiceResponses, NewWalletInvoiceErrors, ThrowOnError>({
     responseTransformer: newWalletInvoiceResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
     url: '/v1/me/wallets/{wallet_id}/invoices',
     ...options,
     headers: {
@@ -1581,7 +1654,11 @@ export const getWalletInvoice = <ThrowOnError extends boolean = false>(
 ): RequestResult<GetWalletInvoiceResponses, GetWalletInvoiceErrors, ThrowOnError> =>
   (options.client ?? client).get<GetWalletInvoiceResponses, GetWalletInvoiceErrors, ThrowOnError>({
     responseTransformer: getWalletInvoiceResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
     url: '/v1/me/wallets/{wallet_id}/invoices/{id}',
     ...options,
   });
@@ -1678,7 +1755,11 @@ export const listWalletPayments = <ThrowOnError extends boolean = false>(
     ThrowOnError
   >({
     responseTransformer: listWalletPaymentsResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
     url: '/v1/me/wallets/{wallet_id}/payments',
     ...options,
   });
@@ -1711,7 +1792,11 @@ export const estimateWalletPaymentFee = <ThrowOnError extends boolean = false>(
     EstimateWalletPaymentFeeErrors,
     ThrowOnError
   >({
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
     url: '/v1/me/wallets/{wallet_id}/payments/fee-estimate',
     ...options,
     headers: {
@@ -1732,7 +1817,11 @@ export const submitWalletPayment = <ThrowOnError extends boolean = false>(
     ThrowOnError
   >({
     responseTransformer: submitWalletPaymentResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
     url: '/v1/me/wallets/{wallet_id}/payments/submissions',
     ...options,
     headers: {
@@ -1774,7 +1863,11 @@ export const getWalletPaymentSubmission = <ThrowOnError extends boolean = false>
     ThrowOnError
   >({
     responseTransformer: getWalletPaymentSubmissionResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
     url: '/v1/me/wallets/{wallet_id}/payments/submissions/{id}',
     ...options,
   });
@@ -1787,7 +1880,11 @@ export const getWalletPayment = <ThrowOnError extends boolean = false>(
 ): RequestResult<GetWalletPaymentResponses, GetWalletPaymentErrors, ThrowOnError> =>
   (options.client ?? client).get<GetWalletPaymentResponses, GetWalletPaymentErrors, ThrowOnError>({
     responseTransformer: getWalletPaymentResponseTransformer,
-    security: [{ scheme: 'bearer', type: 'http' }],
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
     url: '/v1/me/wallets/{wallet_id}/payments/{id}',
     ...options,
   });

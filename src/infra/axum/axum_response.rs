@@ -41,6 +41,7 @@ impl IntoResponse for ApplicationError {
 impl IntoResponse for AuthorizationError {
     fn into_response(self) -> Response {
         let error_message = match self {
+            AuthorizationError::WalletCapability => "Wallet credential does not allow this operation",
             AuthorizationError::MissingPermission(_) => "Access denied due to insufficient permissions",
         };
 
