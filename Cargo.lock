@@ -1195,6 +1195,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto_secretbox"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9d6cf87adf719ddf43a805e92c6870a531aedda35ff640442cbaf8674e141e1"
+dependencies = [
+ "aead",
+ "cipher 0.4.4",
+ "generic-array",
+ "poly1305",
+ "salsa20",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "ctutils"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1737,6 +1752,7 @@ checksum = "4bb6743198531e02858aeaea5398fcc883e71851fcbcb5a2f773e2fb6cb1edf2"
 dependencies = [
  "typenum",
  "version_check",
+ "zeroize",
 ]
 
 [[package]]
@@ -2575,6 +2591,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "l402-proto"
+version = "0.2.0"
+source = "git+https://github.com/lightninglabs/L402sdk?rev=300e136e27237ce1720494e8627e3b21fd895243#300e136e27237ce1720494e8627e3b21fd895243"
+dependencies = [
+ "async-trait",
+ "base64 0.23.1",
+ "serde",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2648,6 +2676,22 @@ name = "libm"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
+
+[[package]]
+name = "libmacaroon"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a49f17cdc54a2bc5c7f583f519bb5af4dc031a7ab2e4158385943cb9b4db53ce"
+dependencies = [
+ "base64 0.23.1",
+ "crypto_secretbox",
+ "getrandom 0.4.3",
+ "hmac",
+ "log",
+ "sha2",
+ "subtle",
+ "zeroize",
+]
 
 [[package]]
 name = "libredox"
@@ -4101,6 +4145,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
+name = "salsa20"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97a22f5af31f73a954c10289c93e8a50cc23d971e80ee446f1f6f7137a088213"
+dependencies = [
+ "cipher 0.4.4",
+]
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4982,6 +5035,23 @@ dependencies = [
  "utoipa-scalar",
  "uuid",
  "wiremock",
+]
+
+[[package]]
+name = "swissknife-l402"
+version = "0.3.5"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64 0.23.1",
+ "bitcoin",
+ "hex",
+ "l402-proto",
+ "libmacaroon",
+ "rand 0.10.4",
+ "thiserror 2.0.21",
+ "tokio",
+ "tower",
 ]
 
 [[package]]

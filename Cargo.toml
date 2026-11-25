@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/migration", "crates/swissknife-types", "crates/swissknife-mcp"]
+members = ["crates/migration", "crates/swissknife-types", "crates/swissknife-mcp", "crates/swissknife-l402"]
 resolver = "2"
 
 [workspace.package]

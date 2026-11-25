@@ -1,0 +1,23 @@
+[package]
+name = "swissknife-l402"
+version = "0.3.5"
+edition = "2021"
+rust-version.workspace = true
+license = "MIT"
+publish = false
+description = "Axum middleware for invoice-backed L402 routes"
+
+[dependencies]
+async-trait = "0.1.92"
+axum = { version = "0.8.9", default-features = false }
+base64 = "0.23.1"
+bitcoin = "=0.32.102"
+hex = "0.4.3"
+l402-proto = { git = "https://github.com/lightninglabs/L402sdk", rev = "300e136e27237ce1720494e8627e3b21fd895243" }
+libmacaroon = { version = "0.4.0", default-features = false }
+rand = "0.10.4"
+thiserror = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+tower = { version = "0.5", features = ["util"] }
