@@ -282,6 +282,8 @@ pub struct OutPoint {
 #[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct TransactionResponse {
+    #[serde(default)]
+    pub raw_tx_hex: String,
     pub tx_hash: String,
     pub block_height: u32,
     pub output_details: Vec<OutputDetailResponse>,
@@ -326,8 +328,54 @@ impl From<TransactionResponse> for BtcTransaction {
             .collect();
 
         BtcTransaction {
+            unsigned_txid: crate::infra::lightning::bitcoin_utils::legacy_unsigned_txid(&val.tx_hash, &val.raw_tx_hex),
             txid: val.tx_hash,
             block_height: Some(val.block_height),
+            outputs,
+            is_outgoing,
+        }
+    }
+}
+
+impl From<super::lnrpc::Transaction> for BtcTransaction {
+    fn from(transaction: super::lnrpc::Transaction) -> Self {
+        let is_outgoing = transaction
+            .previous_outpoints
+            .iter()
+            .any(|outpoint| outpoint.is_our_output);
+
+        let outputs = transaction
+            .output_details
+            .into_iter()
+            .filter_map(|detail| {
+                let output_index = u32::try_from(detail.output_index).ok()?;
+                let amount = u64::try_from(detail.amount).ok()?;
+                Some(BtcTransactionOutput {
+                    output_index,
+                    address: detail.address,
+                    amount_sat: amount,
+                    is_ours: detail.is_our_address,
+                })
+            })
+            .collect();
+
+        let block_height = if transaction.block_height > 0 {
+            Some(transaction.block_height as u32)
+        } else {
+            None
+        };
+
+        BtcTransaction {
+            unsigned_txid: if is_outgoing {
+                crate::infra::lightning::bitcoin_utils::legacy_unsigned_txid(
+                    &transaction.tx_hash,
+                    &transaction.raw_tx_hex,
+                )
+            } else {
+                None
+            },
+            txid: transaction.tx_hash,
+            block_height,
             outputs,
             is_outgoing,
         }

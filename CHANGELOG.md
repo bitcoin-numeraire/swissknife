@@ -21,6 +21,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Existing pending LND withdrawals are reconciled against confirmed transactions using their original unsigned PSBT IDs.
+
 - LND withdrawals retain the finalized Bitcoin transaction ID before publication, including when spending nested SegWit inputs.
 
 ## [0.3.5] - 2026-11-21

@@ -24,6 +24,7 @@ pub struct OnchainSyncBatch {
 
 #[derive(Clone, Debug)]
 pub struct BtcTransaction {
+    pub unsigned_txid: Option<String>,
     pub txid: String,
     pub block_height: Option<u32>,
     pub outputs: Vec<BtcTransactionOutput>,
@@ -44,6 +45,7 @@ impl BtcTransaction {
 
     pub fn withdrawal_event(&self) -> OnchainWithdrawalEvent {
         OnchainWithdrawalEvent {
+            unsigned_txid: self.unsigned_txid.clone(),
             txid: self.txid.clone(),
             block_height: self.block_height,
         }
