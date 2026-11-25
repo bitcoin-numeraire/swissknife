@@ -8,7 +8,7 @@ use crate::{
         composition::{AppConfig, AuthProvider, LightningProvider},
         errors::{ApplicationError, ConfigError},
     },
-    domains::{account::PasswordHasher, bitcoin::BitcoinWallet},
+    domains::{account::PasswordHasher, bitcoin::BitcoinWallet, node::NodeReader},
     infra::{
         database::sea_orm::SeaOrmStore,
         jwt::{local::LocalAuthenticator, oauth2::OAuth2Authenticator, JWTAuthenticator},
@@ -29,6 +29,7 @@ pub struct AppAdapters {
     pub password_hasher: Arc<dyn PasswordHasher>,
     pub ln_client: Arc<dyn LnClient>,
     pub timeout_layer: TimeoutLayer,
+    pub node_reader: Arc<dyn NodeReader>,
     pub bitcoin_wallet: Arc<dyn BitcoinWallet>,
     pub jwt_authenticator: Arc<dyn JWTAuthenticator>,
 }
@@ -47,6 +48,7 @@ impl AppAdapters {
             password_hasher: Arc::new(Argon2PasswordHasher::new()),
             ln_client: lightning.ln_client,
             timeout_layer,
+            node_reader: lightning.node_reader,
             bitcoin_wallet: lightning.bitcoin_wallet,
             jwt_authenticator,
         })
@@ -54,6 +56,7 @@ impl AppAdapters {
 }
 
 struct LightningAdapter {
+    node_reader: Arc<dyn NodeReader>,
     ln_client: Arc<dyn LnClient>,
     bitcoin_wallet: Arc<dyn BitcoinWallet>,
 }
@@ -93,6 +96,7 @@ async fn get_ln_client(config: AppConfig) -> Result<LightningAdapter, Applicatio
             let bitcoin_wallet = ln_client.clone();
 
             Ok(LightningAdapter {
+                node_reader: ln_client.clone(),
                 ln_client,
                 bitcoin_wallet,
             })
@@ -107,6 +111,7 @@ async fn get_ln_client(config: AppConfig) -> Result<LightningAdapter, Applicatio
             let bitcoin_wallet = ln_client.clone();
 
             Ok(LightningAdapter {
+                node_reader: ln_client.clone(),
                 ln_client,
                 bitcoin_wallet,
             })
@@ -121,6 +126,7 @@ async fn get_ln_client(config: AppConfig) -> Result<LightningAdapter, Applicatio
             let bitcoin_wallet = ln_client.clone();
 
             Ok(LightningAdapter {
+                node_reader: ln_client.clone(),
                 ln_client,
                 bitcoin_wallet,
             })
@@ -135,6 +141,7 @@ async fn get_ln_client(config: AppConfig) -> Result<LightningAdapter, Applicatio
             let bitcoin_wallet = ln_client.clone();
 
             Ok(LightningAdapter {
+                node_reader: ln_client.clone(),
                 ln_client,
                 bitcoin_wallet,
             })

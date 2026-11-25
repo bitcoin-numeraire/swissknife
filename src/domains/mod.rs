@@ -5,6 +5,7 @@ pub mod event;
 pub mod invoice;
 pub mod ln_address;
 pub mod lnurl;
+pub mod node;
 pub mod nostr;
 pub mod payment;
 pub mod system;

@@ -131,7 +131,11 @@ impl ClnRestClient {
         Ok(ca_certificate)
     }
 
-    async fn post_request<T: DeserializeOwned>(&self, endpoint: &str, payload: &impl Serialize) -> anyhow::Result<T> {
+    pub(super) async fn post_request<T: DeserializeOwned>(
+        &self,
+        endpoint: &str,
+        payload: &impl Serialize,
+    ) -> anyhow::Result<T> {
         let response = self
             .client
             .post(format!("{}/v1/{}", self.base_url, endpoint))

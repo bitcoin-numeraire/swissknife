@@ -3,6 +3,7 @@ mod lnd_grpc_listener;
 mod lnd_rest_client;
 pub mod lnd_types;
 mod lnd_websocket_listener;
+mod telemetry;
 
 pub use lnd_grpc_client::*;
 pub use lnd_grpc_listener::LndGrpcListener;

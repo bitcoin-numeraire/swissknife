@@ -14,6 +14,7 @@ mod lightning;
 mod ln_addresses;
 mod lnurl_send;
 mod me;
+mod node;
 mod oauth2;
 mod payments;
 mod system;

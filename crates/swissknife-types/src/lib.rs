@@ -16,6 +16,7 @@ mod invoice;
 mod ln_address;
 mod lnurl;
 mod network;
+mod node;
 mod nostr;
 mod payment;
 mod permission;
@@ -45,6 +46,7 @@ pub use lnurl::{
     LnUrlVerifyResponse,
 };
 pub use network::BtcNetwork;
+pub use node::*;
 pub use nostr::{NostrNIP05QueryParams, NostrNIP05Response};
 pub use payment::{
     BtcPayment, InternalPayment, LnPayment, Payment, PaymentFeeEstimate, PaymentFilter, PaymentStatus,

@@ -67,7 +67,7 @@ const DEFAULT_CLIENT_KEY_FILENAME: &str = "client-key.pem";
 const DEFAULT_CA_CRT_FILENAME: &str = "ca.pem";
 
 pub struct ClnGrpcClient {
-    client: NodeClient<Channel>,
+    pub(super) client: NodeClient<Channel>,
     node_id: Vec<u8>,
     maxfee: Option<u64>,
     retry_for: Option<u32>,

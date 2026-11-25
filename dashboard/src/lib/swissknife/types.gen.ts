@@ -932,6 +932,78 @@ export type NewInvoiceRequest = {
   wallet_id?: string | null;
 };
 
+export const NodeAlert = {
+  INFO_UNAVAILABLE: 'info_unavailable',
+  PEERS_UNAVAILABLE: 'peers_unavailable',
+  CHANNELS_UNAVAILABLE: 'channels_unavailable',
+  ONCHAIN_UNAVAILABLE: 'onchain_unavailable',
+  CHAIN_NOT_SYNCED: 'chain_not_synced',
+  NO_CONNECTED_PEERS: 'no_connected_peers',
+  NO_ACTIVE_CHANNELS: 'no_active_channels',
+  LIQUIDITY_UNAVAILABLE: 'liquidity_unavailable',
+} as const;
+
+export type NodeAlert = (typeof NodeAlert)[keyof typeof NodeAlert];
+
+export type NodeChannel = {
+  active: boolean;
+  /**
+   * Provider channel identifier, if already assigned.
+   */
+  id?: string | null;
+  /**
+   * CLN receivable amount or LND remote balance less channel reserve.
+   */
+  inbound_msat?: string | null;
+  /**
+   * CLN spendable amount or LND local balance less channel reserve.
+   */
+  outbound_msat?: string | null;
+  peer_id: string;
+};
+
+export type NodeInfo = {
+  alias: string;
+  block_height: number;
+  network: string;
+  synced_to_chain: boolean;
+};
+
+export type NodeLiquidity = {
+  inbound_msat?: string | null;
+  /**
+   * Sum over active channels. A missing provider value makes that direction unknown.
+   */
+  outbound_msat?: string | null;
+};
+
+export type NodeOnchainBalance = {
+  /**
+   * Confirmed provider wallet funds, including reserved outputs.
+   */
+  confirmed_sat: number;
+  unconfirmed_sat: number;
+};
+
+/**
+ * Point-in-time observations from the configured Lightning provider.
+ */
+export type NodeOverview = {
+  alerts: Array<NodeAlert>;
+  channels?: Array<NodeChannel> | null;
+  info?: NodeInfo | null;
+  liquidity?: NodeLiquidity | null;
+  observed_at: Date;
+  onchain?: NodeOnchainBalance | null;
+  peers?: Array<NodePeer> | null;
+  provider: string;
+};
+
+export type NodePeer = {
+  connected: boolean;
+  id: string;
+};
+
 /**
  * Nostr NIP-05 response. Maps each queried name to its hex-encoded public key.
  */
@@ -4638,6 +4710,35 @@ export type GetWalletPaymentResponses = {
 };
 
 export type GetWalletPaymentResponse = GetWalletPaymentResponses[keyof GetWalletPaymentResponses];
+
+export type ReadNodeOverviewData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/v1/node/overview';
+};
+
+export type ReadNodeOverviewErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Requires read:ln_node
+   */
+  403: ErrorResponse;
+};
+
+export type ReadNodeOverviewError = ReadNodeOverviewErrors[keyof ReadNodeOverviewErrors];
+
+export type ReadNodeOverviewResponses = {
+  /**
+   * Current provider observations
+   */
+  200: NodeOverview;
+};
+
+export type ReadNodeOverviewResponse = ReadNodeOverviewResponses[keyof ReadNodeOverviewResponses];
 
 export type DeletePaymentsData = {
   body?: never;

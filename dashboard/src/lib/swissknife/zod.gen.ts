@@ -411,6 +411,68 @@ export const zNewInvoiceRequest = z.object({
   wallet_id: z.uuid().nullish(),
 });
 
+export const zNodeAlert = z.enum([
+  'info_unavailable',
+  'peers_unavailable',
+  'channels_unavailable',
+  'onchain_unavailable',
+  'chain_not_synced',
+  'no_connected_peers',
+  'no_active_channels',
+  'liquidity_unavailable',
+]);
+
+export const zNodeChannel = z.object({
+  active: z.boolean(),
+  id: z.string().nullish(),
+  inbound_msat: z.string().nullish(),
+  outbound_msat: z.string().nullish(),
+  peer_id: z.string(),
+});
+
+export const zNodeInfo = z.object({
+  alias: z.string(),
+  block_height: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+  network: z.string(),
+  synced_to_chain: z.boolean(),
+});
+
+export const zNodeLiquidity = z.object({
+  inbound_msat: z.string().nullish(),
+  outbound_msat: z.string().nullish(),
+});
+
+export const zNodeOnchainBalance = z.object({
+  confirmed_sat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+  unconfirmed_sat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+});
+
+export const zNodePeer = z.object({
+  connected: z.boolean(),
+  id: z.string(),
+});
+
+/**
+ * Point-in-time observations from the configured Lightning provider.
+ */
+export const zNodeOverview = z.object({
+  alerts: z.array(zNodeAlert),
+  channels: z.array(zNodeChannel).nullish(),
+  info: zNodeInfo.nullish(),
+  liquidity: zNodeLiquidity.nullish(),
+  observed_at: z.iso.datetime(),
+  onchain: zNodeOnchainBalance.nullish(),
+  peers: z.array(zNodePeer).nullish(),
+  provider: z.string(),
+});
+
 /**
  * Nostr NIP-05 response. Maps each queried name to its hex-encoded public key.
  */
@@ -1660,6 +1722,11 @@ export const zGetWalletPaymentPath = z.object({
  * Found
  */
 export const zGetWalletPaymentResponse = zPayment;
+
+/**
+ * Current provider observations
+ */
+export const zReadNodeOverviewResponse = zNodeOverview;
 
 export const zDeletePaymentsQuery = z.object({
   limit: z.coerce

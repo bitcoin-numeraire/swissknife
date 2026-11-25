@@ -8,6 +8,10 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Added
+
+- Administrators can read provider peers, channel liquidity, on-chain balances, and node alerts with the read:ln_node permission.
+
 ## [0.3.5] - 2026-11-21
 
 ### Fixed
