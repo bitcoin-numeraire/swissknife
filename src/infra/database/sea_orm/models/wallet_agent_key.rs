@@ -17,6 +17,7 @@ pub struct Model {
     pub can_spend: bool,
     pub created_at: DateTime,
     pub expires_at: DateTime,
+    pub can_manage_contacts: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

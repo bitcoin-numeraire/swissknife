@@ -3,6 +3,8 @@ use crate::application::{
     errors::{ApplicationError, DataError},
 };
 use async_trait::async_trait;
+use lnurl::lightning_address::LightningAddress;
+use swissknife_types::{SaveContactRequest, SavedContact};
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
@@ -16,6 +18,13 @@ impl WalletService {
     pub fn new(store: AppStore) -> Self {
         WalletService { store }
     }
+}
+
+fn contact_address(input: &str) -> Result<String, DataError> {
+    let address = input.trim();
+    LightningAddress::new(address).map_err(|_| DataError::Validation("Invalid Lightning Address".into()))?;
+    let (name, domain) = address.split_once('@').expect("validated Lightning Address");
+    Ok(format!("{name}@{}", domain.to_ascii_lowercase()))
 }
 
 #[async_trait]
@@ -120,6 +129,35 @@ impl WalletUseCases for WalletService {
 
         debug!(%id, "Contacts fetched successfully");
         Ok(contacts)
+    }
+
+    async fn list_saved_contacts(&self, wallet: Uuid) -> Result<Vec<SavedContact>, ApplicationError> {
+        Ok(self.store.wallet.list_saved_contacts(wallet).await?)
+    }
+
+    async fn save_contact(&self, wallet: Uuid, request: SaveContactRequest) -> Result<SavedContact, ApplicationError> {
+        let address = contact_address(&request.ln_address)?;
+        let label = request.label.as_deref().map(str::trim).filter(|s| !s.is_empty());
+        if label.is_some_and(|s| s.chars().count() > 100 || s.chars().any(char::is_control)) {
+            return Err(DataError::Validation("Contact labels accept up to 100 printable characters".into()).into());
+        }
+        Ok(self
+            .store
+            .wallet
+            .save_contact(wallet, address, label.map(str::to_owned))
+            .await?)
+    }
+
+    async fn remove_saved_contact(&self, wallet: Uuid, address: String) -> Result<(), ApplicationError> {
+        if !self
+            .store
+            .wallet
+            .remove_saved_contact(wallet, contact_address(&address)?)
+            .await?
+        {
+            return Err(DataError::NotFound("Saved contact not found".into()).into());
+        }
+        Ok(())
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError> {

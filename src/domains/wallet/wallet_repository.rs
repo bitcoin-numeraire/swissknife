@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::application::errors::DatabaseError;
 
 use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview};
+use swissknife_types::SavedContact;
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -29,6 +30,14 @@ pub trait WalletRepository: Send + Sync {
     async fn debit_confirmed(&self, id: Uuid, amount_msat: u64) -> Result<bool, DatabaseError>;
     /// Move `amount_msat` from reserved back to available. Returns `false` if the reservation is missing.
     async fn release(&self, id: Uuid, amount_msat: u64) -> Result<bool, DatabaseError>;
+    async fn list_saved_contacts(&self, wallet: Uuid) -> Result<Vec<SavedContact>, DatabaseError>;
+    async fn save_contact(
+        &self,
+        wallet: Uuid,
+        address: String,
+        label: Option<String>,
+    ) -> Result<SavedContact, DatabaseError>;
+    async fn remove_saved_contact(&self, wallet: Uuid, address: String) -> Result<bool, DatabaseError>;
     async fn find_contacts(&self, id: Uuid) -> Result<Vec<Contact>, DatabaseError>;
     async fn delete_many(&self, filter: WalletFilter) -> Result<u64, DatabaseError>;
 }

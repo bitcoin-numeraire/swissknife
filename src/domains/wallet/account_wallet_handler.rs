@@ -43,6 +43,7 @@ use crate::{
     infra::axum::{Json, Path, Query},
 };
 
+use super::saved_contact_handler;
 use super::{Balance, Contact, Wallet, WalletFilter};
 
 #[derive(OpenApi)]
@@ -81,6 +82,9 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         get_wallet_payment,
         delete_failed_payments,
         list_contacts,
+        saved_contact_handler::list_saved_contacts,
+        saved_contact_handler::save_contact,
+        saved_contact_handler::remove_saved_contact,
     ),
     components(schemas(
         Account,
@@ -160,6 +164,14 @@ pub fn account_router() -> Router<Arc<AppServices>> {
         .route("/wallets/{wallet_id}/payments/{id}", get(get_wallet_payment))
         .route("/wallets/{wallet_id}/payments", delete(delete_failed_payments))
         .route("/wallets/{wallet_id}/contacts", get(list_contacts))
+        .route(
+            "/wallets/{wallet_id}/saved-contacts",
+            get(saved_contact_handler::list_saved_contacts).post(saved_contact_handler::save_contact),
+        )
+        .route(
+            "/wallets/{wallet_id}/saved-contacts/{ln_address}",
+            delete(saved_contact_handler::remove_saved_contact),
+        )
 }
 
 /// Stream durable events for every wallet owned by the authenticated account.

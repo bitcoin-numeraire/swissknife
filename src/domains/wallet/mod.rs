@@ -1,4 +1,5 @@
 mod account_wallet_handler;
+mod saved_contact_handler;
 mod wallet_handler;
 mod wallet_repository;
 mod wallet_service;

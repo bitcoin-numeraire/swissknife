@@ -55,6 +55,22 @@ pub struct Contact {
     pub contact_since: DateTime<Utc>,
 }
 
+/// An explicit wallet address-book entry.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+pub struct SavedContact {
+    pub ln_address: String,
+    pub label: Option<String>,
+    /// Time the address was first saved, preserved when its label changes.
+    pub saved_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SaveContactRequest {
+    pub ln_address: String,
+    pub label: Option<String>,
+}
+
 /// A spendable asset on one protocol/network.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 pub struct Asset {

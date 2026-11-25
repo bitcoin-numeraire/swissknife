@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::application::errors::ApplicationError;
 
 use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview};
+use swissknife_types::{SaveContactRequest, SavedContact};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -16,6 +17,9 @@ pub trait WalletUseCases: Send + Sync {
     async fn list_overviews(&self) -> Result<Vec<WalletOverview>, ApplicationError>;
     async fn get_balance(&self, id: Uuid) -> Result<Balance, ApplicationError>;
     async fn list_contacts(&self, id: Uuid) -> Result<Vec<Contact>, ApplicationError>;
+    async fn list_saved_contacts(&self, wallet: Uuid) -> Result<Vec<SavedContact>, ApplicationError>;
+    async fn save_contact(&self, wallet: Uuid, request: SaveContactRequest) -> Result<SavedContact, ApplicationError>;
+    async fn remove_saved_contact(&self, wallet: Uuid, address: String) -> Result<(), ApplicationError>;
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError>;
     async fn delete_many(&self, filter: WalletFilter) -> Result<u64, ApplicationError>;
 }

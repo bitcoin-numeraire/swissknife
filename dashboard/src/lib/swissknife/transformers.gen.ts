@@ -46,6 +46,7 @@ import type {
   ListOffersResponse,
   ListPaymentsResponse,
   ListResponse,
+  ListSavedContactsResponse,
   ListWalletBtcAddressesResponse,
   ListWalletInvoicesResponse,
   ListWalletOffersResponse,
@@ -61,6 +62,7 @@ import type {
   RegisterWalletResponse,
   ReplaceAccountPermissionsResponse,
   ResetLocalLoginResponse,
+  SaveContactResponse,
   StreamAccountEventsResponse,
   SubmitPaymentResponse,
   SubmitWalletPaymentResponse,
@@ -617,6 +619,23 @@ export const getWalletPaymentResponseTransformer = async (
   data: any
 ): Promise<GetWalletPaymentResponse> => {
   data = paymentSchemaResponseTransformer(data);
+  return data;
+};
+
+const savedContactSchemaResponseTransformer = (data: any) => {
+  data.saved_at = new Date(data.saved_at);
+  return data;
+};
+
+export const listSavedContactsResponseTransformer = async (
+  data: any
+): Promise<ListSavedContactsResponse> => {
+  data = data.map((item: any) => savedContactSchemaResponseTransformer(item));
+  return data;
+};
+
+export const saveContactResponseTransformer = async (data: any): Promise<SaveContactResponse> => {
+  data = savedContactSchemaResponseTransformer(data);
   return data;
 };
 

@@ -1294,6 +1294,23 @@ export type ResetLocalPasswordRequest = {
   new_password: string;
 };
 
+export type SaveContactRequest = {
+  label?: string | null;
+  ln_address: string;
+};
+
+/**
+ * An explicit wallet address-book entry.
+ */
+export type SavedContact = {
+  label?: string | null;
+  ln_address: string;
+  /**
+   * Time the address was first saved, preserved when its label changes.
+   */
+  saved_at: Date;
+};
+
 /**
  * Send Payment Request
  */
@@ -1561,6 +1578,10 @@ export type Wallet = {
  * Independent permissions for a single wallet.
  */
 export type WalletCapabilities = {
+  /**
+   * Save, rename and remove address-book entries for this wallet.
+   */
+  manage_contacts?: boolean;
   read?: boolean;
   receive?: boolean;
   spend?: boolean;
@@ -5455,6 +5476,122 @@ export type GetWalletPaymentResponses = {
 };
 
 export type GetWalletPaymentResponse = GetWalletPaymentResponses[keyof GetWalletPaymentResponses];
+
+export type ListSavedContactsData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/saved-contacts';
+};
+
+export type ListSavedContactsErrors = {
+  /**
+   * Invalid credential
+   */
+  401: unknown;
+  /**
+   * Read permission required
+   */
+  403: unknown;
+  /**
+   * Wallet not found
+   */
+  404: unknown;
+};
+
+export type ListSavedContactsResponses = {
+  /**
+   * Saved contacts, ordered by address
+   */
+  200: Array<SavedContact>;
+};
+
+export type ListSavedContactsResponse =
+  ListSavedContactsResponses[keyof ListSavedContactsResponses];
+
+export type SaveContactData = {
+  body: SaveContactRequest;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/saved-contacts';
+};
+
+export type SaveContactErrors = {
+  /**
+   * Invalid credential
+   */
+  401: unknown;
+  /**
+   * Contact management permission required
+   */
+  403: unknown;
+  /**
+   * Wallet not found
+   */
+  404: unknown;
+  /**
+   * Invalid address or label
+   */
+  422: unknown;
+};
+
+export type SaveContactResponses = {
+  /**
+   * Saved contact
+   */
+  200: SavedContact;
+};
+
+export type SaveContactResponse = SaveContactResponses[keyof SaveContactResponses];
+
+export type RemoveSavedContactData = {
+  body?: never;
+  path: {
+    /**
+     * Wallet ID
+     */
+    wallet_id: string;
+    /**
+     * Saved Lightning Address
+     */
+    ln_address: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/saved-contacts/{ln_address}';
+};
+
+export type RemoveSavedContactErrors = {
+  /**
+   * Invalid credential
+   */
+  401: unknown;
+  /**
+   * Contact management permission required
+   */
+  403: unknown;
+  /**
+   * Wallet or saved contact not found
+   */
+  404: unknown;
+  /**
+   * Invalid Lightning Address
+   */
+  422: unknown;
+};
+
+export type RemoveSavedContactResponses = {
+  /**
+   * Saved contact removed
+   */
+  204: void;
+};
+
+export type RemoveSavedContactResponse =
+  RemoveSavedContactResponses[keyof RemoveSavedContactResponses];
 
 export type ListOffersData = {
   body?: never;
