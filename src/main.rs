@@ -19,7 +19,7 @@ use crate::application::composition::{
 };
 use crate::infra::{
     app::{ClientEventRetentionWorker, EventListener, Server},
-    cli::Cli,
+    cli::{recover_local_login, Cli, Command},
     config::config_rs::load_config,
     logging::tracing::setup_tracing,
 };
@@ -31,6 +31,14 @@ async fn main() {
     #[cfg(debug_assertions)]
     dotenv().ok();
 
+    if let Some(Command::Mcp { server, wallet }) = cli.command {
+        if let Err(error) = swissknife_mcp::run(server, wallet).await {
+            eprintln!("Wallet MCP failed: {error:#}");
+            exit(1);
+        }
+        return;
+    }
+
     // Load config and logger
     let config = match load_config() {
         Ok(c) => c,
@@ -39,11 +47,11 @@ async fn main() {
             exit(1);
         }
     };
-    if let Some(command) = cli.command {
+    if let Some(Command::RecoverLocalLogin { account_id }) = cli.command {
         let result = async {
             let adapters = RecoveryAdapters::new(&config).await?;
             let services = RecoveryServices::new(config.auth_provider, adapters);
-            command.run(services.login.as_ref()).await
+            recover_local_login(account_id, services.login.as_ref()).await
         }
         .await;
         if let Err(error) = result {
