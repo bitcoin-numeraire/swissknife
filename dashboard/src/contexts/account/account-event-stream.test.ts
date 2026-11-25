@@ -25,6 +25,15 @@ function event(id: string, eventWalletId = walletId): ClientEvent {
 }
 
 describe('account event cache invalidation', () => {
+  it('refreshes the active submission for its own wallet, resource and account', () => {
+    const e = event('41');
+    const key = ['accountWalletPaymentSubmission', e.wallet_id, e.resource_id, 'alice', false];
+    expect(isAccountEventCacheKey(key, e, 'alice')).toBe(true);
+    expect(isAccountEventCacheKey(key, undefined, 'alice')).toBe(true);
+    expect(isAccountEventCacheKey(key, e, 'bob')).toBe(false);
+    expect(isAccountEventCacheKey(key, { ...e, resource_id: 'other' }, 'alice')).toBe(false);
+    expect(isAccountEventCacheKey(key, { ...e, wallet_id: 'other' }, 'alice')).toBe(false);
+  });
   it('refreshes the affected wallet balance and transaction resources', () => {
     const clientEvent = event('41');
 
