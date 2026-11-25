@@ -35,7 +35,7 @@ const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire";
 pub struct PaymentService {
     domain: String,
     pub(super) store: AppStore,
-    ln_client: Arc<dyn LnClient>,
+    pub(super) ln_client: Arc<dyn LnClient>,
     pub(super) bitcoin_wallet: Arc<dyn BitcoinWallet>,
     pub(super) events: Arc<dyn EventUseCases>,
 }
@@ -475,44 +475,65 @@ impl PaymentService {
             let target = Self::ln_payment_target(&invoice, variable_amount)?;
             let fee_estimate = self.lightning_fee_estimate(target).await?;
 
-            let pending_payment = self
-                .store
-                .payment_uow
-                .reserve(
-                    Payment {
-                        wallet_id,
-                        amount_msat: amount,
-                        status: PaymentStatus::Pending,
-                        ledger: Ledger::Lightning,
-                        description: comment,
-                        lightning: Some(LnPayment {
-                            payment_hash: invoice.payment_hash,
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    },
-                    fee_estimate.maximum_total_msat,
-                )
-                .await?;
-
-            let result = self
-                .ln_client
-                .pay(
-                    invoice.bolt11.clone(),
-                    if invoice.amount_msat.is_some() {
-                        None
-                    } else {
-                        Some(amount)
-                    },
-                    fee_estimate.maximum_fee_msat,
-                    pending_payment.id.to_string(),
-                )
-                .await;
-
-            self.handle_processed_payment(pending_payment, result).await
+            let payment = Payment {
+                wallet_id,
+                amount_msat: amount,
+                status: PaymentStatus::Pending,
+                ledger: Ledger::Lightning,
+                description: comment,
+                lightning: Some(LnPayment {
+                    payment_hash: invoice.payment_hash,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+            self.send_external_invoice(payment, invoice.bolt11, variable_amount, fee_estimate.maximum_fee_msat)
+                .await
         } else {
             Err(DataError::Validation("Amount must be defined for zero-amount invoices.".to_string()).into())
         }
+    }
+
+    async fn send_external_invoice(
+        &self,
+        payment: Payment,
+        invoice: String,
+        variable_amount: Option<u64>,
+        maximum_fee_msat: u64,
+    ) -> Result<Payment, ApplicationError> {
+        let reserve = Self::reserve_amount_msat(payment.amount_msat, maximum_fee_msat)?;
+        let pending = self.store.payment_uow.reserve(payment, reserve).await?;
+        let result = self
+            .ln_client
+            .pay(invoice, variable_amount, maximum_fee_msat, pending.id.to_string())
+            .await;
+        self.handle_processed_payment(pending, result).await
+    }
+
+    async fn enqueue_lightning_invoice(
+        &self,
+        key: &super::SubmissionKey,
+        payment: Payment,
+        invoice: String,
+        variable_amount_msat: Option<u64>,
+        approved_limit: Option<u64>,
+    ) -> Result<super::SubmittedPayment, ApplicationError> {
+        let node_cap = self.ln_client.fee_limit_msat(payment.amount_msat);
+        let maximum_fee_msat = approved_limit.map_or(node_cap, |limit| limit.min(node_cap));
+        let reserve = Self::reserve_amount_msat(payment.amount_msat, maximum_fee_msat)?;
+        self.store
+            .payment_uow
+            .submit(
+                key,
+                payment,
+                reserve,
+                super::PaymentInstructions::Lightning {
+                    invoice,
+                    variable_amount_msat,
+                    maximum_fee_msat,
+                },
+            )
+            .await
     }
 
     async fn send_lnurl_pay(
@@ -740,6 +761,17 @@ impl PaymentsUseCases for PaymentService {
             .await
             .map_err(DataError::Validation)?;
         let (invoice, address, action) = match input {
+            PaymentInput::Bolt12(input) => {
+                self.ensure_wallet_network(wallet_id, self.bitcoin_wallet.network())
+                    .await?;
+                let resolved = self
+                    .resolve_bolt12(input, request.amount_msat, request.comment.as_deref())
+                    .await?;
+                let payment = resolved.payment(wallet_id, request.comment);
+                return self
+                    .enqueue_lightning_invoice(&key, payment, resolved.invoice, None, request.maximum_fee_msat)
+                    .await;
+            }
             PaymentInput::Bolt11(invoice) => (invoice, None, None),
             PaymentInput::LnUrlPay(data) => {
                 self.ensure_wallet_network(wallet_id, self.bitcoin_wallet.network())
@@ -784,14 +816,6 @@ impl PaymentsUseCases for PaymentService {
             return Err(DataError::InternalTransferRequired.into());
         }
         let amount = Self::validate_amount(invoice.amount_msat.or(request.amount_msat))?;
-        let node_cap = self.ln_client.fee_limit_msat(amount);
-        let maximum_fee_msat = request.maximum_fee_msat.map_or(node_cap, |fee| fee.min(node_cap));
-        let reserve = Self::reserve_amount_msat(amount, maximum_fee_msat)?;
-        let instructions = super::PaymentInstructions::Lightning {
-            bolt11: invoice.bolt11,
-            variable_amount_msat: invoice.amount_msat.is_none().then_some(amount),
-            maximum_fee_msat,
-        };
         let payment = Payment {
             wallet_id,
             amount_msat: amount,
@@ -806,10 +830,14 @@ impl PaymentsUseCases for PaymentService {
             }),
             ..Default::default()
         };
-        self.store
-            .payment_uow
-            .submit(&key, payment, reserve, instructions)
-            .await
+        self.enqueue_lightning_invoice(
+            &key,
+            payment,
+            invoice.bolt11,
+            invoice.amount_msat.is_none().then_some(amount),
+            request.maximum_fee_msat,
+        )
+        .await
     }
 
     async fn submission(&self, wallet_id: Option<Uuid>, id: Uuid) -> Result<super::SubmittedPayment, ApplicationError> {
@@ -838,7 +866,7 @@ impl PaymentsUseCases for PaymentService {
             return Ok(false);
         };
         let super::PaymentInstructions::Lightning {
-            bolt11,
+            invoice,
             variable_amount_msat,
             maximum_fee_msat,
         } = command.instructions
@@ -848,7 +876,7 @@ impl PaymentsUseCases for PaymentService {
         let result = self
             .ln_client
             .pay(
-                bolt11,
+                invoice,
                 variable_amount_msat,
                 maximum_fee_msat,
                 command.payment.id.to_string(),
@@ -892,11 +920,16 @@ impl PaymentsUseCases for PaymentService {
         let expected_network = match &input_type {
             PaymentInput::BitcoinAddress(address) => address.network,
             PaymentInput::Bolt11(invoice) => self.bolt11_network(invoice),
-            PaymentInput::LnUrlPay(_) => self.bitcoin_wallet.network(),
+            PaymentInput::LnUrlPay(_) | PaymentInput::Bolt12(_) => self.bitcoin_wallet.network(),
         };
         self.ensure_wallet_network(wallet_id, expected_network).await?;
 
         match input_type {
+            PaymentInput::Bolt12(value) => {
+                let (_, amount) = self.inspect_bolt12(&value, amount_msat).await?;
+                Self::fee_estimate(Ledger::Lightning, amount, None, self.ln_client.fee_limit_msat(amount))
+            }
+
             PaymentInput::BitcoinAddress(data) => {
                 let amount_sat = data
                     .amount_sat
@@ -1006,11 +1039,18 @@ impl PaymentsUseCases for PaymentService {
             let expected_network = match &input_type {
                 PaymentInput::BitcoinAddress(address) => address.network,
                 PaymentInput::Bolt11(invoice) => self.bolt11_network(invoice),
-                PaymentInput::LnUrlPay(_) => self.bitcoin_wallet.network(),
+                PaymentInput::LnUrlPay(_) | PaymentInput::Bolt12(_) => self.bitcoin_wallet.network(),
             };
             self.ensure_wallet_network(wallet_id, expected_network).await?;
 
             match input_type {
+                PaymentInput::Bolt12(value) => {
+                    let resolved = self.resolve_bolt12(value, amount_msat, comment.as_deref()).await?;
+                    let cap = self.ln_client.fee_limit_msat(resolved.amount_msat);
+                    let payment = resolved.payment(wallet_id, comment);
+                    self.send_external_invoice(payment, resolved.invoice, None, cap).await
+                }
+
                 PaymentInput::BitcoinAddress(address) => {
                     let amount_sat = amount_msat.map(|amount| amount / 1000);
                     self.send_bitcoin(address, amount_sat, comment, wallet_id).await

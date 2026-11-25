@@ -67,7 +67,7 @@ services:
       - "${SWISSKNIFE_ITEST_LND_P2P_PORT:-9735}:9735"
 
   cln:
-    image: elementsproject/lightningd:v26.06.10@sha256:59f10c4c7429bb80791481c906859f6de1aa58ef224758aa25d50b7d47fc0c04
+    image: &cln_image elementsproject/lightningd:v26.06.10@sha256:59f10c4c7429bb80791481c906859f6de1aa58ef224758aa25d50b7d47fc0c04
     depends_on:
       bitcoind:
         condition: service_healthy
@@ -88,6 +88,19 @@ services:
       - "${SWISSKNIFE_ITEST_CLN_REST_PORT:-3010}:3010"
       - "${SWISSKNIFE_ITEST_CLN_P2P_PORT:-9736}:9736"
 
+  cln-offers:
+    image: *cln_image
+    profiles: [offers]
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    environment:
+      LIGHTNINGD_NETWORK: regtest
+    command: ["--conf=/etc/cln/config", "--alias=swissknife-offers-peer"]
+    volumes:
+      - ./config/cln/config:/etc/cln/config:ro
+      - cln-offers-data:/root/.lightning
+
   # Mock OpenID Connect provider for the OAuth2/OIDC auth tests. Serves standard
   # discovery + JWKS and mints JWTs whose claims are shaped by the checked-in
   # config (matched per request `client_id`). Reached by the host-run binary and
@@ -107,4 +120,5 @@ volumes:
   postgres-data:
   bitcoin-data:
   lnd-data:
+  cln-offers-data:
   cln-data:

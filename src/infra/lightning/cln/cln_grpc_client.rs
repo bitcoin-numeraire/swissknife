@@ -154,6 +154,61 @@ impl ClnGrpcClient {
 
 #[async_trait]
 impl LnClient for ClnGrpcClient {
+    async fn decode_bolt12(&self, input: &str) -> Result<crate::domains::payment::DecodedBolt12, LightningError> {
+        let response = self
+            .client
+            .clone()
+            .decode(cln::DecodeRequest { string: input.into() })
+            .await
+            .map_err(|e| LightningError::InvalidPaymentTarget(e.message().to_owned()))?
+            .into_inner();
+        let kind = match response.item_type() {
+            cln::decode_response::DecodeType::Bolt12Offer => "bolt12 offer",
+            cln::decode_response::DecodeType::Bolt12Invoice => "bolt12 invoice",
+            _ => "unsupported",
+        };
+        Ok(crate::domains::payment::DecodedBolt12 {
+            kind: kind.into(),
+            valid: response.valid,
+            offer_id: response.offer_id.map(hex::encode),
+            offer_chains: response.offer_chains.into_iter().map(hex::encode).collect(),
+            offer_description: response.offer_description,
+            offer_amount_msat: response.offer_amount_msat.map(|a| a.msat),
+            offer_currency: response.offer_currency,
+            offer_quantity_max: response.offer_quantity_max,
+            offer_recurrence: response.offer_recurrence.is_some(),
+            offer_absolute_expiry: response.offer_absolute_expiry,
+            invreq_chain: response.invreq_chain.map(hex::encode),
+            invoice_created_at: response.invoice_created_at,
+            invoice_relative_expiry: response.invoice_relative_expiry.map(u64::from),
+            invoice_amount_msat: response.invoice_amount_msat.map(|a| a.msat),
+            invoice_payment_hash: response.invoice_payment_hash.map(hex::encode),
+        })
+    }
+
+    async fn fetch_offer_invoice(
+        &self,
+        offer: &str,
+        amount_msat: u64,
+        note: Option<String>,
+    ) -> Result<String, LightningError> {
+        let mut client = self.client.clone();
+        let mut request = tonic::Request::new(cln::FetchinvoiceRequest {
+            offer: offer.into(),
+            amount_msat: Some(cln::Amount { msat: amount_msat }),
+            payer_note: note,
+            ..Default::default()
+        });
+        // CLN's gRPC bridge serializes the optional RPC timeout as a float.
+        request.set_timeout(std::time::Duration::from_secs(15));
+        Ok(client
+            .fetch_invoice(request)
+            .await
+            .map_err(|e| LightningError::InvalidPaymentTarget(e.message().to_owned()))?
+            .into_inner()
+            .invoice)
+    }
+
     async fn disconnect(&self) -> Result<(), LightningError> {
         Ok(())
     }

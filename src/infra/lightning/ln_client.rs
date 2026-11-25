@@ -12,6 +12,22 @@ use crate::{
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait LnClient: Sync + Send {
+    async fn decode_bolt12(&self, _input: &str) -> Result<crate::domains::payment::DecodedBolt12, LightningError> {
+        Err(LightningError::InvalidPaymentTarget(
+            "This Lightning provider does not support BOLT12".into(),
+        ))
+    }
+    async fn fetch_offer_invoice(
+        &self,
+        _offer: &str,
+        _amount_msat: u64,
+        _note: Option<String>,
+    ) -> Result<String, LightningError> {
+        Err(LightningError::InvalidPaymentTarget(
+            "This Lightning provider does not support BOLT12".into(),
+        ))
+    }
+
     async fn disconnect(&self) -> Result<(), LightningError>;
     async fn invoice(
         &self,

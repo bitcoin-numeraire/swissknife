@@ -163,6 +163,32 @@ impl ClnRestClient {
 
 #[async_trait]
 impl LnClient for ClnRestClient {
+    async fn decode_bolt12(&self, input: &str) -> Result<crate::domains::payment::DecodedBolt12, LightningError> {
+        self.post_request("decode", &serde_json::json!({"string":input}))
+            .await
+            .map_err(|e| LightningError::InvalidPaymentTarget(e.to_string()))
+    }
+
+    async fn fetch_offer_invoice(
+        &self,
+        offer: &str,
+        amount_msat: u64,
+        note: Option<String>,
+    ) -> Result<String, LightningError> {
+        #[derive(serde::Deserialize)]
+        struct FetchedInvoice {
+            invoice: String,
+        }
+        let mut request = serde_json::json!({"offer":offer,"amount_msat":amount_msat,"timeout":15});
+        if let Some(note) = note {
+            request["payer_note"] = serde_json::Value::String(note.to_owned());
+        }
+        self.post_request::<FetchedInvoice>("fetchinvoice", &request)
+            .await
+            .map(|r| r.invoice)
+            .map_err(|e| LightningError::InvalidPaymentTarget(e.to_string()))
+    }
+
     async fn disconnect(&self) -> Result<(), LightningError> {
         Ok(())
     }

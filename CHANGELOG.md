@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Core Lightning wallets can pay reusable BOLT12 offers and negotiated invoices, including amountless offers and optional payer notes.
+
 - The send drawer tracks background Lightning payments and recovers the original request after a lost response.
 
 - External Lightning payments support idempotent background submission, a wallet-scoped status resource and resumable execution events.
