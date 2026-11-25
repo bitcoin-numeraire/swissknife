@@ -11,16 +11,16 @@ use std::{sync::Arc, time::Duration};
 
 use axum::{
     extract::Extension,
-    http::{header, HeaderValue, StatusCode},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     middleware,
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, head},
     Router,
 };
 use bitcoin::hashes::{sha256, Hash};
 use bytes::BytesMut;
 use reqwest::{redirect::Policy, Client, Url};
-use swissknife_l402::{require_payment, Bakery, PaidRoute};
+use swissknife_l402::{pass_status, require_payment, Bakery, PaidRoute};
 use utoipa::OpenApi;
 
 use crate::application::{composition::AppServices, errors::WebServerError};
@@ -84,6 +84,8 @@ pub fn router(
                 challenges: Arc::new(ChallengeLimit::new(route.challenges_per_minute)),
             }),
         });
+        let status = head(merchant_pass_status).with_state(paid.clone());
+        router = router.route(&format!("/l402/{name}/status"), status);
         let handler = get(get_paid_resource)
             .layer::<_, std::convert::Infallible>(Extension(Target {
                 client: client.clone(),
@@ -97,8 +99,21 @@ pub fn router(
 }
 
 #[derive(OpenApi)]
-#[openapi(paths(get_paid_resource,wallet_routes::paid_wallet_route), tags((name = "L402", description = "Wallet-backed paid resources")))]
+#[openapi(paths(get_paid_resource,merchant_pass_status,wallet_routes::paid_wallet_route,wallet_routes::wallet_pass_status), tags((name = "L402", description = "Wallet-backed paid resources")))]
 pub struct MerchantHandler;
+
+/// Inspect this merchant's cached pass using a status-only macaroon.
+#[utoipa::path(head, path="/l402/{name}/status", tag="L402",
+    params(("name"=String, Path),("SwissKnife-L402-Inspection"=String,Header,description="Macaroon attenuated with purpose=status")),
+    responses((status=200,description="Pass terms at the time of inspection",
+        headers(("SwissKnife-L402-Status"=String,description="active, exhausted or inactive"),("SwissKnife-L402-Remaining"=u64,description="Remaining successful requests for a metered pass"))),
+    (status=401,description="Invalid status credential"),(status=404),(status=503)))]
+async fn merchant_pass_status(
+    state: axum::extract::State<Arc<PaidRoute>>,
+    headers: HeaderMap,
+) -> Result<Response, swissknife_l402::GateError> {
+    pass_status(state, headers).await
+}
 
 /// Fetch a fixed merchant resource with an L402 access pass. Each configured
 /// route advertises its invoice in WWW-Authenticate. A paid pass can be reused

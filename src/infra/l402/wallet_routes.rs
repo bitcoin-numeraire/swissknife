@@ -1,15 +1,15 @@
 use axum::{
     extract::{Request, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     middleware::{self, Next},
     response::Response,
-    routing::get,
+    routing::{get, head},
     Router,
 };
 use bitcoin::hashes::{sha256, Hash};
 use reqwest::{Client, Url};
 use std::{collections::BTreeMap, num::NonZeroU32, sync::Arc, time::Duration};
-use swissknife_l402::{require_payment, Bakery, GateError, PaidRoute};
+use swissknife_l402::{pass_status, require_payment, Bakery, GateError, PaidRoute};
 use swissknife_types::MerchantOrigin;
 use uuid::Uuid;
 
@@ -100,10 +100,13 @@ pub(super) fn router(
         bakery,
         services,
     });
+    let status = head(wallet_pass_status).with_state(state.clone());
     let protected = get(get_paid_resource)
         .route_layer(middleware::from_fn_with_state(state, paid_wallet_route))
         .head(|| async { StatusCode::METHOD_NOT_ALLOWED });
-    Ok(merchant_handler::router(catalog).route("/l402/w/{wallet_id}/{name}", protected))
+    Ok(merchant_handler::router(catalog)
+        .route("/l402/w/{wallet_id}/{name}", protected)
+        .route("/l402/w/{wallet_id}/{name}/status", status))
 }
 
 /// Download a paid resource published by the selected wallet.
@@ -117,18 +120,42 @@ async fn paid_wallet_route(
     mut request: Request,
     next: Next,
 ) -> Result<Response, GateError> {
-    if !valid_name(&name, 57) {
+    let (route, target) = resolve_route(&gateway, wallet, &name).await?;
+    request.extensions_mut().insert(target);
+    require_payment(State(route), request, next).await
+}
+
+/// Inspect a pass issued for the selected wallet's published resource.
+#[utoipa::path(head,path="/l402/w/{wallet_id}/{name}/status",tag="L402",
+params(("wallet_id"=Uuid,Path),("name"=String,Path),("SwissKnife-L402-Inspection"=String,Header,description="Macaroon attenuated with purpose=status")),
+responses((status=200,description="Current pass terms",
+headers(("SwissKnife-L402-Status"=String,description="active, exhausted or inactive"),("SwissKnife-L402-Remaining"=u64,description="Remaining successful requests for a metered pass"))),
+(status=401,description="Invalid status credential"),(status=404),(status=503)))]
+async fn wallet_pass_status(
+    State(gateway): State<Arc<WalletGateway>>,
+    Path((wallet, name)): Path<(Uuid, String)>,
+    headers: HeaderMap,
+) -> Result<Response, GateError> {
+    let (route, _) = resolve_route(&gateway, wallet, &name).await?;
+    pass_status(State(route), headers).await
+}
+
+async fn resolve_route(
+    gateway: &WalletGateway,
+    wallet: Uuid,
+    name: &str,
+) -> Result<(Arc<PaidRoute>, Target), GateError> {
+    if !valid_name(name, 57) {
         return Err(GateError::Closed);
     }
     let terms = gateway
         .catalog
         .routes
-        .get(wallet, &name)
+        .get(wallet, name)
         .await
         .map_err(|_| GateError::Unavailable)?
         .ok_or(GateError::Closed)?;
     let origin = gateway.origins.get(&(wallet, terms.origin)).ok_or(GateError::Closed)?;
-    request.extensions_mut().insert(origin.target.clone());
     let route = PaidRoute {
         scope: format!("{}/{}", origin.scope, name),
         validity: Duration::from_secs(u64::from(origin.seconds)),
@@ -144,5 +171,5 @@ async fn paid_wallet_route(
             challenges: origin.challenges.clone(),
         }),
     };
-    require_payment(State(Arc::new(route)), request, next).await
+    Ok((Arc::new(route), origin.target.clone()))
 }

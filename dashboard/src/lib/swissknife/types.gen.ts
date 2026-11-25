@@ -1794,6 +1794,38 @@ export type PaidWalletRouteResponses = {
 
 export type PaidWalletRouteResponse = PaidWalletRouteResponses[keyof PaidWalletRouteResponses];
 
+export type WalletPassStatusData = {
+  body?: never;
+  headers: {
+    /**
+     * Macaroon attenuated with purpose=status
+     */
+    'SwissKnife-L402-Inspection': string;
+  };
+  path: {
+    wallet_id: string;
+    name: string;
+  };
+  query?: never;
+  url: '/l402/w/{wallet_id}/{name}/status';
+};
+
+export type WalletPassStatusErrors = {
+  /**
+   * Invalid status credential
+   */
+  401: unknown;
+  404: unknown;
+  503: unknown;
+};
+
+export type WalletPassStatusResponses = {
+  /**
+   * Current pass terms
+   */
+  200: unknown;
+};
+
 export type GetPaidResourceData = {
   body?: never;
   path: {
@@ -1841,6 +1873,37 @@ export type GetPaidResourceResponses = {
 };
 
 export type GetPaidResourceResponse = GetPaidResourceResponses[keyof GetPaidResourceResponses];
+
+export type MerchantPassStatusData = {
+  body?: never;
+  headers: {
+    /**
+     * Macaroon attenuated with purpose=status
+     */
+    'SwissKnife-L402-Inspection': string;
+  };
+  path: {
+    name: string;
+  };
+  query?: never;
+  url: '/l402/{name}/status';
+};
+
+export type MerchantPassStatusErrors = {
+  /**
+   * Invalid status credential
+   */
+  401: unknown;
+  404: unknown;
+  503: unknown;
+};
+
+export type MerchantPassStatusResponses = {
+  /**
+   * Pass terms at the time of inspection
+   */
+  200: unknown;
+};
 
 export type VerifyLnurlInvoiceData = {
   body?: never;

@@ -193,6 +193,69 @@
         ]
       }
     },
+    "/l402/w/{wallet_id}/{name}/status": {
+      "head": {
+        "tags": [
+          "L402"
+        ],
+        "summary": "Inspect a pass issued for the selected wallet's published resource.",
+        "operationId": "wallet_pass_status",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SwissKnife-L402-Inspection",
+            "in": "header",
+            "description": "Macaroon attenuated with purpose=status",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current pass terms",
+            "headers": {
+              "SwissKnife-L402-Remaining": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "description": "Remaining successful requests for a metered pass"
+              },
+              "SwissKnife-L402-Status": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "active, exhausted or inactive"
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid status credential"
+          },
+          "404": {},
+          "503": {}
+        }
+      }
+    },
     "/l402/{name}": {
       "get": {
         "tags": [
@@ -260,6 +323,60 @@
             "l402": []
           }
         ]
+      }
+    },
+    "/l402/{name}/status": {
+      "head": {
+        "tags": [
+          "L402"
+        ],
+        "summary": "Inspect this merchant's cached pass using a status-only macaroon.",
+        "operationId": "merchant_pass_status",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SwissKnife-L402-Inspection",
+            "in": "header",
+            "description": "Macaroon attenuated with purpose=status",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pass terms at the time of inspection",
+            "headers": {
+              "SwissKnife-L402-Remaining": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "description": "Remaining successful requests for a metered pass"
+              },
+              "SwissKnife-L402-Status": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "active, exhausted or inactive"
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid status credential"
+          },
+          "404": {},
+          "503": {}
+        }
       }
     },
     "/lnurlp/{token}/verify": {

@@ -318,6 +318,9 @@ import type {
   MarkWelcomeCompleteData,
   MarkWelcomeCompleteErrors,
   MarkWelcomeCompleteResponses,
+  MerchantPassStatusData,
+  MerchantPassStatusErrors,
+  MerchantPassStatusResponses,
   NewWalletBtcAddressData,
   NewWalletBtcAddressErrors,
   NewWalletBtcAddressResponses,
@@ -419,6 +422,9 @@ import type {
   VerifyLnurlInvoiceResponses,
   VersionCheckData,
   VersionCheckResponses,
+  WalletPassStatusData,
+  WalletPassStatusErrors,
+  WalletPassStatusResponses,
   WalletPayData,
   WalletPayErrors,
   WalletPayResponses,
@@ -489,6 +495,18 @@ export const paidWalletRoute = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Inspect a pass issued for the selected wallet's published resource.
+ */
+export const walletPassStatus = <ThrowOnError extends boolean = false>(
+  options: Options<WalletPassStatusData, ThrowOnError>
+): RequestResult<WalletPassStatusResponses, WalletPassStatusErrors, ThrowOnError> =>
+  (options.client ?? client).head<WalletPassStatusResponses, WalletPassStatusErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/l402/w/{wallet_id}/{name}/status',
+    ...options,
+  });
+
+/**
  * Fetch a fixed merchant resource with an L402 access pass. Each configured
  * route advertises its invoice in WWW-Authenticate. A paid pass can be reused
  * until expiry or exhaustion of its configured request allowance.
@@ -499,6 +517,22 @@ export const getPaidResource = <ThrowOnError extends boolean = false>(
   (options.client ?? client).get<GetPaidResourceResponses, GetPaidResourceErrors, ThrowOnError>({
     security: [{ name: 'Authorization', type: 'apiKey' }],
     url: '/l402/{name}',
+    ...options,
+  });
+
+/**
+ * Inspect this merchant's cached pass using a status-only macaroon.
+ */
+export const merchantPassStatus = <ThrowOnError extends boolean = false>(
+  options: Options<MerchantPassStatusData, ThrowOnError>
+): RequestResult<MerchantPassStatusResponses, MerchantPassStatusErrors, ThrowOnError> =>
+  (options.client ?? client).head<
+    MerchantPassStatusResponses,
+    MerchantPassStatusErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/l402/{name}/status',
     ...options,
   });
 

@@ -5001,6 +5001,7 @@ dependencies = [
  "http",
  "humantime",
  "jsonwebtoken",
+ "libmacaroon",
  "lightning-invoice",
  "lnurl-rs",
  "migration",

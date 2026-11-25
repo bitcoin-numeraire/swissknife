@@ -84,8 +84,12 @@ impl InvoiceGate for Merchant {
     }
 
     async fn redeem(&self, grant: &PaidGrant) -> Result<bool, GateError> {
+        Ok(self.remaining_requests(grant).await? != Some(0))
+    }
+
+    async fn remaining_requests(&self, grant: &PaidGrant) -> Result<Option<u64>, GateError> {
         let Some(limit) = self.requests_per_payment else {
-            return Ok(true);
+            return Ok(None);
         };
         let used = self
             .services
@@ -93,7 +97,7 @@ impl InvoiceGate for Merchant {
             .used(grant.payment_hash)
             .await
             .map_err(|_| GateError::Unavailable)?;
-        Ok(used < u64::from(limit.get()))
+        Ok(Some(u64::from(limit.get()).saturating_sub(used)))
     }
 
     async fn record_success(&self, grant: &PaidGrant) -> Result<bool, GateError> {

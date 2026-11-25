@@ -1046,6 +1046,15 @@ export const zPaidWalletRouteResponse = z.array(
   z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 );
 
+export const zWalletPassStatusHeaders = z.object({
+  'SwissKnife-L402-Inspection': z.string(),
+});
+
+export const zWalletPassStatusPath = z.object({
+  wallet_id: z.uuid(),
+  name: z.string(),
+});
+
 export const zGetPaidResourcePath = z.object({
   name: z.string(),
 });
@@ -1056,6 +1065,14 @@ export const zGetPaidResourcePath = z.object({
 export const zGetPaidResourceResponse = z.array(
   z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 );
+
+export const zMerchantPassStatusHeaders = z.object({
+  'SwissKnife-L402-Inspection': z.string(),
+});
+
+export const zMerchantPassStatusPath = z.object({
+  name: z.string(),
+});
 
 export const zVerifyLnurlInvoicePath = z.object({
   token: z.uuid(),
