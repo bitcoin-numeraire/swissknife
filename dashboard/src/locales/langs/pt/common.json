@@ -1233,5 +1233,21 @@
     "empty": "Não houve pagamentos contabilizados no orçamento neste período.",
     "csv": "Descarregar CSV",
     "json": "Descarregar JSON"
+  },
+  "agent_hours": {
+    "title": "Horário de pagamentos dos agentes",
+    "none": "As credenciais da carteira podem iniciar pagamentos a qualquer hora.",
+    "help": "Selecione os dias em que começa o período. As horas são em UTC. Se a hora de fim for anterior à de início, o período termina no dia seguinte.",
+    "days": "Dias de início",
+    "start": "Das (UTC)",
+    "end": "Às (UTC)",
+    "next_day": "dia seguinte",
+    "set": "Definir horário",
+    "edit": "Editar horário",
+    "remove": "Remover horário",
+    "confirm": "As credenciais da carteira poderão iniciar pagamentos a qualquer hora. Os limites de montante da conta continuam em vigor.",
+    "save": "Guardar horário",
+    "invalid": "Selecione pelo menos um dia e duas horas válidas. Da meia-noite à meia-noite corresponde ao dia inteiro.",
+    "error": "Não foi possível carregar o horário de pagamentos dos agentes."
   }
 }
