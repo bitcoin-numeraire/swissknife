@@ -427,6 +427,7 @@ export {
   type NewWalletInvoiceResponse,
   type NewWalletInvoiceResponses,
   type NostrNip05Response,
+  type OnchainFeePreview,
   OrderDirection,
   type PayData,
   type PayError,

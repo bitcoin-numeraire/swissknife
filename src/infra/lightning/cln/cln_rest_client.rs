@@ -375,6 +375,29 @@ impl BitcoinWallet for ClnRestClient {
             .ok_or_else(|| BitcoinError::Address("No address returned by CLN".to_string()))
     }
 
+    async fn estimate_transaction_fee(
+        &self,
+        address: String,
+        amount_sat: u64,
+    ) -> Result<swissknife_types::OnchainFeePreview, BitcoinError> {
+        let startweight = super::onchain_fee::start_weight(&address)?;
+        let response: super::FundPsbtPreview = self
+            .post_request(
+                "fundpsbt",
+                &serde_json::json!({
+                    "satoshi": format!("{amount_sat}sat"), "feerate":"normal", "startweight":startweight,
+                    "minconf":1, "reserve":0, "excess_as_change":false
+                }),
+            )
+            .await
+            .map_err(|e| BitcoinError::FeeEstimate(e.to_string()))?;
+        super::onchain_fee::preview(
+            response.feerate_per_kw,
+            response.estimated_final_weight,
+            response.excess_msat,
+        )
+    }
+
     async fn prepare_transaction(
         &self,
         address: String,

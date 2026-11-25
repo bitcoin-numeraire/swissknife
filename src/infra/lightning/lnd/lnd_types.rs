@@ -333,3 +333,12 @@ impl From<TransactionResponse> for BtcTransaction {
         }
     }
 }
+
+#[serde_as]
+#[derive(Debug, Deserialize)]
+pub struct OnchainFeeResponse {
+    #[serde_as(as = "DisplayFromStr")]
+    pub fee_sat: i64,
+    #[serde_as(as = "DisplayFromStr")]
+    pub sat_per_vbyte: u64,
+}

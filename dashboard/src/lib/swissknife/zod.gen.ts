@@ -419,6 +419,23 @@ export const zNostrNip05Response = z.object({
 });
 
 /**
+ * A non-reserving single-recipient estimate from the Bitcoin wallet.
+ */
+export const zOnchainFeePreview = z.object({
+  fee_rate_sat_per_kw: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+  fee_sat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+  target_blocks: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .nullish(),
+});
+
+/**
  * Direction of result ordering for list endpoints.
  */
 export const zOrderDirection = z.enum(['Asc', 'Desc']);
@@ -429,7 +446,8 @@ export const zOrderDirection = z.enum(['Asc', 'Desc']);
  * `estimated_fee_msat` is the route or transaction fee expected at quote time.
  * It can be absent when the Lightning node cannot find a graph route while the
  * configured payment policy still permits an execution attempt. The maximum is
- * the hard cap passed to the Lightning provider (or the prepared on-chain fee).
+ * the hard cap passed to Lightning. For on-chain previews the legacy maximum
+ * fields mirror the estimate and do not authorize a later fee.
  */
 export const zPaymentFeeEstimate = z.object({
   amount_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
@@ -456,6 +474,7 @@ export const zPaymentFeeEstimate = z.object({
   maximum_total_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
     error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
   }),
+  onchain: zOnchainFeePreview.nullish(),
 });
 
 /**

@@ -496,6 +496,27 @@ impl BitcoinWallet for LndGrpcClient {
         Ok(response.address)
     }
 
+    async fn estimate_transaction_fee(
+        &self,
+        address: String,
+        amount_sat: u64,
+    ) -> Result<swissknife_types::OnchainFeePreview, BitcoinError> {
+        let amount = i64::try_from(amount_sat).map_err(|e| BitcoinError::FeeEstimate(e.to_string()))?;
+        let response = self
+            .client
+            .clone()
+            .estimate_fee(lnrpc::EstimateFeeRequest {
+                addr_to_amount: HashMap::from([(address, amount)]),
+                target_conf: 1,
+                min_confs: 1,
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| BitcoinError::FeeEstimate(e.message().to_owned()))?
+            .into_inner();
+        super::onchain_fee_preview(response.fee_sat, response.sat_per_vbyte)
+    }
+
     async fn prepare_transaction(
         &self,
         address: String,

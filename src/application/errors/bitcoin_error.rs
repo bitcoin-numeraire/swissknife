@@ -8,6 +8,9 @@ pub enum BitcoinError {
     #[error("Unsupported address type: {0}")]
     AddressType(String),
 
+    #[error("On-chain fee estimate unavailable: {0}")]
+    FeeEstimate(String),
+
     #[error("Failed to prepare/fund bitcoin transaction: {0}")]
     PrepareTransaction(String),
 
