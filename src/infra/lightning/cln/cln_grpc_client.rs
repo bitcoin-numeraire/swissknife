@@ -20,8 +20,8 @@ use crate::{
     },
     domains::{
         bitcoin::{
-            BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcPreparedTransaction, BtcTransaction,
-            BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
+            BitcoinWallet, BtcAddressType, BtcBroadcastTransaction, BtcNetwork, BtcOutput, BtcPreparedTransaction,
+            BtcTransaction, BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
         },
         event::OnchainWithdrawalEvent,
         invoice::{Invoice, LnInvoiceOptions},
@@ -428,10 +428,15 @@ impl BitcoinWallet for ClnGrpcClient {
         })
     }
 
-    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError> {
+    async fn broadcast_transaction(&self, transaction: &BtcBroadcastTransaction) -> Result<(), BitcoinError> {
+        let BtcBroadcastTransaction::Prepared(txid) = transaction else {
+            return Err(BitcoinError::BroadcastTransaction(
+                "Core Lightning requires a prepared transaction ID".into(),
+            ));
+        };
         let mut client = self.client.clone();
 
-        let txid = hex::decode(prepared.txid.clone()).map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+        let txid = hex::decode(txid.clone()).map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
 
         client
             .tx_send(TxsendRequest { txid })
@@ -439,7 +444,7 @@ impl BitcoinWallet for ClnGrpcClient {
             .map_err(|e| BitcoinError::BroadcastTransaction(e.message().to_string()))?
             .into_inner();
 
-        Ok(None)
+        Ok(())
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {

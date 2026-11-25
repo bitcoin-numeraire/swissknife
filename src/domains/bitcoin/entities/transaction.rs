@@ -66,6 +66,22 @@ pub struct BtcPreparedTransaction {
     pub locked_utxos: Vec<BtcLockedUtxo>,
 }
 
+/// A fully signed wire transaction or the identifier of a transaction held by the node.
+#[derive(Clone, Debug)]
+pub enum BtcBroadcastTransaction {
+    Signed(bitcoin::Transaction),
+    Prepared(String),
+}
+
+impl BtcBroadcastTransaction {
+    pub fn txid(&self) -> String {
+        match self {
+            Self::Signed(tx) => tx.compute_txid().to_string(),
+            Self::Prepared(txid) => txid.clone(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct BtcLockedUtxo {
     pub id: String,

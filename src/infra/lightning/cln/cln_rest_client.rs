@@ -18,8 +18,9 @@ use crate::{
     },
     domains::{
         bitcoin::{
-            BitcoinWallet, BtcAddressType, BtcNetwork, BtcOutput, BtcOutputStatus, BtcPreparedTransaction,
-            BtcTransaction, BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
+            BitcoinWallet, BtcAddressType, BtcBroadcastTransaction, BtcNetwork, BtcOutput, BtcOutputStatus,
+            BtcPreparedTransaction, BtcTransaction, BtcTransactionOutput, OnchainSyncBatch, OnchainSyncCursor,
+            OnchainTransaction,
         },
         event::OnchainWithdrawalEvent,
         invoice::{Invoice, LnInvoiceOptions},
@@ -417,17 +418,17 @@ impl BitcoinWallet for ClnRestClient {
         })
     }
 
-    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError> {
-        self.post_request::<TxSendResponse>(
-            "txsend",
-            &TxSendRequest {
-                txid: prepared.txid.clone(),
-            },
-        )
-        .await
-        .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?;
+    async fn broadcast_transaction(&self, transaction: &BtcBroadcastTransaction) -> Result<(), BitcoinError> {
+        let BtcBroadcastTransaction::Prepared(txid) = transaction else {
+            return Err(BitcoinError::BroadcastTransaction(
+                "Core Lightning requires a prepared transaction ID".into(),
+            ));
+        };
+        self.post_request::<TxSendResponse>("txsend", &TxSendRequest { txid: txid.clone() })
+            .await
+            .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?;
 
-        Ok(None)
+        Ok(())
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {

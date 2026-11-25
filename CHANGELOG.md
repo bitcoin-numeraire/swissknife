@@ -19,6 +19,10 @@ release notes when a tag is published.
 - Clients can update individual dashboard settings using `PATCH /v1/me/preferences`.
 - The wallet balance visibility toggle follows the account across devices.
 
+### Fixed
+
+- LND withdrawals retain the finalized Bitcoin transaction ID before publication, including when spending nested SegWit inputs.
+
 ## [0.3.5] - 2026-11-21
 
 ### Fixed

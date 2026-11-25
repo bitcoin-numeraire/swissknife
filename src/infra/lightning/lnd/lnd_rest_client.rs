@@ -17,8 +17,9 @@ use crate::{
     },
     domains::{
         bitcoin::{
-            BitcoinWallet, BtcAddressType, BtcLockedUtxo, BtcNetwork, BtcOutput, BtcOutputStatus,
-            BtcPreparedTransaction, BtcTransaction, OnchainSyncBatch, OnchainSyncCursor, OnchainTransaction,
+            BitcoinWallet, BtcAddressType, BtcBroadcastTransaction, BtcLockedUtxo, BtcNetwork, BtcOutput,
+            BtcOutputStatus, BtcPreparedTransaction, BtcTransaction, OnchainSyncBatch, OnchainSyncCursor,
+            OnchainTransaction,
         },
         invoice::{Invoice, LnInvoiceOptions},
         payment::{LnPayment, LnPaymentTarget, Payment, PaymentStatus},
@@ -26,7 +27,11 @@ use crate::{
     },
     infra::{
         config::config_rs::deserialize_duration,
-        lightning::{bitcoin_utils::parse_psbt, types::parse_network, LnClient},
+        lightning::{
+            bitcoin_utils::{parse_psbt, signed_transaction},
+            types::parse_network,
+            LnClient,
+        },
     },
 };
 use async_trait::async_trait;
@@ -537,7 +542,10 @@ impl BitcoinWallet for LndRestClient {
         })
     }
 
-    async fn sign_send_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<Option<String>, BitcoinError> {
+    async fn finalize_transaction(
+        &self,
+        prepared: &BtcPreparedTransaction,
+    ) -> Result<BtcBroadcastTransaction, BitcoinError> {
         let finalize_response = self
             .post_request::<FinalizePsbtResponse>(
                 "v2/wallet/psbt/finalize",
@@ -548,11 +556,23 @@ impl BitcoinWallet for LndRestClient {
             .await
             .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
 
+        let bytes = STANDARD
+            .decode(finalize_response.raw_final_tx)
+            .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+        signed_transaction(&prepared.psbt, &bytes)
+    }
+
+    async fn broadcast_transaction(&self, transaction: &BtcBroadcastTransaction) -> Result<(), BitcoinError> {
+        let BtcBroadcastTransaction::Signed(tx) = transaction else {
+            return Err(BitcoinError::BroadcastTransaction(
+                "LND requires a signed transaction".into(),
+            ));
+        };
         let response: PublishTransactionResponse = self
             .post_request(
                 "v2/wallet/tx",
                 &PublishTransactionRequest {
-                    tx_hex: finalize_response.raw_final_tx,
+                    tx_hex: STANDARD.encode(bitcoin::consensus::serialize(tx)),
                 },
             )
             .await
@@ -562,7 +582,7 @@ impl BitcoinWallet for LndRestClient {
             return Err(BitcoinError::BroadcastTransaction(response.publish_error));
         }
 
-        Ok(None)
+        Ok(())
     }
 
     async fn release_prepared_transaction(&self, prepared: &BtcPreparedTransaction) -> Result<(), BitcoinError> {
