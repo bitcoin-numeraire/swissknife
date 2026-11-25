@@ -105,7 +105,10 @@
       "internal": "Interno",
       "onchain": "On-chain",
       "bitcoin": "Bitcoin"
-    }
+    },
+    "pending_title": "{{amount}} sats entrantes, pendientes de confirmación",
+    "sent_title": "{{amount}} sats enviados",
+    "failed_title": "Ha fallado el pago de {{amount}} sats"
   },
   "need_help": "¿Necesitas ayuda?",
   "auth_panel": {
@@ -399,7 +402,15 @@
     "unsupported_request": "Solicitud no compatible",
     "sent": "Enviado",
     "pending": "Pago pendiente",
-    "pending_note": "El resultado no es definitivo. Comprueba el estado del pago antes de intentarlo de nuevo."
+    "pending_note": "El resultado no es definitivo. Comprueba el estado del pago antes de intentarlo de nuevo.",
+    "onchain_fee_target_one": "{{rate}} sat/kw para un objetivo de {{count}} bloque. La comisión de minería se recalcula antes del envío.",
+    "onchain_fee_target_other": "{{rate}} sat/kw para un objetivo de {{count}} bloques. La comisión de minería se recalcula antes del envío.",
+    "onchain_fee_normal": "{{rate}} sat/kw con la prioridad normal del nodo. La comisión de minería se recalcula antes del envío.",
+    "accepted": "Pago aceptado",
+    "processing": "Pago en curso",
+    "submitting": "Enviando el pago…",
+    "confirm_submission": "No se ha podido confirmar la respuesta del servidor. Reintenta la solicitud original para consultar su estado.",
+    "recover_submission": "Reintentar la solicitud original"
   },
   "receive_money": {
     "title": "Recibir",
@@ -542,7 +553,8 @@
     "used": "Usado",
     "unused": "No usado",
     "no_onchain_addresses": "Aún no hay direcciones en cadena",
-    "no_people": "Aún no hay personas guardadas"
+    "no_people": "Aún no hay personas guardadas",
+    "domain_needed": "Pide a tu administrador que configure el dominio público de las direcciones Lightning de esta instalación."
   },
   "wallet_contacts": {
     "subheader": "Tienes {{count}} contactos",
@@ -879,7 +891,11 @@
     "title": "Registrar nueva cartera",
     "account_id": "ID de cuenta",
     "asset_id": "ID del activo",
-    "success_wallet_registration": "Cartera registrada con éxito"
+    "success_wallet_registration": "Cartera registrada con éxito",
+    "loading_assets": "Cargando los activos disponibles…",
+    "no_assets": "Esta cuenta ya tiene una cartera para cada activo disponible.",
+    "no_matches": "Ningún activo coincide",
+    "asset_load_error": "No se han podido cargar los activos disponibles para esta cuenta."
   },
   "register_ln_address": {
     "title": "Registrar nueva dirección Lightning",
@@ -1051,5 +1067,92 @@
     "display_name_help": "Cómo te gustaría que te saludaran. Puedes cambiarlo en Configuración.",
     "reset_display_name_help": "Deja en blanco para mantener tu nombre de visualización actual. Tu nombre de usuario asignado permanece igual."
   },
-  "select_language": "Elegir idioma"
+  "select_language": "Elegir idioma",
+  "pos": {
+    "title": "Punto de venta",
+    "amount": "Importe en sats",
+    "reference": "Descripción o referencia del pedido (opcional)",
+    "sound": "Sonido",
+    "haptics": "Vibración",
+    "start": "Crear solicitud de pago",
+    "previous": "Última venta completada",
+    "issue_error": "Ninguno de los dos métodos de pago está disponible. Vuelve a intentarlo.",
+    "waiting": "Esperando el pago",
+    "incoming": "Pago detectado",
+    "partial": "Pago parcial",
+    "expired": "Solicitud caducada",
+    "paid": "Pago recibido",
+    "pending_amount": "{{amount}} sats pendientes de confirmación",
+    "received": "{{amount}} sats recibidos",
+    "unified": "Bitcoin o Lightning",
+    "onchain": "Bitcoin en cadena",
+    "lightning": "Lightning",
+    "receipt": "Abrir los detalles del pago",
+    "next": "Siguiente venta",
+    "cancel": "Cerrar el cobro",
+    "stop_note": "Una dirección de Bitcoin puede seguir recibiendo fondos después de cerrar el cobro. Los pagos posteriores aparecen en la actividad de la cartera.",
+    "sync_error": "Restableciendo la conexión con el historial de pagos. Comprueba la actividad de la cartera antes de completar la venta.",
+    "back": "Volver a la cartera",
+    "select_bitcoin": "Selecciona una cartera de Bitcoin para iniciar el cobro."
+  },
+  "node_health": {
+    "title": "Estado del nodo",
+    "refresh": "Actualizar",
+    "unavailable": "No disponible",
+    "failed": "No se han podido actualizar los datos del nodo.",
+    "outbound": "Liquidez saliente",
+    "inbound": "Liquidez entrante",
+    "confirmed": "Confirmado en cadena",
+    "unconfirmed": "Sin confirmar en cadena",
+    "lnd_basis": "LND estima la liquidez a partir de los saldos de los canales activos tras descontar sus reservas. Las comisiones de enrutamiento y los límites de HTLC pendientes pueden reducir el importe disponible para un pago.",
+    "cln_basis": "Core Lightning indica cuánto se puede enviar y recibir por los canales activos.",
+    "channels": "Canales",
+    "summary": "{{active}} de {{total}} activos · {{peers}} pares conectados · Bloque {{height}}",
+    "peer": "Par y canal",
+    "status": "Estado",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "alerts": {
+      "info_unavailable": "Comprueba la conexión con el proveedor y el acceso a la información del nodo.",
+      "peers_unavailable": "Comprueba el acceso del proveedor a la lista de pares.",
+      "channels_unavailable": "Comprueba el acceso del proveedor a la lista de canales.",
+      "onchain_unavailable": "Comprueba el acceso del proveedor a los saldos en cadena.",
+      "chain_not_synced": "El nodo aún se está sincronizando con la cadena de bloques.",
+      "no_connected_peers": "El nodo no está conectado a ningún par.",
+      "no_active_channels": "El nodo no tiene canales activos.",
+      "liquidity_unavailable": "No hay datos de liquidez para uno o varios canales activos."
+    }
+  },
+  "notification_inbox": {
+    "title": "Notificaciones",
+    "open_one": "Notificaciones, {{count}} sin leer",
+    "open_other": "Notificaciones, {{count}} sin leer",
+    "inbox": "Bandeja de entrada",
+    "archived": "Archivadas",
+    "all_read": "Marcar todas como leídas",
+    "read": "Marcar como leída",
+    "archive": "Archivar",
+    "view": "Ver actividad",
+    "newer": "Más recientes",
+    "older": "Más antiguas",
+    "loading": "Cargando notificaciones",
+    "load_error": "No se han podido cargar las notificaciones.",
+    "retry": "Reintentar",
+    "update_error": "No se ha podido actualizar la notificación.",
+    "empty": "Aún no hay notificaciones.",
+    "empty_archive": "No hay notificaciones archivadas.",
+    "received": "Pago recibido",
+    "sent": "Pago enviado",
+    "failed": "Pago fallido",
+    "pending": "Pago pendiente",
+    "unread": "Sin leer",
+    "amount": "{{amount}} msat",
+    "rail_Lightning": "Lightning",
+    "rail_Internal": "Interno",
+    "rail_Onchain": "En cadena",
+    "preferences": "Preferencias",
+    "incoming_alerts": "Avisos de pagos recibidos",
+    "outgoing_alerts": "Avisos de pagos enviados",
+    "sound": "Reproducir un sonido con los avisos de pago"
+  }
 }
