@@ -1,0 +1,11 @@
+{
+  "name": "@bitcoin-numeraire/swissknife-mcp",
+  "version": "0.3.5",
+  "private": true,
+  "description": "Start the installed SwissKnife wallet MCP command for a local MCP host",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "swissknife-mcp": "bin/swissknife-mcp.js" },
+  "files": ["bin"],
+  "engines": { "node": ">=20" }
+}
