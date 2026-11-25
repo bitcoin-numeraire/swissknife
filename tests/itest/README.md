@@ -87,6 +87,8 @@ The REST cells verify server certificates against the bootstrapped private CAs
 while allowing hostname differences. This exercises the custom-CA configuration
 used by self-hosted deployments instead of bypassing certificate verification.
 
+Compose publishes the fixture services on `127.0.0.1` by default. If another machine needs to reach these fixtures, set `SWISSKNIFE_ITEST_BIND_ADDRESS` to the specific interface address for that run. Containers still use the private Compose network.
+
 Every compose host port is overridable with a `SWISSKNIFE_ITEST_*_PORT`
 variable. When another regtest environment is already using the defaults, also
 override the corresponding SwissKnife endpoint (for example
