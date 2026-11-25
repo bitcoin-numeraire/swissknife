@@ -96,3 +96,38 @@ pub struct AgentSpendingHours {
     /// Excluded UTC minute of day, from 0 to 1440. An earlier end crosses midnight.
     pub end_minute: u16,
 }
+
+/// One trailing hour of policy-accounted payments, including live reservations.
+#[serde_as]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+pub struct AgentActivityHour {
+    pub payments: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    pub charged_msat: u128,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct AgentSpendingActivity {
+    pub agent_key_id: uuid::Uuid,
+    pub wallet_id: Option<uuid::Uuid>,
+    /// Current credential label when its metadata still exists.
+    pub name: Option<String>,
+    pub current_hour: AgentActivityHour,
+    pub previous_hour: AgentActivityHour,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct AgentActivityPage {
+    pub as_of: chrono::DateTime<chrono::Utc>,
+    pub items: Vec<AgentSpendingActivity>,
+    /// Continue strictly after this credential ID.
+    pub next_after: Option<uuid::Uuid>,
+}
+
+#[derive(Default, Debug, Deserialize, utoipa::IntoParams)]
+pub struct AgentActivityQuery {
+    pub after: Option<uuid::Uuid>,
+    /// Credentials per page, from 1 to 100. Defaults to 25.
+    pub limit: Option<u32>,
+}

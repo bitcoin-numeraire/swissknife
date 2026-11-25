@@ -22,6 +22,7 @@ import type {
   GetAccountResponse,
   GetAccountWalletResponse,
   GetAddressResponse,
+  GetAgentSpendingActivityResponse,
   GetApiKeyResponse,
   GetBtcAddressResponse,
   GetInvoiceResponse,
@@ -203,6 +204,18 @@ export const createAccountResponseTransformer = async (
   data: any
 ): Promise<CreateAccountResponse> => {
   data = accountSchemaResponseTransformer(data);
+  return data;
+};
+
+const agentActivityPageSchemaResponseTransformer = (data: any) => {
+  data.as_of = new Date(data.as_of);
+  return data;
+};
+
+export const getAgentSpendingActivityResponseTransformer = async (
+  data: any
+): Promise<GetAgentSpendingActivityResponse> => {
+  data = agentActivityPageSchemaResponseTransformer(data);
   return data;
 };
 

@@ -15,6 +15,7 @@ use uuid::Uuid;
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        get_agent_spending_activity,
         list_payment_approvals,
         get_payment_approval,
         decide_payment_approval,
@@ -28,6 +29,9 @@ use uuid::Uuid;
         disable_account_spending_policy
     ),
     components(schemas(
+        swissknife_types::AgentActivityPage,
+        swissknife_types::AgentSpendingActivity,
+        swissknife_types::AgentActivityHour,
         swissknife_types::PaymentApproval,
         swissknife_types::ApprovalState,
         swissknife_types::ApprovalDecision,
@@ -44,6 +48,10 @@ pub struct SpendingPolicyHandler;
 
 pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
+        .route(
+            "/v1/accounts/{account_id}/agent-spending-activity",
+            get(get_agent_spending_activity),
+        )
         .route(
             "/v1/accounts/{account_id}/payment-approvals",
             get(list_payment_approvals),
@@ -226,4 +234,17 @@ async fn decide_payment_approval(
             .decide(account, id, user.account_id, decision.decision)
             .await?,
     ))
+}
+
+/// Compare each active credential's charged spending in two consecutive rolling hours.
+#[utoipa::path(get,path="/v1/accounts/{account_id}/agent-spending-activity",tag="Accounts",security(("jwt"=[]),("api_key"=[])),params(("account_id"=Uuid,Path),swissknife_types::AgentActivityQuery),responses((status=200,body=swissknife_types::AgentActivityPage),(status=403),(status=404),(status=422)))]
+async fn get_agent_spending_activity(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(account): Path<Uuid>,
+    Query(query): Query<swissknife_types::AgentActivityQuery>,
+) -> Result<Json<swissknife_types::AgentActivityPage>, ApplicationError> {
+    user.check_permission(Permission::ReadAccount)?;
+    services.account.get(account).await?;
+    Ok(Json(services.spending_policies.activity(account, query).await?))
 }

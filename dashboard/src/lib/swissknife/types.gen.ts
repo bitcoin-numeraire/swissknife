@@ -78,6 +78,23 @@ export type AccountPreferences = {
   updated_at?: Date | null;
 };
 
+/**
+ * One trailing hour of policy-accounted payments, including live reservations.
+ */
+export type AgentActivityHour = {
+  charged_msat: string;
+  payments: number;
+};
+
+export type AgentActivityPage = {
+  as_of: Date;
+  items: Array<AgentSpendingActivity>;
+  /**
+   * Continue strictly after this credential ID.
+   */
+  next_after?: string | null;
+};
+
 export type AgentKey = {
   capabilities: WalletCapabilities;
   created_at: Date;
@@ -85,6 +102,17 @@ export type AgentKey = {
   id: string;
   name: string;
   wallet_id: string;
+};
+
+export type AgentSpendingActivity = {
+  agent_key_id: string;
+  current_hour: AgentActivityHour;
+  /**
+   * Current credential label when its metadata still exists.
+   */
+  name?: string | null;
+  previous_hour: AgentActivityHour;
+  wallet_id?: string | null;
 };
 
 /**
@@ -2021,6 +2049,34 @@ export type CreateAccountResponses = {
 };
 
 export type CreateAccountResponse = CreateAccountResponses[keyof CreateAccountResponses];
+
+export type GetAgentSpendingActivityData = {
+  body?: never;
+  path: {
+    account_id: string;
+  };
+  query?: {
+    after?: string | null;
+    /**
+     * Credentials per page, from 1 to 100. Defaults to 25.
+     */
+    limit?: number | null;
+  };
+  url: '/v1/accounts/{account_id}/agent-spending-activity';
+};
+
+export type GetAgentSpendingActivityErrors = {
+  403: unknown;
+  404: unknown;
+  422: unknown;
+};
+
+export type GetAgentSpendingActivityResponses = {
+  200: AgentActivityPage;
+};
+
+export type GetAgentSpendingActivityResponse =
+  GetAgentSpendingActivityResponses[keyof GetAgentSpendingActivityResponses];
 
 export type ClearAgentSpendingHoursData = {
   body?: never;
