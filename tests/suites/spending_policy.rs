@@ -281,3 +281,88 @@ async fn delegated_hours_apply_without_a_budget_and_owner_payments_stay_independ
     assert_error(&api.get(&path, operator).await, StatusCode::NOT_FOUND);
     app.stop();
 }
+
+#[tokio::test]
+async fn rolling_velocity_is_atomic_per_credential_and_does_not_limit_owner_payments() {
+    let app = TestApp::isolated("agent-velocity", &[]).await;
+    let admin = app.admin_token().await;
+    let owner = app.create_account_with_wallet(admin, "agent-rate").await;
+    let recipient = app.create_account_with_wallet(admin, "recipient-rate").await;
+    let api = app.api();
+    let owner_auth = Auth::ApiKey(&owner.key);
+    let policy = format!("/v1/accounts/{}/spending-policy", owner.account.id);
+    let wallet = format!("/v1/me/wallets/{}", owner.wallet.id);
+    let path = format!("{wallet}/payments/submissions");
+    let mut credentials = Vec::new();
+    for name in ["worker-a", "worker-b"] {
+        let result = api
+            .post(
+                &format!("{wallet}/agent-keys"),
+                owner_auth,
+                json!({
+                    "name":name,"capabilities":{"spend":true,"read":true},
+                    "expires_at":chrono::Utc::now()+chrono::Duration::hours(2)
+                }),
+            )
+            .await;
+        assert_status(&result, StatusCode::CREATED);
+        credentials.push(result.parse::<IssuedAgentKey>());
+    }
+    let operator = Auth::Bearer(admin);
+    let cap = json!({"agent_hourly_msat":"10000"});
+    assert_status(&api.put(&policy, operator, &cap).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        api.get(&policy, operator).await.body["limits"]["agent_hourly_msat"],
+        "10000"
+    );
+    app.fund_onchain(admin, owner.wallet.id, 10_000).await;
+    let address = api
+        .post(
+            "/v1/bitcoin/addresses",
+            operator,
+            json!({"wallet_id":recipient.wallet.id}),
+        )
+        .await
+        .body["address"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let request = |amount: u64| json!({"input":address,"idempotency_key":Uuid::new_v4(),"amount_msat":amount,"maximum_fee_msat":0});
+    let first = Auth::WalletKey(&credentials[0].key);
+    let second = Auth::WalletKey(&credentials[1].key);
+    let requests: Vec<_> = (0..6).map(|_| request(6000)).collect();
+    let results = futures_util::future::join_all(requests.iter().map(|r| api.post(&path, first, r))).await;
+    let mut admitted = Vec::new();
+    for (i, response) in results.iter().enumerate() {
+        if response.status == StatusCode::ACCEPTED {
+            admitted.push(i);
+        } else {
+            assert_error(response, StatusCode::UNPROCESSABLE_ENTITY);
+            assert!(response.body.to_string().contains("rolling hourly"));
+        }
+    }
+    assert_eq!(admitted.len(), 1);
+    assert_status(&api.post(&path, first, request(4000)).await, StatusCode::ACCEPTED);
+    assert_error(
+        &api.post(&path, first, request(1000)).await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+    );
+    assert_status(&api.post(&path, second, request(10000)).await, StatusCode::ACCEPTED);
+    assert_status(&api.post(&path, owner_auth, request(11000)).await, StatusCode::ACCEPTED);
+    let app = app.restart("velocity-restart", &[]).await;
+    let api = app.api();
+    assert_error(
+        &api.post(&path, first, request(1000)).await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+    );
+    let replay = api.post(&path, first, &requests[admitted[0]]).await;
+    assert_status(&replay, StatusCode::ACCEPTED);
+    assert_eq!(replay.body["payment"]["id"], results[admitted[0]].body["payment"]["id"]);
+    assert_eq!(
+        app.wallet_balance(app.admin_token().await, recipient.wallet.id)
+            .await
+            .available_msat,
+        31000
+    );
+    app.stop();
+}

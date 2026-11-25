@@ -97,6 +97,7 @@ impl SpendingPolicyUseCases for SpendingPolicyService {
             limits.daily_msat,
             limits.weekly_msat,
             limits.monthly_msat,
+            limits.agent_hourly_msat,
         ];
         if amounts.iter().all(Option::is_none) {
             return Err(DataError::Validation("Set at least one spending limit".into()).into());
@@ -164,6 +165,7 @@ mod tests {
             daily_msat: Some(14),
             weekly_msat: Some(24),
             monthly_msat: Some(34),
+            ..Default::default()
         };
         assert!(authorize_spending(&limits, &usage, 4).is_ok());
         for limits in [

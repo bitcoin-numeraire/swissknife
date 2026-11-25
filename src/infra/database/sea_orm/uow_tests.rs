@@ -1652,3 +1652,60 @@ async fn spending_policy_serializes_two_wallets_and_retains_usage_across_payment
         .unwrap();
     assert_eq!(policy.get(account).await.unwrap().unwrap().usage.monthly_msat, 80_501);
 }
+
+#[tokio::test]
+async fn agent_hour_excludes_earlier_admissions_and_uses_corrected_reservations() {
+    use super::{
+        models::spending_entry,
+        spending_policy_repository::{admit, SeaOrmSpendingPolicyRepository},
+    };
+    use crate::domains::agent::SpendingPolicyRepository;
+    let db = connect().await;
+    let wallet = seed_wallet(&db, 100_000).await;
+    let account = account_id(&db, wallet).await;
+    let key = Uuid::new_v4();
+    SeaOrmSpendingPolicyRepository(db.clone())
+        .replace(
+            account,
+            swissknife_types::SpendingLimits {
+                agent_hourly_msat: Some(10_000),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    let now = Utc::now().naive_utc();
+    let recent = Uuid::new_v4();
+    for (id, age, charged_msat) in [(Uuid::new_v4(), 61, 10_000), (recent, 59, 7000)] {
+        spending_entry::ActiveModel {
+            payment_id: Set(id),
+            account_id: Set(account),
+            wallet_id: Set(Some(wallet)),
+            agent_key_id: Set(Some(key)),
+            admitted_at: Set(now - chrono::Duration::minutes(age)),
+            charged_msat: Set(charged_msat),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+    }
+    let tx = db.begin().await.unwrap();
+    let new = pending_payment(wallet, 4000, 0);
+    assert!(admit(&tx, &new, 4000, Some(key)).await.is_err());
+    tx.rollback().await.unwrap();
+    let tx = db.begin().await.unwrap();
+    super::spending_policy_repository::adjust(&tx, recent, 6000)
+        .await
+        .unwrap();
+    admit(&tx, &new, 4000, Some(key)).await.unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        spending_entry::Entity::find_by_id(new.id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap()
+            .charged_msat,
+        4000
+    );
+}

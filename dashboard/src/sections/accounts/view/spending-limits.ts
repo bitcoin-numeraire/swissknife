@@ -1,7 +1,7 @@
 import type { SpendingLimits } from 'src/lib/swissknife';
 
 export const periods = ['daily_msat', 'weekly_msat', 'monthly_msat'] as const;
-export const limitFields = ['per_payment_msat', ...periods] as const;
+export const limitFields = ['per_payment_msat', 'agent_hourly_msat', ...periods] as const;
 export type LimitField = (typeof limitFields)[number];
 export type LimitsForm = Record<LimitField, string>;
 

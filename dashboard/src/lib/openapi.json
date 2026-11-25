@@ -12520,6 +12520,14 @@
         "type": "object",
         "description": "Account-wide limits, including fees. Amounts are decimal millisatoshi strings.\nOmitted limits are unrestricted. Zero blocks positive payments.",
         "properties": {
+          "agent_hourly_msat": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Maximum charged to each delegated credential over a rolling hour, including fees.",
+            "example": "500000"
+          },
           "daily_msat": {
             "type": [
               "string",

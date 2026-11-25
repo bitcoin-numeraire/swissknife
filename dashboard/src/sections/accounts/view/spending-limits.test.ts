@@ -3,7 +3,12 @@ import { it, expect } from 'vitest';
 import { editLimits, parseLimits, usedPercent } from './spending-limits';
 
 it('round trips exact millisatoshis, zero and unrestricted periods', () => {
-  const limits = { daily_msat: '9007199254740993', weekly_msat: '0', per_payment_msat: '17' };
+  const limits = {
+    daily_msat: '9007199254740993',
+    weekly_msat: '0',
+    per_payment_msat: '17',
+    agent_hourly_msat: '9007199254740993',
+  };
   const form = editLimits(limits);
   expect(form.daily_msat).toBe('9007199254740.993');
   expect(form.monthly_msat).toBe('');

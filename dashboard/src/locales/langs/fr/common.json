@@ -1099,6 +1099,7 @@
     "load_error": "Impossible de charger le budget.",
     "loading": "Chargement du budget…",
     "periods": "Frais et réservations en cours compris. Les périodes commencent à minuit UTC. La semaine commence le lundi.",
+    "agent_hourly_msat": "Par agent sur une heure glissante",
     "per_payment_msat": "Par paiement",
     "unlimited": "Illimité",
     "daily_msat": "Aujourd’hui",
