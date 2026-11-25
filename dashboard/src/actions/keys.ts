@@ -13,6 +13,7 @@ export const endpointKeys = {
       ['accountAgentSpendingActivity', id, after ?? ''] as const,
     paymentApprovals: (id: string) => ['accountPaymentApprovals', id] as const,
     spendingReport: (id: string) => ['accountSpendingReport', id] as const,
+    agentHours: (id: string) => ['accountAgentSpendingHours', id] as const,
     spendingPolicy: (id: string) => ['accountSpendingPolicy', id] as const,
     get: (id: string) => ['getAccount', id] as const,
   },
