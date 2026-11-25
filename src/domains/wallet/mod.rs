@@ -1,5 +1,7 @@
 mod account_wallet_handler;
 mod transaction_summary;
+mod wallet_credit;
+pub use wallet_credit::*;
 mod wallet_handler;
 pub(crate) use transaction_summary::administrative_summaries;
 mod wallet_repository;

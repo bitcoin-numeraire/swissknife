@@ -25,6 +25,7 @@ pub const NATIVE_ASSET_REF: &str = "native";
 pub struct Balance {
     /// Total amount received
     #[schema(example = 1000000000)]
+    /// Receipts from payments and deposits. Operator credits are excluded from this volume.
     pub received_msat: u64,
 
     /// Total amount sent (settled outgoing payments)
@@ -42,6 +43,9 @@ pub struct Balance {
     /// Amount available to spend.
     #[schema(example = 989999000)]
     pub available_msat: i64,
+    /// Exact available balance in the asset's smallest units for decimal-safe clients.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub available_units: Option<String>,
 }
 
 /// A counterparty the wallet has paid, with the date of first contact.

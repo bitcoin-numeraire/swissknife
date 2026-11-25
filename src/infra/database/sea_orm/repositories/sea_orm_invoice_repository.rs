@@ -139,6 +139,8 @@ where
             amount_received_msat: Set(invoice.amount_received_msat.map(amount_to_db).transpose()?),
             timestamp: Set(invoice.timestamp.naive_utc()),
             payment_time: Set(invoice.payment_time.map(|t| t.naive_utc())),
+            credit_purpose: Set(invoice.credit_purpose.map(|p| p.to_string())),
+            fee_msat: Set(invoice.fee_msat.map(amount_to_db).transpose()?),
             ledger: Set(invoice.ledger.to_string()),
             btc_output_id: Set(invoice.btc_output_id),
             ..Default::default()
@@ -218,6 +220,7 @@ where
     async fn delete_many(&self, filter: InvoiceFilter) -> Result<u64, DatabaseError> {
         let now = Utc::now().naive_utc();
         let result = InvoiceEntity::delete_many()
+            .filter(Column::Ledger.ne(Ledger::Adjustment.to_string()))
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.lnurl_verify_token, |q, token| {

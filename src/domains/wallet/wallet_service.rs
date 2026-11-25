@@ -22,6 +22,29 @@ impl WalletService {
 
 #[async_trait]
 impl WalletUseCases for WalletService {
+    async fn credit(
+        &self,
+        wallet_id: Uuid,
+        actor: &crate::domains::account::User,
+        mut request: swissknife_types::CreateWalletCredit,
+    ) -> Result<swissknife_types::WalletCreditReceipt, ApplicationError> {
+        actor.check_permission(swissknife_types::Permission::CreditWallet)?;
+        request.reason = request.reason.trim().to_owned();
+        if request.amount_units == 0 || request.amount_units > i64::MAX as u64 {
+            return Err(DataError::Validation(
+                "Credit amount must be a positive, representable number of asset units.".into(),
+            )
+            .into());
+        }
+        if request.request_id.is_nil() || request.reason.is_empty() || request.reason.chars().count() > 240 {
+            return Err(DataError::Validation(
+                "Supply a request UUID and a credit reason of up to 240 characters.".into(),
+            )
+            .into());
+        }
+        self.store.credit_uow.post(wallet_id, actor, request).await
+    }
+
     async fn create(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, ApplicationError> {
         debug!(%account_id, %asset_id, "Creating account asset wallet");
 

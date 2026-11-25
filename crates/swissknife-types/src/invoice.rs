@@ -33,6 +33,11 @@ pub struct Invoice {
     pub status: InvoiceStatus,
     /// Ledger
     pub ledger: Ledger,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credit_purpose: Option<crate::CreditPurpose>,
+    /// Exact incoming adjustment amount in the wallet asset's smallest units.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credit_amount_units: Option<String>,
     /// Fees paid. Populated when a new channel is opened to receive the funds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fee_msat: Option<u64>,

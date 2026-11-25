@@ -11,6 +11,7 @@ use super::Permission;
 #[derive(Clone, Debug, Default)]
 pub struct User {
     pub account_id: Uuid,
+    pub api_key_id: Option<Uuid>,
     pub permissions: Vec<Permission>,
 }
 

@@ -23,6 +23,7 @@
               "write:account",
               "read:wallet",
               "write:wallet",
+              "credit:wallet",
               "read:ln_address",
               "write:ln_address",
               "read:transaction",

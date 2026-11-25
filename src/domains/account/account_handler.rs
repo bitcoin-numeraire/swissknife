@@ -370,6 +370,7 @@ mod tests {
     fn user(account_id: Uuid, permissions: Vec<Permission>) -> User {
         User {
             account_id,
+            api_key_id: None,
             permissions,
         }
     }

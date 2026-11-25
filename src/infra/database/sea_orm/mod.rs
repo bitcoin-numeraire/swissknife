@@ -4,6 +4,7 @@ mod repositories;
 mod store;
 mod types;
 mod uow;
+mod wallet_credit_uow;
 
 #[cfg(all(test, feature = "itest"))]
 mod uow_tests;

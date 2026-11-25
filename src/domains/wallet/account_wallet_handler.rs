@@ -1169,6 +1169,7 @@ mod tests {
     fn user() -> User {
         User {
             account_id: Uuid::new_v4(),
+            api_key_id: None,
             permissions: vec![],
         }
     }

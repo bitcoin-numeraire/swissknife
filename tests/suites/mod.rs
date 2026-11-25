@@ -18,6 +18,7 @@ mod oauth2;
 mod payments;
 mod system;
 mod transaction_summaries;
+mod wallet_credits;
 mod wallet_statements;
 mod wallets;
 mod well_known;

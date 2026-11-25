@@ -386,6 +386,7 @@ impl AuthUseCases for AuthService {
 
         let user = User {
             account_id: account.id,
+            api_key_id: None,
             permissions,
         };
 
@@ -407,6 +408,7 @@ impl AuthUseCases for AuthService {
 
         let user = User {
             account_id: api_key.account_id,
+            api_key_id: Some(api_key.id),
             permissions: api_key.permissions,
         };
 
@@ -608,6 +610,7 @@ mod tests {
                 let id = Uuid::new_v4();
                 let user = User {
                     account_id: id,
+                    api_key_id: None,
                     permissions: vec![Permission::WriteAccount],
                 };
                 assert!(matches!(

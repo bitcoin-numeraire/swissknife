@@ -8,6 +8,12 @@ use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletStatem
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait WalletUseCases: Send + Sync {
+    async fn credit(
+        &self,
+        wallet_id: Uuid,
+        actor: &crate::domains::account::User,
+        request: swissknife_types::CreateWalletCredit,
+    ) -> Result<swissknife_types::WalletCreditReceipt, ApplicationError>;
     async fn create(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, ApplicationError>;
     async fn get(&self, id: Uuid) -> Result<Wallet, ApplicationError>;
     async fn get_by_account_id(&self, account_id: Uuid, id: Uuid) -> Result<Wallet, ApplicationError>;

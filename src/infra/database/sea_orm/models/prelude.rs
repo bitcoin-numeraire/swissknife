@@ -14,3 +14,4 @@ pub use super::ln_address::Entity as LnAddress;
 pub use super::local_credential::Entity as LocalCredential;
 pub use super::payment::Entity as Payment;
 pub use super::wallet::Entity as Wallet;
+pub use super::wallet_credit::Entity as WalletCredit;

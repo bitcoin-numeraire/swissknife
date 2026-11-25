@@ -259,6 +259,7 @@ mod tests {
     fn user(permissions: Vec<Permission>) -> User {
         User {
             account_id: Uuid::new_v4(),
+            api_key_id: None,
             permissions,
         }
     }

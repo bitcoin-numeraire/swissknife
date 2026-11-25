@@ -12,6 +12,8 @@ pub enum Permission {
     ReadWallet,
     #[serde(rename = "write:wallet")]
     WriteWallet,
+    #[serde(rename = "credit:wallet")]
+    CreditWallet,
     #[serde(rename = "read:ln_address")]
     ReadLnAddress,
     #[serde(rename = "write:ln_address")]
@@ -41,6 +43,7 @@ impl Permission {
             Permission::WriteAccount,
             Permission::ReadWallet,
             Permission::WriteWallet,
+            Permission::CreditWallet,
             Permission::ReadLnAddress,
             Permission::WriteLnAddress,
             Permission::ReadTransaction,

@@ -10,6 +10,10 @@ release notes when a tag is published.
 
 ### Added
 
+- Authorized operators can post an opening credit or top up a wallet in its own asset units. Every credit records its operator, reason, and settled adjustment activity.
+
+### Added
+
 - Administrative transaction lists include wallet labels and asset details according to the reader’s permissions.
 
 - Authenticated clients can discover available wallet assets through `GET /v1/assets`.

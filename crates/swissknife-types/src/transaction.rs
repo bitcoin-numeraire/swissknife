@@ -9,6 +9,8 @@ pub enum Ledger {
     Lightning,
     Internal,
     Onchain,
+    /// Operator credit recorded entirely in the wallet ledger.
+    Adjustment,
 }
 
 /// The currency and network a transaction is denominated in.

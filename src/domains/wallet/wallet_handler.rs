@@ -28,7 +28,7 @@ use super::{Wallet, WalletFilter, WalletOverview};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(register_wallet, list_wallets, list_wallet_overviews, get_wallet, delete_wallet, export_wallet_statement, delete_wallets),
+    paths(credit_wallet, register_wallet, list_wallets, list_wallet_overviews, get_wallet, delete_wallet, export_wallet_statement, delete_wallets),
     components(schemas(Wallet, WalletOverview, CreateWalletRequest)),
     tags(
         (name = "Wallets", description = "Wallet management endpoints. Require `read:wallet` or `write:wallet` permissions.")
@@ -43,9 +43,29 @@ pub fn router() -> Router<Arc<AppServices>> {
         .route("/", get(list_wallets))
         .route("/overviews", get(list_wallet_overviews))
         .route("/{id}", get(get_wallet))
+        .route("/{id}/credits", post(credit_wallet))
         .route("/{id}/statement", get(export_wallet_statement))
         .route("/{id}", delete(delete_wallet))
         .route("/", delete(delete_wallets))
+}
+
+/// Credit an explicitly selected account wallet in its smallest asset units.
+#[utoipa::path(post, path = "/{id}/credits", tag = "Wallets", context_path = CONTEXT_PATH,
+    params(("id" = Uuid, Path, description = "Target wallet ID")),
+    request_body = swissknife_types::CreateWalletCredit,
+    responses((status = 200, description = "Committed credit or matching replay", body = swissknife_types::WalletCreditReceipt),
+        (status = 401, description = "Authentication required", body = ErrorResponse),
+        (status = 403, description = "Requires credit:wallet", body = ErrorResponse),
+        (status = 404, description = "Target wallet, account and asset do not match", body = ErrorResponse),
+        (status = 409, description = "Request conflict or opening credit already recorded", body = ErrorResponse),
+        (status = 422, description = "Invalid amount or reason", body = ErrorResponse)))]
+async fn credit_wallet(
+    State(services): State<Arc<AppServices>>,
+    Path(wallet_id): Path<Uuid>,
+    user: User,
+    Json(request): Json<swissknife_types::CreateWalletCredit>,
+) -> Result<Json<swissknife_types::WalletCreditReceipt>, ApplicationError> {
+    Ok(Json(services.wallet.credit(wallet_id, &user, request).await?))
 }
 
 /// Download wallet activity as a CSV statement. The date interval applies to transaction creation.
