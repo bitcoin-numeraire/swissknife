@@ -103,6 +103,7 @@ Developer documentation:
   - [ADR 0002: Identity, assets, and asset-scoped wallets](docs/adr/0002-identity-assets-wallet-model.md)
   - [ADR 0004: Durable client event log and server-sent events](docs/adr/0004-client-event-outbox.md)
   - [ADR 0005: Local JWT credentials and account management](docs/adr/0005-local-jwt-credentials.md)
+  - [ADR 0006: Taproot Assets catalog admission](docs/adr/0006-taproot-asset-catalog.md)
 - [Code of conduct](docs/CODE_OF_CONDUCT.md)
 
 ## Work In Progress (WIP)

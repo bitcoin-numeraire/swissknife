@@ -92,6 +92,73 @@ async fn connect() -> DatabaseConnection {
     conn
 }
 
+#[tokio::test]
+async fn taproot_catalog_identity_survives_duplicate_tickers_networks_and_label_edits() {
+    use super::models::asset;
+    use crate::domains::asset::Protocol;
+
+    let conn = connect().await;
+    let first_ref = "a1".repeat(32);
+    let second_ref = "b2".repeat(32);
+    let candidate = |network: BtcNetwork, reference: &str| asset::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        protocol: Set(Protocol::TaprootAssets.to_string()),
+        network: Set(network.to_string()),
+        asset_ref: Set(reference.to_owned()),
+        code: Set("TEST".into()),
+        display_ticker: Set("TEST".into()),
+        name: Set(Some("Test issuance".into())),
+        decimals: Set(2),
+        created_at: Set(Utc::now().naive_utc()),
+        ..Default::default()
+    };
+    let mut ids = Vec::new();
+    for (network, reference) in [
+        (BtcNetwork::Regtest, &first_ref),
+        (BtcNetwork::Regtest, &second_ref),
+        (BtcNetwork::Signet, &first_ref),
+    ] {
+        ids.push(candidate(network, reference).insert(&conn).await.unwrap().id);
+    }
+    let duplicate = candidate(BtcNetwork::Regtest, &first_ref)
+        .insert(&conn)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        duplicate.sql_err(),
+        Some(sea_orm::SqlErr::UniqueConstraintViolation(_))
+    ));
+
+    let account = SeaOrmAccountRepository::new(conn.clone())
+        .insert(None, &[])
+        .await
+        .unwrap();
+    let wallets = SeaOrmWalletRepository::new(conn.clone());
+    let mut owned = Vec::new();
+    for id in &ids {
+        owned.push(wallets.upsert(account.id, *id).await.unwrap().id);
+    }
+    wallets.credit(owned[1], 12_345).await.unwrap();
+    let mut renamed: asset::ActiveModel = asset::Entity::find_by_id(ids[1])
+        .one(&conn)
+        .await
+        .unwrap()
+        .unwrap()
+        .into();
+    renamed.display_ticker = Set("NEW".into());
+    renamed.update(&conn).await.unwrap();
+
+    let assets = SeaOrmAssetRepository::new(conn.clone()).list().await.unwrap();
+    assert_eq!(assets.iter().filter(|asset| asset.code == "TEST").count(), 3);
+    let renamed = assets.iter().find(|asset| asset.id == ids[1]).unwrap();
+    assert_eq!(renamed.display_ticker, "NEW");
+    assert_eq!(renamed.asset_ref, second_ref);
+    assert_eq!(renamed.decimals, 2);
+    assert_eq!(balance(&conn, owned[0]).await, (0, 0));
+    assert_eq!(balance(&conn, owned[1]).await, (12_345, 0));
+    assert_eq!(balance(&conn, owned[2]).await, (0, 0));
+}
+
 /// Register a wallet and credit it `balance_msat` of available funds.
 async fn seed_wallet(conn: &DatabaseConnection, balance_msat: u64) -> Uuid {
     let account = SeaOrmAccountRepository::new(conn.clone())
