@@ -23,6 +23,7 @@ use crate::{
 pub struct AppConfig {
     #[serde(default, deserialize_with = "deserialize_optional_string")]
     pub dashboard_dir: Option<String>,
+    pub l402: Option<crate::infra::l402::MerchantConfig>,
     pub domain: String,
     pub host: String,
     pub auth_provider: AuthProvider,

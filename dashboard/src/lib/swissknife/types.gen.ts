@@ -1707,6 +1707,50 @@ export type WellKnownNostrResponses = {
 
 export type WellKnownNostrResponse = WellKnownNostrResponses[keyof WellKnownNostrResponses];
 
+export type GetPaidResourceData = {
+  body?: never;
+  path: {
+    /**
+     * Operator-configured merchant route
+     */
+    name: string;
+  };
+  query?: never;
+  url: '/l402/{name}';
+};
+
+export type GetPaidResourceErrors = {
+  /**
+   * Pay the advertised invoice and present the macaroon and preimage
+   */
+  402: unknown;
+  /**
+   * Unknown merchant route
+   */
+  404: unknown;
+  /**
+   * Invoice issuance limit reached
+   */
+  429: unknown;
+  /**
+   * Upstream failed, redirected or exceeded the response limit
+   */
+  502: unknown;
+  /**
+   * Invoice service unavailable
+   */
+  503: unknown;
+};
+
+export type GetPaidResourceResponses = {
+  /**
+   * Paid resource
+   */
+  200: Array<number>;
+};
+
+export type GetPaidResourceResponse = GetPaidResourceResponses[keyof GetPaidResourceResponses];
+
 export type VerifyLnurlInvoiceData = {
   body?: never;
   path: {

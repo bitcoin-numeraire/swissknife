@@ -123,6 +123,72 @@
         }
       }
     },
+    "/l402/{name}": {
+      "get": {
+        "tags": [
+          "L402"
+        ],
+        "summary": "Fetch a fixed merchant resource with an L402 access pass. Each configured\nroute advertises its invoice in WWW-Authenticate. A paid pass can be reused\nuntil the expiry set when its challenge was issued.",
+        "operationId": "get_paid_resource",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Operator-configured merchant route",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paid resource",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Pay the advertised invoice and present the macaroon and preimage",
+            "headers": {
+              "WWW-Authenticate": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "L402 macaroon and BOLT11 invoice"
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown merchant route"
+          },
+          "429": {
+            "description": "Invoice issuance limit reached"
+          },
+          "502": {
+            "description": "Upstream failed, redirected or exceeded the response limit"
+          },
+          "503": {
+            "description": "Invoice service unavailable"
+          }
+        },
+        "security": [
+          {},
+          {
+            "l402": []
+          }
+        ]
+      }
+    },
     "/lnurlp/{token}/verify": {
       "get": {
         "tags": [
@@ -12752,6 +12818,11 @@
         "type": "http",
         "scheme": "bearer"
       },
+      "l402": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization"
+      },
       "wallet_key": {
         "type": "apiKey",
         "in": "header",
@@ -12768,6 +12839,10 @@
     {
       "name": "Agent credentials",
       "description": "Owner-managed access to a single wallet."
+    },
+    {
+      "name": "L402",
+      "description": "Wallet-backed paid resources"
     },
     {
       "name": "Authentication",

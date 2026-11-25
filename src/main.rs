@@ -74,6 +74,14 @@ async fn main() {
 
     let services = Arc::new(AppServices::new(config.clone(), adapters.clone()));
 
+    let app = match Server::new(adapters.clone(), services.clone(), &config) {
+        Ok(server) => server,
+        Err(err) => {
+            error!(%err, "failed to configure API server");
+            exit(1);
+        }
+    };
+
     ClientEventRetentionWorker::new(services.clone(), config.client_events.cleanup_interval).start();
 
     let event_listener =
@@ -102,7 +110,6 @@ async fn main() {
     crate::infra::app::start_payment_workers(services.clone());
 
     // We start accepting external requests only when everything is synced and ready
-    let app = Server::new(adapters.clone(), services.clone(), config.dashboard_dir.as_deref());
     if let Err(err) = app.start(&config.web.addr, shutdown_signal(adapters.clone())).await {
         error!(%err, "failed to start API server");
         exit(1);

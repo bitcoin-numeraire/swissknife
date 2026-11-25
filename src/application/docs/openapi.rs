@@ -39,6 +39,7 @@ pub fn merged_openapi() -> OpenApi {
 
     openapi.merge(crate::domains::agent::AgentKeyHandler::openapi());
     openapi.merge(crate::domains::agent::spending_policy_handler::SpendingPolicyHandler::openapi());
+    openapi.merge(crate::infra::l402::MerchantHandler::openapi());
     openapi.merge(AuthHandler::openapi());
     openapi.merge(AccountHandler::openapi());
     openapi.merge(AccountWalletHandler::openapi());
@@ -117,6 +118,10 @@ impl Modify for SecurityAddon {
         components.add_security_scheme(
             "api_key",
             SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("Api-Key"))),
+        );
+        components.add_security_scheme(
+            "l402",
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("Authorization"))),
         );
         components.add_security_scheme("jwt", SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)));
     }

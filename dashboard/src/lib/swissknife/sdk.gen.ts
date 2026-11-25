@@ -219,6 +219,9 @@ import type {
   GetOfferData,
   GetOfferErrors,
   GetOfferResponses,
+  GetPaidResourceData,
+  GetPaidResourceErrors,
+  GetPaidResourceResponses,
   GetPaymentData,
   GetPaymentErrors,
   GetPaymentResponses,
@@ -458,6 +461,20 @@ export const wellKnownNostr = <ThrowOnError extends boolean = false>(
   (options?.client ?? client).get<WellKnownNostrResponses, WellKnownNostrErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/.well-known/nostr.json',
+    ...options,
+  });
+
+/**
+ * Fetch a fixed merchant resource with an L402 access pass. Each configured
+ * route advertises its invoice in WWW-Authenticate. A paid pass can be reused
+ * until the expiry set when its challenge was issued.
+ */
+export const getPaidResource = <ThrowOnError extends boolean = false>(
+  options: Options<GetPaidResourceData, ThrowOnError>
+): RequestResult<GetPaidResourceResponses, GetPaidResourceErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetPaidResourceResponses, GetPaidResourceErrors, ThrowOnError>({
+    security: [{ name: 'Authorization', type: 'apiKey' }],
+    url: '/l402/{name}',
     ...options,
   });
 
