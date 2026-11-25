@@ -89,25 +89,6 @@ jobs:
       - name: Build
         run: make build
 
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7.0.1
-
-      - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@1.100.0
-
-      - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2.9.3
-
-      - name: Run tests
-        run: make test
-
   docker-planner:
     runs-on: ${{ matrix.platform == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     timeout-minutes: 20

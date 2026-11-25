@@ -1,3 +1,4 @@
+CARGO_TEST ?= cargo test
 COMPOSE := docker compose -f docker-compose.yml
 DB_SERVICE := postgres
 PGADMIN_SERVICE := pgadmin
@@ -122,7 +123,7 @@ protos:
 	@./scripts/update-protos.sh
 
 test:
-	@cargo test --workspace --all-targets
+	@$(CARGO_TEST) --workspace --all-targets
 
 test-unit:
 	@cargo test --workspace --bins $(TEST) -- $(TESTARGS)
@@ -132,7 +133,7 @@ test-unit:
 # ITEST_DATABASE / ITEST_PROVIDER (e.g. `make test-integration ITEST_PROVIDER=cln_grpc`).
 # Narrow to a suite/test with TEST=... and pass runner flags with TESTARGS=...
 test-integration: itest-up
-	@$(ITEST_ENV) cargo test --features itest --test api $(TEST) -- $(TESTARGS)
+	@$(ITEST_ENV) $(CARGO_TEST) --features itest --test api $(TEST) -- $(TESTARGS)
 
 # Recreate dependency volumes before a liquidity-sensitive integration run.
 test-integration-fresh:
@@ -145,7 +146,7 @@ test-integration-fresh:
 # via ITEST_DATABASE (sqlite|postgres); TEST defaults to the uow_tests module.
 test-persistence:
 	@if [ "$(ITEST_DATABASE)" = "postgres" ]; then $(ITEST_COMPOSE) up -d --wait postgres; fi
-	@$(ITEST_ENV) cargo test --features itest --bins $(if $(TEST),$(TEST),uow_tests) -- $(TESTARGS)
+	@$(ITEST_ENV) $(CARGO_TEST) --features itest --bins $(if $(TEST),$(TEST),uow_tests) -- $(TESTARGS)
 
 # Bring up the regtest dependency stack (bitcoind + LND + CLN + Postgres).
 itest-up:

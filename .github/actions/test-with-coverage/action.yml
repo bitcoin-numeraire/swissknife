@@ -1,0 +1,45 @@
+name: Run a Rust test suite and collect its coverage
+description: Run the Make target once and publish its LCOV trace on main or manual runs.
+inputs:
+  target:
+    description: The SwissKnife Make test target
+    required: true
+  artifact:
+    description: Unique name for the coverage fragment
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install matching LLVM tools
+      if: github.event_name != 'pull_request'
+      shell: bash
+      run: rustup component add llvm-tools-preview
+
+    - name: Install cargo-llvm-cov
+      if: github.event_name != 'pull_request'
+      uses: taiki-e/install-action@v2.90.6
+      with:
+        tool: cargo-llvm-cov@0.8.7
+
+    - name: Run tests
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+        COLLECT_COVERAGE: ${{ github.event_name != 'pull_request' }}
+      run: |
+        if [[ "$COLLECT_COVERAGE" == true ]]; then
+          cargo llvm-cov clean --workspace
+          make "$TARGET" CARGO_TEST='cargo llvm-cov test --no-report'
+          cargo llvm-cov report --lcov --output-path "$RUNNER_TEMP/coverage.info"
+        else
+          make "$TARGET"
+        fi
+
+    - name: Upload coverage fragment
+      if: github.event_name != 'pull_request'
+      uses: actions/upload-artifact@v7.0.2
+      with:
+        name: coverage-cell-${{ inputs.artifact }}
+        path: ${{ runner.temp }}/coverage.info
+        if-no-files-found: error
+        retention-days: 2

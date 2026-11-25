@@ -16,6 +16,28 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@1.100.0
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2.9.3
+
+      - name: Run tests
+        uses: ./.github/actions/test-with-coverage
+        with:
+          target: test
+          artifact: unit
+
   # Run all four Lightning adapters on SQLite. On PostgreSQL, cover LND gRPC
   # and the production CLN REST configuration.
   integration:
@@ -47,11 +69,14 @@ jobs:
         uses: swatinem/rust-cache@v2.9.3
 
       - name: Integration tests (${{ matrix.database }} / ${{ matrix.provider }})
-        run: |
-          make test-integration \
-            ITEST_DATABASE=${{ matrix.database }} \
-            ITEST_PROVIDER=${{ matrix.provider }} \
-            ITEST_PROJECT=swissknife-itest-${{ matrix.database }}-${{ matrix.provider }}
+        uses: ./.github/actions/test-with-coverage
+        with:
+          target: test-integration
+          artifact: integration-${{ matrix.database }}-${{ matrix.provider }}
+        env:
+          ITEST_DATABASE: ${{ matrix.database }}
+          ITEST_PROVIDER: ${{ matrix.provider }}
+          ITEST_PROJECT: swissknife-itest-${{ matrix.database }}-${{ matrix.provider }}
 
       - name: Collect dependency logs
         if: failure()
@@ -99,50 +124,44 @@ jobs:
         uses: swatinem/rust-cache@v2.9.3
 
       - name: Persistence (UoW) tests (${{ matrix.database }})
-        run: |
-          make test-persistence \
-            ITEST_DATABASE=${{ matrix.database }} \
-            ITEST_PROJECT=swissknife-persistence-${{ matrix.database }}
+        uses: ./.github/actions/test-with-coverage
+        with:
+          target: test-persistence
+          artifact: persistence-${{ matrix.database }}
+        env:
+          ITEST_DATABASE: ${{ matrix.database }}
+          ITEST_PROJECT: swissknife-persistence-${{ matrix.database }}
 
       - name: Stop dependencies
         if: always()
         run: |
           make itest-down ITEST_PROJECT=swissknife-persistence-${{ matrix.database }} || true
 
-  # Full-matrix merged coverage: unit + UoW (both DBs) + the integration suite
-  # across every provider x DB cell, merged into one report (printed to the job
-  # log and uploaded as lcov). This is the true total coverage.
-  #
-  # It re-runs the whole suite under instrumentation, which duplicates the
-  # integration + persistence jobs above, so coverage runs only on pushes to
-  # main (and manual dispatch), not on every pull-request push.
   coverage:
     if: github.event_name != 'pull_request'
+    needs: [test, integration, persistence]
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 10
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7.0.1
 
-      - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@1.100.0
+      - name: Download tracefiles from this run
+        uses: actions/download-artifact@v8.0.2
         with:
-          components: llvm-tools-preview
+          pattern: coverage-cell-*
+          path: coverage-cells
 
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2.90.6
-        with:
-          tool: cargo-llvm-cov
-
-      - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2.9.3
-
-      - name: Full-matrix merged coverage
-        run: make coverage-matrix
+      - name: Merge test coverage
+        run: |
+          sudo apt-get update && sudo apt-get install -y lcov
+          args=()
+          for fragment in coverage-cells/*/coverage.info; do
+            test -s "$fragment"
+            args+=(--add-tracefile "$fragment")
+          done
+          lcov "${args[@]}" --branch-coverage --output-file lcov.info
+          lcov --summary lcov.info --branch-coverage
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7.0.2
