@@ -1190,5 +1190,27 @@
     "incoming_alerts": "Avisos de pagos recibidos",
     "outgoing_alerts": "Avisos de pagos enviados",
     "sound": "Reproducir un sonido con los avisos de pago"
+  },
+  "spending_policy": {
+    "title": "Presupuesto de gastos",
+    "load_error": "No se pudo cargar el presupuesto.",
+    "loading": "Cargando presupuesto…",
+    "periods": "Incluye las comisiones y las reservas pendientes. Los períodos comienzan a medianoche UTC. La semana comienza el lunes.",
+    "per_payment_msat": "Por pago",
+    "unlimited": "Sin límite",
+    "daily_msat": "Hoy",
+    "weekly_msat": "Esta semana",
+    "monthly_msat": "Este mes",
+    "sats": "{{value}} sats",
+    "uncapped_usage": "{{used}} sats utilizados · sin límite",
+    "usage": "{{used}} de {{cap}} sats",
+    "inactive": "Esta cuenta no tiene un límite de gasto activo.",
+    "edit": "Editar límites",
+    "create": "Establecer límites de gasto",
+    "disable": "Desactivar presupuesto",
+    "input_help": "Introduce importes en sats con hasta tres decimales. Deja un campo vacío para permitir gastos ilimitados en ese período. Cero bloquea los gastos.",
+    "cancel": "Cancelar",
+    "save": "Guardar límites",
+    "disable_help": "Se permitirán pagos salientes sin estos límites. Se conservarán los gastos ya contabilizados."
   }
 }

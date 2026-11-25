@@ -1190,5 +1190,27 @@
     "incoming_alerts": "Avvisi per i pagamenti in entrata",
     "outgoing_alerts": "Avvisi per i pagamenti in uscita",
     "sound": "Riproduci un suono per gli avvisi di pagamento"
+  },
+  "spending_policy": {
+    "title": "Budget di spesa",
+    "load_error": "Impossibile caricare il budget.",
+    "loading": "Caricamento del budget…",
+    "periods": "Include commissioni e importi prenotati. I periodi iniziano a mezzanotte UTC. La settimana inizia il lunedì.",
+    "per_payment_msat": "Per pagamento",
+    "unlimited": "Illimitato",
+    "daily_msat": "Oggi",
+    "weekly_msat": "Questa settimana",
+    "monthly_msat": "Questo mese",
+    "sats": "{{value}} sats",
+    "uncapped_usage": "{{used}} sats utilizzati · senza limite",
+    "usage": "{{used}} di {{cap}} sats",
+    "inactive": "Questo conto non ha limiti di spesa attivi.",
+    "edit": "Modifica limiti",
+    "create": "Imposta limiti di spesa",
+    "disable": "Disattiva budget",
+    "input_help": "Inserisci gli importi in sats con un massimo di tre decimali. Lascia vuoto il campo per consentire spese illimitate nel periodo. Zero blocca le spese.",
+    "cancel": "Annulla",
+    "save": "Salva limiti",
+    "disable_help": "I pagamenti in uscita saranno consentiti senza questi limiti. Le spese già contabilizzate saranno conservate."
   }
 }

@@ -1190,5 +1190,27 @@
     "incoming_alerts": "Benachrichtigungen über eingehende Zahlungen",
     "outgoing_alerts": "Benachrichtigungen über ausgehende Zahlungen",
     "sound": "Ton bei Zahlungsbenachrichtigungen abspielen"
+  },
+  "spending_policy": {
+    "title": "Ausgabenbudget",
+    "load_error": "Das Budget konnte nicht geladen werden.",
+    "loading": "Budget wird geladen …",
+    "periods": "Gebühren und offene Reservierungen sind enthalten. Die Zeiträume beginnen um Mitternacht UTC. Die Woche beginnt am Montag.",
+    "per_payment_msat": "Pro Zahlung",
+    "unlimited": "Unbegrenzt",
+    "daily_msat": "Heute",
+    "weekly_msat": "Diese Woche",
+    "monthly_msat": "Dieser Monat",
+    "sats": "{{value}} Sats",
+    "uncapped_usage": "{{used}} Sats verbraucht · unbegrenzt",
+    "usage": "{{used}} von {{cap}} Sats",
+    "inactive": "Für dieses Konto ist kein Ausgabenlimit aktiv.",
+    "edit": "Limits bearbeiten",
+    "create": "Ausgabenlimits festlegen",
+    "disable": "Budget deaktivieren",
+    "input_help": "Beträge in Sats mit bis zu drei Nachkommastellen eingeben. Ein leeres Feld lässt Ausgaben im jeweiligen Zeitraum unbegrenzt zu. Null sperrt Ausgaben.",
+    "cancel": "Abbrechen",
+    "save": "Limits speichern",
+    "disable_help": "Ausgehende Zahlungen unterliegen diesen Limits dann nicht mehr. Bereits angerechnete Ausgaben bleiben erhalten."
   }
 }
