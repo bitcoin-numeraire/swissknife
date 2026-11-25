@@ -381,6 +381,99 @@ impl BitcoinWallet for ClnGrpcClient {
             .ok_or_else(|| BitcoinError::Address("No address returned by CLN".to_string()))
     }
 
+    fn withdrawal_backend(&self) -> String {
+        format!("cln:{}:{}", self.network, hex::encode(&self.node_id))
+    }
+
+    async fn plan_withdrawal(
+        &self,
+        address: String,
+        amount_sat: u64,
+        _lock_id: [u8; 32],
+    ) -> Result<BtcPreparedTransaction, BitcoinError> {
+        let (expected, startweight, msat) = super::withdrawal::destination(&address, amount_sat)?;
+        let amount = Amount { msat };
+        let mut client = self.client.clone();
+        let funded = client
+            .fund_psbt(cln::FundpsbtRequest {
+                satoshi: Some(cln::AmountOrAll {
+                    value: Some(cln::amount_or_all::Value::Amount(amount)),
+                }),
+                feerate: Some(Feerate {
+                    style: Some(feerate::Style::Normal(true)),
+                }),
+                startweight,
+                reserve: Some(0),
+                minconf: Some(1),
+                excess_as_change: Some(true),
+                nonwrapped: Some(true),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?
+            .into_inner();
+        let output = client
+            .add_psbt_output(cln::AddpsbtoutputRequest {
+                satoshi: Some(amount),
+                initialpsbt: Some(funded.psbt),
+                destination: Some(address),
+                locktime: None,
+            })
+            .await
+            .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?
+            .into_inner();
+        let v0 = client
+            .set_psbt_version(SetpsbtversionRequest {
+                psbt: output.psbt.clone(),
+                version: 0,
+            })
+            .await
+            .map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?
+            .into_inner();
+        super::withdrawal::plan(&v0.psbt, output.psbt, output.outnum, expected)
+    }
+
+    async fn sign_withdrawal(
+        &self,
+        plan: &BtcPreparedTransaction,
+        _lock_id: [u8; 32],
+    ) -> Result<BtcBroadcastTransaction, BitcoinError> {
+        let mut client = self.client.clone();
+        client
+            .reserve_inputs(cln::ReserveinputsRequest {
+                psbt: plan.psbt.clone(),
+                exclusive: Some(true),
+                reserve: Some(super::withdrawal::RESERVATION_BLOCKS),
+            })
+            .await
+            .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+        let signed = client
+            .sign_psbt(cln::SignpsbtRequest {
+                psbt: plan.psbt.clone(),
+                signonly: vec![],
+            })
+            .await
+            .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?
+            .into_inner();
+        let signed_v0 = client
+            .set_psbt_version(SetpsbtversionRequest {
+                psbt: signed.signed_psbt.clone(),
+                version: 0,
+            })
+            .await
+            .map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?
+            .into_inner();
+        if parse_psbt(&signed_v0.psbt)?.unsigned_tx.compute_txid().to_string() != plan.txid {
+            return Err(BitcoinError::FinalizeTransaction(
+                "Signed PSBT differs from the approved withdrawal".into(),
+            ));
+        }
+        Ok(BtcBroadcastTransaction::SignedPsbt {
+            txid: plan.txid.clone(),
+            psbt: signed.signed_psbt,
+        })
+    }
+
     async fn prepare_transaction(
         &self,
         address: String,
@@ -429,6 +522,26 @@ impl BitcoinWallet for ClnGrpcClient {
     }
 
     async fn broadcast_transaction(&self, transaction: &BtcBroadcastTransaction) -> Result<(), BitcoinError> {
+        if let BtcBroadcastTransaction::SignedPsbt { txid, psbt } = transaction {
+            let response = self
+                .client
+                .clone()
+                .send_psbt(cln::SendpsbtRequest {
+                    psbt: psbt.clone(),
+                    reserve: Some(super::withdrawal::RESERVATION_BLOCKS),
+                })
+                .await
+                .map_err(|e| BitcoinError::BroadcastTransaction(e.to_string()))?
+                .into_inner();
+            let actual = hex::encode(response.txid);
+            return if actual == *txid {
+                Ok(())
+            } else {
+                Err(BitcoinError::BroadcastTransaction(
+                    "Published transaction ID differs from the signed plan".into(),
+                ))
+            };
+        }
         let BtcBroadcastTransaction::Prepared(txid) = transaction else {
             return Err(BitcoinError::BroadcastTransaction(
                 "Core Lightning requires a prepared transaction ID".into(),

@@ -74,7 +74,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         delete_expired_invoices,
         wallet_pay,
         submit_wallet_payment,
-        get_wallet_payment_submission,
+        get_wallet_payment_submission, cancel_wallet_withdrawal,
         estimate_wallet_payment_fee,
         list_wallet_payments,
         get_wallet_payment,
@@ -149,7 +149,7 @@ pub fn account_router() -> Router<Arc<AppServices>> {
         .route("/wallets/{wallet_id}/payments/submissions", post(submit_wallet_payment))
         .route(
             "/wallets/{wallet_id}/payments/submissions/{id}",
-            get(get_wallet_payment_submission),
+            get(get_wallet_payment_submission).delete(cancel_wallet_withdrawal),
         )
         .route(
             "/wallets/{wallet_id}/payments/fee-estimate",
@@ -568,7 +568,7 @@ async fn list_wallet_btc_addresses(
     Ok(Json(services.bitcoin.list_addresses(filter).await?))
 }
 
-/// Reserve wallet funds and accept an external Lightning payment.
+/// Reserve wallet funds and accept an external Lightning or Bitcoin payment.
 #[utoipa::path(post, path = "/wallets/{wallet_id}/payments/submissions", context_path = CONTEXT_PATH, tag = "Me", request_body = SubmitPaymentRequest,
     params(("wallet_id" = Uuid, Path, description = "Owned wallet")), responses((status = 202, body = PaymentSubmission), (status = 404, body = ErrorResponse), (status = 409, body = ErrorResponse), (status = 422, body = ErrorResponse)))]
 async fn submit_wallet_payment(
@@ -588,7 +588,7 @@ async fn submit_wallet_payment(
     let base = format!("/v1/me/wallets/{wallet_id}/payments/submissions");
     let submission = services
         .payment
-        .submit_lightning(wallet_id, request)
+        .submit_payment(wallet_id, request)
         .await?
         .response(&base);
     services.payment_command_available.notify_one();
@@ -611,6 +611,25 @@ async fn get_wallet_payment_submission(
     let base = format!("/v1/me/wallets/{wallet_id}/payments/submissions");
     Ok(Json(
         services.payment.submission(Some(wallet_id), id).await?.response(&base),
+    ))
+}
+
+/// Cancel a queued external Bitcoin withdrawal from a wallet submission.
+#[utoipa::path(delete, path = "/wallets/{wallet_id}/payments/submissions/{id}", context_path = CONTEXT_PATH, tag = "Me",
+    params(("wallet_id" = Uuid, Path, description = "Owned wallet"), ("id" = Uuid, Path, description = "Payment ID")), responses((status = 200, body = PaymentSubmission), (status = 404, body = ErrorResponse), (status = 409, body = ErrorResponse)))]
+async fn cancel_wallet_withdrawal(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((wallet_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<PaymentSubmission>, ApplicationError> {
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    let base = format!("/v1/me/wallets/{wallet_id}/payments/submissions");
+    Ok(Json(
+        services
+            .payment
+            .cancel_withdrawal(Some(wallet_id), id)
+            .await?
+            .response(&base),
     ))
 }
 

@@ -8,12 +8,18 @@ use super::{Payment, PaymentFeeEstimate, PaymentFilter};
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait PaymentsUseCases: Send + Sync {
-    async fn submit_lightning(
+    async fn submit_payment(
         &self,
         wallet_id: Uuid,
         request: swissknife_types::SubmitPaymentRequest,
     ) -> Result<super::SubmittedPayment, ApplicationError>;
     async fn submission(&self, wallet_id: Option<Uuid>, id: Uuid) -> Result<super::SubmittedPayment, ApplicationError>;
+    async fn cancel_withdrawal(
+        &self,
+        wallet_id: Option<Uuid>,
+        id: Uuid,
+    ) -> Result<super::SubmittedPayment, ApplicationError>;
+    async fn execute_next_withdrawal(&self) -> Result<bool, ApplicationError>;
     async fn execute_next(&self) -> Result<bool, ApplicationError>;
 
     async fn estimate_fee(

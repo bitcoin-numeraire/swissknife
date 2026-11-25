@@ -10,6 +10,8 @@ import type {
 } from './client';
 import { client } from './client.gen';
 import {
+  cancelWalletWithdrawalResponseTransformer,
+  cancelWithdrawalResponseTransformer,
   createAccountApiKeyResponseTransformer,
   createAccountResponseTransformer,
   createAccountWalletResponseTransformer,
@@ -72,6 +74,12 @@ import type {
   CallbackData,
   CallbackErrors,
   CallbackResponses,
+  CancelWalletWithdrawalData,
+  CancelWalletWithdrawalErrors,
+  CancelWalletWithdrawalResponses,
+  CancelWithdrawalData,
+  CancelWithdrawalErrors,
+  CancelWithdrawalResponses,
   ChangePasswordData,
   ChangePasswordErrors,
   ChangePasswordResponses,
@@ -1617,7 +1625,7 @@ export const estimateWalletPaymentFee = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Reserve wallet funds and accept an external Lightning payment.
+ * Reserve wallet funds and accept an external Lightning or Bitcoin payment.
  */
 export const submitWalletPayment = <ThrowOnError extends boolean = false>(
   options: Options<SubmitWalletPaymentData, ThrowOnError>
@@ -1635,6 +1643,23 @@ export const submitWalletPayment = <ThrowOnError extends boolean = false>(
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Cancel a queued external Bitcoin withdrawal from a wallet submission.
+ */
+export const cancelWalletWithdrawal = <ThrowOnError extends boolean = false>(
+  options: Options<CancelWalletWithdrawalData, ThrowOnError>
+): RequestResult<CancelWalletWithdrawalResponses, CancelWalletWithdrawalErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    CancelWalletWithdrawalResponses,
+    CancelWalletWithdrawalErrors,
+    ThrowOnError
+  >({
+    responseTransformer: cancelWalletWithdrawalResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/wallets/{wallet_id}/payments/submissions/{id}',
+    ...options,
   });
 
 /**
@@ -1745,7 +1770,7 @@ export const estimatePaymentFee = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Accept an external Lightning payment for background execution.
+ * Accept an external Lightning or Bitcoin payment for background execution.
  */
 export const submitPayment = <ThrowOnError extends boolean = false>(
   options: Options<SubmitPaymentData, ThrowOnError>
@@ -1759,6 +1784,23 @@ export const submitPayment = <ThrowOnError extends boolean = false>(
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Cancel a queued external Bitcoin withdrawal from an administrative payment submission.
+ */
+export const cancelWithdrawal = <ThrowOnError extends boolean = false>(
+  options: Options<CancelWithdrawalData, ThrowOnError>
+): RequestResult<CancelWithdrawalResponses, CancelWithdrawalErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    CancelWithdrawalResponses,
+    CancelWithdrawalErrors,
+    ThrowOnError
+  >({
+    responseTransformer: cancelWithdrawalResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/payments/submissions/{id}',
+    ...options,
   });
 
 /**

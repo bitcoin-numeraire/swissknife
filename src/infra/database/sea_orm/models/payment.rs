@@ -44,6 +44,14 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Wallet,
+    #[sea_orm(has_one = "super::withdrawal_command::Entity")]
+    WithdrawalCommand,
+}
+
+impl Related<super::payment_command::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::PaymentCommand.def()
+    }
 }
 
 impl Related<super::wallet::Entity> for Entity {
@@ -52,9 +60,9 @@ impl Related<super::wallet::Entity> for Entity {
     }
 }
 
-impl Related<super::payment_command::Entity> for Entity {
+impl Related<super::withdrawal_command::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::PaymentCommand.def()
+        Relation::WithdrawalCommand.def()
     }
 }
 

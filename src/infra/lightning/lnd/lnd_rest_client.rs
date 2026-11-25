@@ -66,12 +66,66 @@ pub struct LndRestClient {
     fee_limit_msat: u64,
     retry_for: u32,
     network: BtcNetwork,
+    node_id: String,
     reorg_buffer_blocks: u32,
 }
 
 const USER_AGENT: &str = "Numeraire Swissknife/1.0";
 
 impl LndRestClient {
+    async fn fund_withdrawal(
+        &self,
+        address: String,
+        amount_sat: u64,
+        fee_rate_sat_vb: Option<u32>,
+        lock_id: Option<[u8; 32]>,
+    ) -> Result<BtcPreparedTransaction, BitcoinError> {
+        let mut outputs = HashMap::new();
+        outputs.insert(address, amount_sat);
+
+        let target_conf = if fee_rate_sat_vb.is_none() { Some(1) } else { None };
+
+        let response: FundPsbtResponse = self
+            .post_request(
+                "v2/wallet/psbt/fund",
+                &FundPsbtRequest {
+                    raw: TxTemplate { outputs },
+                    sat_per_vbyte: fee_rate_sat_vb,
+                    target_conf,
+                    custom_lock_id: lock_id.map(|id| STANDARD.encode(id)),
+                    lock_expiration_seconds: lock_id.map(|_| 120),
+                    min_confs: 1,
+                    spend_unconfirmed: false,
+                },
+            )
+            .await
+            .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
+
+        let locked_utxos: Vec<BtcLockedUtxo> = response
+            .locked_utxos
+            .into_iter()
+            .filter_map(|lease| {
+                let txid = lease.outpoint.txid_str?;
+                let output_index = lease.outpoint.output_index? as u32;
+                Some(BtcLockedUtxo {
+                    id: lease.id,
+                    txid,
+                    output_index,
+                })
+            })
+            .collect();
+
+        let psbt = parse_psbt(&response.funded_psbt)?;
+        let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
+
+        Ok(BtcPreparedTransaction {
+            txid: psbt.unsigned_tx.compute_txid().to_string(),
+            fee_sat: fee.to_sat(),
+            psbt: response.funded_psbt,
+            locked_utxos,
+        })
+    }
+
     pub async fn new(config: LndRestClientConfig) -> Result<Self, LightningError> {
         let macaroon = read_macaroon(&config.macaroon_path)
             .await
@@ -114,11 +168,11 @@ impl LndRestClient {
             fee_limit_msat: config.fee_limit_msat,
             retry_for: config.payment_timeout.as_secs() as u32,
             network: BtcNetwork::default(),
+            node_id: String::new(),
             reorg_buffer_blocks: config.reorg_buffer_blocks,
         };
 
-        let network = lnd_client.network().await?;
-        lnd_client.network = network;
+        (lnd_client.network, lnd_client.node_id) = lnd_client.wallet_identity().await?;
 
         Ok(lnd_client)
     }
@@ -205,7 +259,7 @@ impl LndRestClient {
         Ok(result)
     }
 
-    async fn network(&self) -> Result<BtcNetwork, LightningError> {
+    async fn wallet_identity(&self) -> Result<(BtcNetwork, String), LightningError> {
         let response: GetinfoResponse = self
             .get_request("v1/getinfo")
             .await
@@ -216,7 +270,7 @@ impl LndRestClient {
             .and_then(|mut chains| chains.pop())
             .and_then(|chain| chain.network)
         {
-            return Ok(parse_network(&chain));
+            return Ok((parse_network(&chain), response.identity_pubkey));
         }
 
         Err(LightningError::NodeInfo(
@@ -496,50 +550,64 @@ impl BitcoinWallet for LndRestClient {
         &self,
         address: String,
         amount_sat: u64,
-        fee_rate_sat_vb: Option<u32>,
+        fee_rate: Option<u32>,
     ) -> Result<BtcPreparedTransaction, BitcoinError> {
-        let mut outputs = HashMap::new();
-        outputs.insert(address, amount_sat);
+        self.fund_withdrawal(address, amount_sat, fee_rate, None).await
+    }
 
-        let target_conf = if fee_rate_sat_vb.is_none() { Some(1) } else { None };
+    fn withdrawal_backend(&self) -> String {
+        format!("lnd:{}:{}", self.network, self.node_id)
+    }
 
-        let response: FundPsbtResponse = self
-            .post_request(
-                "v2/wallet/psbt/fund",
-                &FundPsbtRequest {
-                    raw: TxTemplate { outputs },
-                    sat_per_vbyte: fee_rate_sat_vb,
-                    target_conf,
-                    min_confs: 1,
-                    spend_unconfirmed: false,
+    async fn plan_withdrawal(
+        &self,
+        address: String,
+        amount_sat: u64,
+        lock_id: [u8; 32],
+    ) -> Result<BtcPreparedTransaction, BitcoinError> {
+        let plan = self
+            .fund_withdrawal(address.clone(), amount_sat, None, Some(lock_id))
+            .await?;
+        super::verify_withdrawal_output(&plan, &address, amount_sat)?;
+        Ok(plan)
+    }
+
+    async fn clear_withdrawal_attempt(&self, lock_id: [u8; 32]) -> Result<(), BitcoinError> {
+        let owner = STANDARD.encode(lock_id);
+        let leases: ListLeasesResponse = self
+            .post_request("v2/wallet/utxos/leases", &serde_json::json!({}))
+            .await
+            .map_err(|e| BitcoinError::ReleaseTransaction(e.to_string()))?;
+        for lease in leases.locked_utxos.into_iter().filter(|l| l.id == owner) {
+            self.post_request::<ReleaseOutputResponse>(
+                "v2/wallet/utxos/release",
+                &ReleaseOutputRequest {
+                    id: lease.id,
+                    outpoint: lease.outpoint,
                 },
             )
             .await
-            .map_err(|e| BitcoinError::PrepareTransaction(e.to_string()))?;
+            .map_err(|e| BitcoinError::ReleaseTransaction(e.to_string()))?;
+        }
+        Ok(())
+    }
 
-        let locked_utxos: Vec<BtcLockedUtxo> = response
-            .locked_utxos
-            .into_iter()
-            .filter_map(|lease| {
-                let txid = lease.outpoint.txid_str?;
-                let output_index = lease.outpoint.output_index? as u32;
-                Some(BtcLockedUtxo {
-                    id: lease.id,
-                    txid,
-                    output_index,
-                })
-            })
-            .collect();
-
-        let psbt = parse_psbt(&response.funded_psbt)?;
-        let fee = psbt.fee().map_err(|e| BitcoinError::ParsePsbt(e.to_string()))?;
-
-        Ok(BtcPreparedTransaction {
-            txid: psbt.unsigned_tx.compute_txid().to_string(),
-            fee_sat: fee.to_sat(),
-            psbt: response.funded_psbt,
-            locked_utxos,
-        })
+    async fn sign_withdrawal(
+        &self,
+        prepared: &BtcPreparedTransaction,
+        lock_id: [u8; 32],
+    ) -> Result<BtcBroadcastTransaction, BitcoinError> {
+        // Reacquire every input under its persisted owner. A different owner or a spent input
+        // prevents signing an expired plan recovered after a restart.
+        let inputs = parse_psbt(&prepared.psbt)?.unsigned_tx.input;
+        for input in inputs {
+            let outpoint = input.previous_output;
+            self.post_request::<serde_json::Value>("v2/wallet/utxos/lease", &serde_json::json!({
+                "id": STANDARD.encode(lock_id), "outpoint": {"txid_str":outpoint.txid.to_string(), "output_index":outpoint.vout},
+                "expiration_seconds":"600",
+            })).await.map_err(|e| BitcoinError::FinalizeTransaction(e.to_string()))?;
+        }
+        self.finalize_transaction(prepared).await
     }
 
     async fn finalize_transaction(
@@ -612,7 +680,9 @@ impl BitcoinWallet for LndRestClient {
             Err(e) => {
                 let error_msg = e.to_string();
                 // LND returns "not found" or similar error when transaction doesn't exist
-                if error_msg.to_lowercase().contains("not found") || error_msg.to_lowercase().contains("unknown") {
+                if error_msg.contains(&format!("can not find transaction: txid {txid}"))
+                    || error_msg.to_lowercase().contains("not found")
+                {
                     Ok(None)
                 } else {
                     Err(BitcoinError::GetTransaction(error_msg))

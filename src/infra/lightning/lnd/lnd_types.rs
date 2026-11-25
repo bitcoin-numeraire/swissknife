@@ -128,6 +128,7 @@ pub struct DeleteCanceledInvoiceResponse {}
 
 #[derive(Debug, Deserialize)]
 pub struct GetinfoResponse {
+    pub identity_pubkey: String,
     pub chains: Option<Vec<Chain>>,
 }
 
@@ -212,6 +213,10 @@ pub struct NewAddressResponse {
 
 #[derive(Debug, Serialize, Default)]
 pub struct FundPsbtRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_lock_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lock_expiration_seconds: Option<u64>,
     pub raw: TxTemplate,
     pub sat_per_vbyte: Option<u32>,
     pub min_confs: u32,
@@ -271,6 +276,12 @@ pub struct ReleaseOutputResponse {
 pub struct UtxoLease {
     pub id: String,
     pub outpoint: OutPoint,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListLeasesResponse {
+    #[serde(default)]
+    pub locked_utxos: Vec<UtxoLease>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

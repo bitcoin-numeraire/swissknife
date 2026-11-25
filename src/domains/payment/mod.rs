@@ -5,6 +5,9 @@ mod payment_repository;
 mod payment_service;
 mod payment_unit_of_work;
 mod payment_use_cases;
+mod withdrawal_command;
+mod withdrawal_service;
+pub use withdrawal_command::*;
 
 pub use payment_command::*;
 pub use payment_handler::*;

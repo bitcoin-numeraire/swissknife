@@ -20,7 +20,7 @@ use crate::{
     },
 };
 
-fn db_error(error: sea_orm::DbErr) -> DatabaseError {
+pub(super) fn db_error(error: sea_orm::DbErr) -> DatabaseError {
     DatabaseError::Transaction(error.to_string())
 }
 
@@ -54,13 +54,19 @@ pub(super) async fn submitted(
         .find(id)
         .await?
         .ok_or_else(|| DataError::Conflict("The submitted payment was deleted".into()))?;
+    let withdrawal = super::withdrawal_command::summary(db, &payment).await?;
     Ok(Some(SubmittedPayment {
+        withdrawal,
         payment,
         dispatched: row.dispatched_at.is_some(),
     }))
 }
 
-async fn append(tx: &DatabaseTransaction, payment: &Payment, event_type: ClientEventType) -> Result<(), DatabaseError> {
+pub(super) async fn append(
+    tx: &DatabaseTransaction,
+    payment: &Payment,
+    event_type: ClientEventType,
+) -> Result<(), DatabaseError> {
     SeaOrmClientEventRepository::new(tx)
         .append_event(NewClientEvent {
             event_type,
@@ -71,27 +77,41 @@ async fn append(tx: &DatabaseTransaction, payment: &Payment, event_type: ClientE
         .await
 }
 
+pub(super) enum Admission {
+    External {
+        reserve: u64,
+        instructions: PaymentInstructions,
+    },
+    Internal(Box<crate::domains::invoice::Invoice>),
+}
+
 pub(super) async fn submit(
     db: &DatabaseConnection,
     key: &SubmissionKey,
     payment: Payment,
-    reserve: u64,
-    instructions: PaymentInstructions,
+    admission: Admission,
 ) -> Result<SubmittedPayment, ApplicationError> {
     if key.wallet_id != payment.wallet_id {
         return Err(DataError::Validation("Submission wallet differs from payment wallet".into()).into());
     }
     let tx = db.begin().await.map_err(db_error)?;
     let id = Uuid::new_v4();
+    let (stored_instructions, lightning_queue) = match &admission {
+        Admission::External { instructions, .. } => (
+            serde_json::to_value(instructions).expect("payment instructions serialize"),
+            matches!(instructions, PaymentInstructions::Lightning { .. }),
+        ),
+        Admission::Internal(_) => (serde_json::json!({"rail":"internal"}), false),
+    };
     let inserted = Entity::insert(ActiveModel {
         id: Set(id),
         wallet_id: Set(key.wallet_id),
         idempotency_key: Set(key.key),
         payment_id: Set(None),
         request_fingerprint: Set(key.fingerprint.clone()),
-        instructions: Set(serde_json::to_value(instructions).expect("payment instructions serialize")),
+        instructions: Set(stored_instructions),
         created_at: Set(Utc::now().naive_utc()),
-        dispatched_at: Set(None),
+        dispatched_at: Set((!lightning_queue).then(|| Utc::now().naive_utc())),
     })
     .on_conflict(
         OnConflict::columns([Column::WalletId, Column::IdempotencyKey])
@@ -108,18 +128,45 @@ pub(super) async fn submit(
             .await?
             .ok_or_else(|| DatabaseError::FindOne("Conflicting payment submission disappeared".into()).into());
     }
-    let payment = reserve_in_transaction(&tx, payment, reserve).await?;
+    let (payment, instructions) = match admission {
+        Admission::External { reserve, instructions } => {
+            (reserve_in_transaction(&tx, payment, reserve).await?, Some(instructions))
+        }
+        Admission::Internal(invoice) => (
+            super::uow::settle_internal_in_transaction(&tx, payment, *invoice).await?,
+            None,
+        ),
+    };
     Entity::update_many()
         .col_expr(Column::PaymentId, Expr::value(payment.id))
         .filter(Column::Id.eq(id))
         .exec(&tx)
         .await
         .map_err(db_error)?;
-    append(&tx, &payment, ClientEventType::PaymentAccepted).await?;
+    let withdrawal = match instructions {
+        Some(PaymentInstructions::Onchain {
+            backend,
+            address,
+            maximum_fee_msat,
+        }) => {
+            let details =
+                super::withdrawal_command::insert(&tx, payment.id, backend.clone(), address, maximum_fee_msat).await?;
+            Some(crate::domains::payment::StoredWithdrawal {
+                backend,
+                state: swissknife_types::PaymentExecutionState::Accepted,
+                details,
+            })
+        }
+        Some(PaymentInstructions::Lightning { .. }) | None => None,
+    };
+    if payment.status == crate::domains::payment::PaymentStatus::Pending {
+        append(&tx, &payment, ClientEventType::PaymentAccepted).await?;
+    }
     tx.commit().await.map_err(db_error)?;
     Ok(SubmittedPayment {
         payment,
         dispatched: false,
+        withdrawal,
     })
 }
 
@@ -129,6 +176,7 @@ pub(super) async fn claim(db: &DatabaseConnection) -> Result<Option<ClaimedPayme
         .inner_join(payment::Entity)
         .filter(Column::DispatchedAt.is_null())
         .filter(payment::Column::Status.eq("Pending"))
+        .filter(payment::Column::Ledger.eq("Lightning"))
         .order_by_asc(Column::CreatedAt)
         .order_by_asc(Column::Id)
         .one(db)
@@ -182,9 +230,13 @@ pub(super) async fn by_id(
     let Some(row) = query.one(db).await.map_err(db_error)? else {
         return Ok(None);
     };
-    let payment = SeaOrmPaymentRepository::new(db.clone()).find(id).await?;
-    Ok(payment.map(|payment| SubmittedPayment {
+    let Some(payment) = SeaOrmPaymentRepository::new(db.clone()).find(id).await? else {
+        return Ok(None);
+    };
+    let withdrawal = super::withdrawal_command::summary(db, &payment).await?;
+    Ok(Some(SubmittedPayment {
         payment,
+        withdrawal,
         dispatched: row.dispatched_at.is_some(),
     }))
 }

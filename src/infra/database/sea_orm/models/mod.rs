@@ -19,3 +19,4 @@ pub mod local_credential;
 pub mod payment;
 pub mod payment_command;
 pub mod wallet;
+pub mod withdrawal_command;

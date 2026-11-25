@@ -60,7 +60,7 @@ pub struct BtcTransactionOutput {
     pub is_ours: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BtcPreparedTransaction {
     pub txid: String,
     pub fee_sat: u64,
@@ -69,22 +69,24 @@ pub struct BtcPreparedTransaction {
 }
 
 /// A fully signed wire transaction or the identifier of a transaction held by the node.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "format", content = "data", rename_all = "snake_case")]
 pub enum BtcBroadcastTransaction {
     Signed(bitcoin::Transaction),
     Prepared(String),
+    SignedPsbt { txid: String, psbt: String },
 }
 
 impl BtcBroadcastTransaction {
     pub fn txid(&self) -> String {
         match self {
             Self::Signed(tx) => tx.compute_txid().to_string(),
-            Self::Prepared(txid) => txid.clone(),
+            Self::Prepared(txid) | Self::SignedPsbt { txid, .. } => txid.clone(),
         }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BtcLockedUtxo {
     pub id: String,
     pub txid: String,

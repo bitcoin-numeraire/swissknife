@@ -25,8 +25,25 @@ pub trait PaymentUnitOfWork: Send + Sync {
         instructions: PaymentInstructions,
     ) -> Result<SubmittedPayment, ApplicationError>;
 
+    /// Settle a registered recipient and its wallet-scoped idempotency key in the same transaction.
+    async fn submit_internal(
+        &self,
+        key: &SubmissionKey,
+        payment: Payment,
+        invoice: Invoice,
+    ) -> Result<SubmittedPayment, ApplicationError>;
+
     /// Commit the dispatch boundary before contacting the provider. Only one worker can claim a command.
     async fn claim(&self) -> Result<Option<ClaimedPayment>, ApplicationError>;
+
+    async fn claim_withdrawal(&self, backend: &str) -> Result<Option<super::ClaimedWithdrawal>, ApplicationError>;
+    async fn advance_withdrawal(
+        &self,
+        claim: &super::ClaimedWithdrawal,
+        progress: super::WithdrawalProgress,
+        retry_seconds: i64,
+    ) -> Result<bool, ApplicationError>;
+    async fn cancel_withdrawal(&self, wallet_id: Option<uuid::Uuid>, id: uuid::Uuid) -> Result<(), ApplicationError>;
 
     /// Reserve `reserve_amount_msat` and insert a pending outgoing payment, atomically.
     async fn reserve(&self, payment: Payment, reserve_amount_msat: u64) -> Result<Payment, ApplicationError>;

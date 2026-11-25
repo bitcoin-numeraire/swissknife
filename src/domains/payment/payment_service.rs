@@ -34,10 +34,10 @@ const DEFAULT_INTERNAL_PAYMENT_DESCRIPTION: &str = "Payment to Numeraire";
 
 pub struct PaymentService {
     domain: String,
-    store: AppStore,
+    pub(super) store: AppStore,
     ln_client: Arc<dyn LnClient>,
-    bitcoin_wallet: Arc<dyn BitcoinWallet>,
-    events: Arc<dyn EventUseCases>,
+    pub(super) bitcoin_wallet: Arc<dyn BitcoinWallet>,
+    pub(super) events: Arc<dyn EventUseCases>,
 }
 
 impl PaymentService {
@@ -71,7 +71,7 @@ impl PaymentService {
         Ok(amount)
     }
 
-    fn reserve_amount_msat(amount_msat: u64, fee_msat: u64) -> Result<u64, ApplicationError> {
+    pub(super) fn reserve_amount_msat(amount_msat: u64, fee_msat: u64) -> Result<u64, ApplicationError> {
         amount_msat
             .checked_add(fee_msat)
             .filter(|total| *total <= i64::MAX as u64)
@@ -206,6 +206,53 @@ impl PaymentService {
         Ok(())
     }
 
+    pub(super) fn registered_bitcoin_transfer(
+        wallet_id: Uuid,
+        recipient_wallet_id: Uuid,
+        address: String,
+        amount_msat: u64,
+        description: Option<String>,
+    ) -> Result<(Payment, Invoice), ApplicationError> {
+        if recipient_wallet_id == wallet_id {
+            return Err(DataError::Validation("Cannot pay to your own bitcoin address.".to_string()).into());
+        }
+
+        let timestamp = Utc::now();
+
+        let invoice = Invoice {
+            wallet_id: recipient_wallet_id,
+            ln_address_id: None,
+            description: description.clone(),
+            amount_msat: Some(amount_msat),
+            amount_received_msat: Some(amount_msat),
+            timestamp,
+            status: InvoiceStatus::Settled,
+            ledger: Ledger::Internal,
+            fee_msat: Some(0),
+            payment_time: Some(timestamp),
+            btc_output_id: None,
+            ..Default::default()
+        };
+
+        let payment = Payment {
+            wallet_id,
+            amount_msat,
+            status: PaymentStatus::Settled,
+            ledger: Ledger::Internal,
+            description,
+            internal: Some(InternalPayment {
+                ln_address: None,
+                btc_address: Some(address),
+                payment_hash: None,
+            }),
+            fee_msat: Some(0),
+            payment_time: Some(timestamp),
+            ..Default::default()
+        };
+
+        Ok((payment, invoice))
+    }
+
     async fn send_bitcoin(
         &self,
         data: BitcoinAddressData,
@@ -223,43 +270,13 @@ impl PaymentService {
             let description: Option<String> = comment.or(data.message);
 
             if let Some(recipient_address) = self.store.btc_address.find_by_address(&data.address).await? {
-                if recipient_address.wallet_id == wallet_id {
-                    return Err(DataError::Validation("Cannot pay to your own bitcoin address.".to_string()).into());
-                }
-
-                let timestamp = Utc::now();
-
-                let invoice = Invoice {
-                    wallet_id: recipient_address.wallet_id,
-                    ln_address_id: None,
-                    description: description.clone(),
-                    amount_msat: Some(amount_msat),
-                    amount_received_msat: Some(amount_msat),
-                    timestamp,
-                    status: InvoiceStatus::Settled,
-                    ledger: Ledger::Internal,
-                    fee_msat: Some(0),
-                    payment_time: Some(timestamp),
-                    btc_output_id: None,
-                    ..Default::default()
-                };
-
-                let payment = Payment {
+                let (payment, invoice) = Self::registered_bitcoin_transfer(
                     wallet_id,
+                    recipient_address.wallet_id,
+                    data.address,
                     amount_msat,
-                    status: PaymentStatus::Settled,
-                    ledger: Ledger::Internal,
-                    description: description.clone(),
-                    internal: Some(InternalPayment {
-                        ln_address: None,
-                        btc_address: Some(data.address),
-                        payment_hash: None,
-                    }),
-                    fee_msat: Some(0),
-                    payment_time: Some(timestamp),
-                    ..Default::default()
-                };
-
+                    description,
+                )?;
                 let internal_payment = self.store.payment_uow.settle_internal(payment, invoice).await?;
 
                 return Ok(internal_payment);
@@ -674,7 +691,11 @@ impl PaymentService {
         }
     }
 
-    async fn ensure_wallet_network(&self, wallet_id: Uuid, network: BtcNetwork) -> Result<(), ApplicationError> {
+    pub(super) async fn ensure_wallet_network(
+        &self,
+        wallet_id: Uuid,
+        network: BtcNetwork,
+    ) -> Result<(), ApplicationError> {
         let wallet = self
             .store
             .wallet
@@ -700,7 +721,7 @@ impl PaymentService {
 
 #[async_trait]
 impl PaymentsUseCases for PaymentService {
-    async fn submit_lightning(
+    async fn submit_payment(
         &self,
         wallet_id: Uuid,
         request: swissknife_types::SubmitPaymentRequest,
@@ -710,7 +731,7 @@ impl PaymentsUseCases for PaymentService {
             return Err(DataError::Validation("Submission wallet differs from the path".into()).into());
         }
         if let Some(original) = self.store.payment_uow.submitted(&key).await? {
-            return Ok(original);
+            return Ok(original.check_original_backend(&self.bitcoin_wallet.withdrawal_backend()));
         }
         if self.is_internal_payment(&request.input) {
             return Err(DataError::InternalTransferRequired.into());
@@ -733,8 +754,8 @@ impl PaymentsUseCases for PaymentService {
                     callback.success_action,
                 )
             }
-            PaymentInput::BitcoinAddress(_) => {
-                return Err(DataError::Validation("This submission requires a Lightning destination".into()).into())
+            PaymentInput::BitcoinAddress(destination) => {
+                return self.submit_withdrawal(&key, request, destination).await
             }
         };
         self.ensure_wallet_network(wallet_id, self.bolt11_network(&invoice))
@@ -796,7 +817,20 @@ impl PaymentsUseCases for PaymentService {
             .payment_uow
             .submission_by_id(wallet_id, id)
             .await?
+            .map(|row| row.check_original_backend(&self.bitcoin_wallet.withdrawal_backend()))
             .ok_or_else(|| DataError::NotFound("Payment submission not found".into()).into())
+    }
+
+    async fn cancel_withdrawal(
+        &self,
+        wallet_id: Option<Uuid>,
+        id: Uuid,
+    ) -> Result<super::SubmittedPayment, ApplicationError> {
+        self.store.payment_uow.cancel_withdrawal(wallet_id, id).await?;
+        self.submission(wallet_id, id).await
+    }
+    async fn execute_next_withdrawal(&self) -> Result<bool, ApplicationError> {
+        self.execute_withdrawal().await
     }
 
     async fn execute_next(&self) -> Result<bool, ApplicationError> {
@@ -807,7 +841,10 @@ impl PaymentsUseCases for PaymentService {
             bolt11,
             variable_amount_msat,
             maximum_fee_msat,
-        } = command.instructions;
+        } = command.instructions
+        else {
+            return Err(DataError::Inconsistency("Non-Lightning command claimed by Lightning worker".into()).into());
+        };
         let result = self
             .ln_client
             .pay(

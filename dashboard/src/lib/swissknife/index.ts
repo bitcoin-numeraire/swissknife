@@ -2,6 +2,8 @@
 
 export {
   callback,
+  cancelWalletWithdrawal,
+  cancelWithdrawal,
   changePassword,
   createAccount,
   createAccountApiKey,
@@ -118,6 +120,16 @@ export {
   type CallbackErrors,
   type CallbackResponse,
   type CallbackResponses,
+  type CancelWalletWithdrawalData,
+  type CancelWalletWithdrawalError,
+  type CancelWalletWithdrawalErrors,
+  type CancelWalletWithdrawalResponse,
+  type CancelWalletWithdrawalResponses,
+  type CancelWithdrawalData,
+  type CancelWithdrawalError,
+  type CancelWithdrawalErrors,
+  type CancelWithdrawalResponse,
+  type CancelWithdrawalResponses,
   type ChangePasswordData,
   type ChangePasswordError,
   type ChangePasswordErrors,
@@ -636,4 +648,5 @@ export {
   type WellKnownNostrResponses,
   type WellKnownResponse,
   type WellKnownResponses,
+  type WithdrawalSubmission,
 } from './types.gen';

@@ -354,3 +354,14 @@ mod tests {
         );
     }
 }
+
+#[derive(Debug, Deserialize)]
+pub struct AddPsbtOutputResponse {
+    pub psbt: String,
+    pub outnum: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SignedPsbtResponse {
+    pub signed_psbt: String,
+}

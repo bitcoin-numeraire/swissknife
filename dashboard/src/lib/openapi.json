@@ -7027,7 +7027,7 @@
         "tags": [
           "Me"
         ],
-        "summary": "Reserve wallet funds and accept an external Lightning payment.",
+        "summary": "Reserve wallet funds and accept an external Lightning or Bitcoin payment.",
         "operationId": "submit_wallet_payment",
         "parameters": [
           {
@@ -7131,6 +7131,64 @@
             }
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Cancel a queued external Bitcoin withdrawal from a wallet submission.",
+        "operationId": "cancel_wallet_withdrawal",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "description": "Owned wallet",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Payment ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentSubmission"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -7809,7 +7867,7 @@
         "tags": [
           "Payments"
         ],
-        "summary": "Accept an external Lightning payment for background execution.",
+        "summary": "Accept an external Lightning or Bitcoin payment for background execution.",
         "operationId": "submit_payment",
         "requestBody": {
           "content": {
@@ -7895,6 +7953,54 @@
             }
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Cancel a queued external Bitcoin withdrawal from an administrative payment submission.",
+        "operationId": "cancel_withdrawal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Payment ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentSubmission"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -10473,6 +10579,11 @@
         "enum": [
           "accepted",
           "processing",
+          "waiting",
+          "broadcast",
+          "reconciling",
+          "cancelled",
+          "expired",
           "settled",
           "failed"
         ]
@@ -10555,6 +10666,16 @@
           "status_url": {
             "type": "string",
             "description": "Authorized REST resource for this submission, relative to the SwissKnife server."
+          },
+          "withdrawal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WithdrawalSubmission"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -10778,7 +10899,7 @@
       },
       "SubmitPaymentRequest": {
         "type": "object",
-        "description": "Accept an external Lightning payment for durable execution.",
+        "description": "Accept an external Lightning or Bitcoin payment for durable execution.",
         "required": [
           "idempotency_key",
           "input"
@@ -10811,7 +10932,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "An optional additional ceiling below the node's configured maximum.",
+            "description": "Maximum approved fee in millisatoshis. Required in whole satoshis for Bitcoin withdrawals.",
             "minimum": 0
           },
           "wallet_id": {
@@ -11143,6 +11264,34 @@
             ],
             "format": "date-time",
             "description": "Date of update in database"
+          }
+        }
+      },
+      "WithdrawalSubmission": {
+        "type": "object",
+        "description": "Approved Bitcoin withdrawal terms. The deadline applies until signing is committed.",
+        "required": [
+          "awaiting_original_provider",
+          "address",
+          "maximum_fee_msat",
+          "expires_at"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "awaiting_original_provider": {
+            "type": "boolean",
+            "description": "Execution resumes when this installation reconnects to the original node and network."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "maximum_fee_msat": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           }
         }
       }
