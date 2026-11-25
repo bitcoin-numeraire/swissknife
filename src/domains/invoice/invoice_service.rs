@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::Utc;
+use swissknife_types::{MerchantRevenue, MerchantRevenueQuery};
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
@@ -69,16 +70,14 @@ impl InvoiceService {
         ))
         .into())
     }
-}
 
-#[async_trait]
-impl InvoiceUseCases for InvoiceService {
-    async fn invoice(
+    async fn issue(
         &self,
         wallet_id: Uuid,
         amount: u64,
         description: Option<String>,
         expiry: Option<u32>,
+        merchant_route: Option<&str>,
     ) -> Result<Invoice, ApplicationError> {
         if amount > i64::MAX as u64 {
             return Err(DataError::Validation("Amount exceeds the supported storage range".to_string()).into());
@@ -99,12 +98,65 @@ impl InvoiceUseCases for InvoiceService {
             )
             .await?;
         invoice.id = invoice_id;
+        invoice.merchant_route = merchant_route.map(str::to_owned);
         invoice.wallet_id.clone_from(&wallet_id);
 
         let invoice = self.store.invoice.insert(invoice).await?;
 
         info!(id = %invoice.id, "Invoice generated successfully");
         Ok(invoice)
+    }
+}
+
+#[async_trait]
+impl InvoiceUseCases for InvoiceService {
+    async fn invoice(
+        &self,
+        wallet_id: Uuid,
+        amount: u64,
+        description: Option<String>,
+        expiry: Option<u32>,
+    ) -> Result<Invoice, ApplicationError> {
+        self.issue(wallet_id, amount, description, expiry, None).await
+    }
+
+    async fn merchant_invoice(
+        &self,
+        wallet_id: Uuid,
+        amount: u64,
+        description: String,
+        expiry: u32,
+        route: &str,
+    ) -> Result<Invoice, ApplicationError> {
+        self.issue(wallet_id, amount, Some(description), Some(expiry), Some(route))
+            .await
+    }
+
+    async fn merchant_revenue(
+        &self,
+        wallet_id: Uuid,
+        query: MerchantRevenueQuery,
+    ) -> Result<Vec<MerchantRevenue>, ApplicationError> {
+        let last = query.through.unwrap_or_else(|| Utc::now().date_naive());
+        let first = query
+            .from
+            .or_else(|| last.checked_sub_days(chrono::Days::new(29)))
+            .ok_or_else(|| DataError::Validation("Invalid merchant report start date".into()))?;
+        let end = last
+            .succ_opt()
+            .ok_or_else(|| DataError::Validation("Invalid merchant report end date".into()))?;
+        if first > last || (end - first).num_days() > 366 {
+            return Err(DataError::Validation("Choose a merchant report range of 1–366 days".into()).into());
+        }
+        Ok(self
+            .store
+            .invoice
+            .merchant_revenue(
+                wallet_id,
+                first.and_time(chrono::NaiveTime::MIN),
+                end.and_time(chrono::NaiveTime::MIN),
+            )
+            .await?)
     }
 
     async fn get(&self, id: Uuid) -> Result<Invoice, ApplicationError> {

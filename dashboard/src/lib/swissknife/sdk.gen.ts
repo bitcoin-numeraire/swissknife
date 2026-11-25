@@ -216,6 +216,9 @@ import type {
   GetLocalLoginData,
   GetLocalLoginErrors,
   GetLocalLoginResponses,
+  GetMerchantRevenueData,
+  GetMerchantRevenueErrors,
+  GetMerchantRevenueResponses,
   GetOfferData,
   GetOfferErrors,
   GetOfferResponses,
@@ -1755,6 +1758,26 @@ export const getWalletInvoice = <ThrowOnError extends boolean = false>(
       { name: 'Wallet-Key', type: 'apiKey' },
     ],
     url: '/v1/me/wallets/{wallet_id}/invoices/{id}',
+    ...options,
+  });
+
+/**
+ * Summarize settled merchant invoices by route for an inclusive UTC date range.
+ */
+export const getMerchantRevenue = <ThrowOnError extends boolean = false>(
+  options: Options<GetMerchantRevenueData, ThrowOnError>
+): RequestResult<GetMerchantRevenueResponses, GetMerchantRevenueErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetMerchantRevenueResponses,
+    GetMerchantRevenueErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+      { name: 'Wallet-Key', type: 'apiKey' },
+    ],
+    url: '/v1/me/wallets/{wallet_id}/l402/revenue',
     ...options,
   });
 

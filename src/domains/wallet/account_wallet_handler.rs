@@ -81,6 +81,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         get_wallet_payment,
         delete_failed_payments,
         list_contacts,
+        get_merchant_revenue,
     ),
     components(schemas(
         Account,
@@ -95,6 +96,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         Wallet,
         Balance,
         Contact,
+        swissknife_types::MerchantRevenue,
         LnAddress,
         BtcAddress,
         SendPaymentRequest,
@@ -160,6 +162,7 @@ pub fn account_router() -> Router<Arc<AppServices>> {
         .route("/wallets/{wallet_id}/payments/{id}", get(get_wallet_payment))
         .route("/wallets/{wallet_id}/payments", delete(delete_failed_payments))
         .route("/wallets/{wallet_id}/contacts", get(list_contacts))
+        .route("/wallets/{wallet_id}/l402/revenue", get(get_merchant_revenue))
 }
 
 /// Stream durable events for every wallet owned by the authenticated account.
@@ -1027,6 +1030,22 @@ async fn get_wallet_invoice(
         .ok_or_else(|| DataError::NotFound("Invoice not found.".to_string()))?;
 
     Ok(Json(invoice))
+}
+
+/// Summarize settled merchant invoices by route for an inclusive UTC date range.
+#[utoipa::path(get, path="/wallets/{wallet_id}/l402/revenue", context_path=CONTEXT_PATH, tag="Me",
+    security(("jwt"=[]),("api_key"=[]),("wallet_key"=[])),
+    params(("wallet_id"=Uuid,Path),swissknife_types::MerchantRevenueQuery),
+    responses((status=200, body=Vec<swissknife_types::MerchantRevenue>),(status=401),(status=403),(status=404),(status=422)))]
+async fn get_merchant_revenue(
+    State(services): State<Arc<AppServices>>,
+    actor: WalletActor,
+    Path(wallet_id): Path<Uuid>,
+    Query(query): Query<swissknife_types::MerchantRevenueQuery>,
+) -> Result<Json<Vec<swissknife_types::MerchantRevenue>>, ApplicationError> {
+    let account = actor.account_for(&services, wallet_id, WalletCapability::Read).await?;
+    services.wallet.verify_ownership(account, wallet_id).await?;
+    Ok(Json(services.invoice.merchant_revenue(wallet_id, query).await?))
 }
 
 /// List contacts for a wallet.

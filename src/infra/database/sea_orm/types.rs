@@ -126,6 +126,7 @@ impl From<InvoiceModel> for Invoice {
             id: model.id,
             wallet_id: model.wallet_id,
             ln_address_id: model.ln_address_id,
+            merchant_route: model.merchant_route,
             description: model.description,
             amount_msat: model.amount_msat.map(|v| v as u64),
             amount_received_msat: model.amount_received_msat.map(|v| v as u64),

@@ -6931,6 +6931,81 @@
         ]
       }
     },
+    "/v1/me/wallets/{wallet_id}/l402/revenue": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Summarize settled merchant invoices by route for an inclusive UTC date range.",
+        "operationId": "get_merchant_revenue",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day, inclusive. Defaults to 29 days before the last day.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "example": "2026-11-01"
+          },
+          {
+            "name": "through",
+            "in": "query",
+            "description": "Last day, inclusive. Defaults to today.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "example": "2026-11-30"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MerchantRevenue"
+                  }
+                }
+              }
+            }
+          },
+          "401": {},
+          "403": {},
+          "404": {},
+          "422": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          },
+          {
+            "wallet_key": []
+          }
+        ]
+      }
+    },
     "/v1/me/wallets/{wallet_id}/offers": {
       "get": {
         "tags": [
@@ -11060,6 +11135,13 @@
               }
             ]
           },
+          "merchant_route": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Merchant route which issued this invoice, when attribution is available."
+          },
           "offer_invoice": {
             "oneOf": [
               {
@@ -11566,6 +11648,33 @@
             "type": "string",
             "format": "date-time",
             "description": "UTC deadline for redeeming the code, 30 minutes after it was issued."
+          }
+        }
+      },
+      "MerchantRevenue": {
+        "type": "object",
+        "required": [
+          "route",
+          "settled_invoices",
+          "received_msat",
+          "fee_msat"
+        ],
+        "properties": {
+          "fee_msat": {
+            "type": "string",
+            "description": "Fees recorded on these incoming invoices, in exact decimal millisatoshis."
+          },
+          "received_msat": {
+            "type": "string",
+            "description": "Total amount received, in exact decimal millisatoshis."
+          },
+          "route": {
+            "type": "string"
+          },
+          "settled_invoices": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           }
         }
       },

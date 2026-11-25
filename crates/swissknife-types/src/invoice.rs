@@ -17,6 +17,10 @@ pub struct Invoice {
     /// Wallet ID
     pub wallet_id: Uuid,
 
+    /// Merchant route which issued this invoice, when attribution is available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub merchant_route: Option<String>,
+
     /// Lightning Address. Populated when invoice is generated as part of the LNURL protocol
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ln_address_id: Option<Uuid>,
@@ -67,6 +71,27 @@ pub struct Invoice {
     /// Private LNURL verification data. Never part of the invoice API response.
     #[serde(skip)]
     pub lnurl: Option<LnUrlInvoiceData>,
+}
+
+/// UTC settlement dates included in a wallet's merchant revenue report.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+pub struct MerchantRevenueQuery {
+    /// First day, inclusive. Defaults to 29 days before the last day.
+    #[param(value_type = Option<String>, example = "2026-11-01")]
+    pub from: Option<chrono::NaiveDate>,
+    /// Last day, inclusive. Defaults to today.
+    #[param(value_type = Option<String>, example = "2026-11-30")]
+    pub through: Option<chrono::NaiveDate>,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct MerchantRevenue {
+    pub route: String,
+    pub settled_invoices: u64,
+    /// Total amount received, in exact decimal millisatoshis.
+    pub received_msat: String,
+    /// Fees recorded on these incoming invoices, in exact decimal millisatoshis.
+    pub fee_msat: String,
 }
 
 /// Private data retained for LUD-21 verification, including after internal settlement.

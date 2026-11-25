@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use swissknife_types::{MerchantRevenue, MerchantRevenueQuery};
 
 use uuid::Uuid;
 
@@ -16,6 +17,19 @@ pub trait InvoiceUseCases: Send + Sync {
         description: Option<String>,
         expiry: Option<u32>,
     ) -> Result<Invoice, ApplicationError>;
+    async fn merchant_invoice(
+        &self,
+        wallet_id: Uuid,
+        amount: u64,
+        description: String,
+        expiry: u32,
+        route: &str,
+    ) -> Result<Invoice, ApplicationError>;
+    async fn merchant_revenue(
+        &self,
+        wallet_id: Uuid,
+        query: MerchantRevenueQuery,
+    ) -> Result<Vec<MerchantRevenue>, ApplicationError>;
     async fn get(&self, id: Uuid) -> Result<Invoice, ApplicationError>;
     async fn list(&self, filter: InvoiceFilter) -> Result<Vec<Invoice>, ApplicationError>;
     async fn delete(&self, id: Uuid) -> Result<(), ApplicationError>;

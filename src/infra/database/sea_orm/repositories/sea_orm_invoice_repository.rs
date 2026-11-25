@@ -44,6 +44,7 @@ impl<C> SeaOrmInvoiceRepository<C> {
 impl<C> InvoiceRepository for SeaOrmInvoiceRepository<C>
 where
     C: SeaOrmConnection,
+    C::Connection: sea_orm::StreamTrait,
 {
     async fn find(&self, id: Uuid) -> Result<Option<Invoice>, DatabaseError> {
         let model = InvoiceEntity::find_by_id(id)
@@ -134,6 +135,7 @@ where
             id: Set(id),
             wallet_id: Set(invoice.wallet_id),
             ln_address_id: Set(invoice.ln_address_id),
+            merchant_route: Set(invoice.merchant_route),
             description: Set(invoice.description),
             amount_msat: Set(invoice.amount_msat.map(amount_to_db).transpose()?),
             amount_received_msat: Set(invoice.amount_received_msat.map(amount_to_db).transpose()?),
@@ -175,6 +177,47 @@ where
             .map_err(|e| DatabaseError::Insert(e.to_string()))?;
 
         Ok(result.into())
+    }
+
+    async fn merchant_revenue(
+        &self,
+        wallet_id: Uuid,
+        start: chrono::NaiveDateTime,
+        end: chrono::NaiveDateTime,
+    ) -> Result<Vec<swissknife_types::MerchantRevenue>, DatabaseError> {
+        use futures_util::TryStreamExt;
+        use std::collections::BTreeMap;
+        let query = InvoiceEntity::find()
+            .select_only()
+            .columns([Column::MerchantRoute, Column::AmountReceivedMsat, Column::FeeMsat])
+            .filter(Column::WalletId.eq(wallet_id))
+            .filter(Column::MerchantRoute.is_not_null())
+            .filter(Column::PaymentTime.gte(start))
+            .filter(Column::PaymentTime.lt(end))
+            .into_tuple::<(String, i64, Option<i64>)>();
+        let database_error = |error: sea_orm::DbErr| DatabaseError::FindMany(error.to_string());
+        let mut rows = query.stream(self.db.connection()).await.map_err(database_error)?;
+        // An annual total may exceed the signed SQL sum even when every invoice fits.
+        let mut routes = BTreeMap::<String, (u64, u128, u128)>::new();
+        while let Some((name, received, fee)) = rows.try_next().await.map_err(database_error)? {
+            let totals = routes.entry(name).or_default();
+            totals.0 += 1;
+            totals.1 +=
+                u128::try_from(received).map_err(|_| DatabaseError::FindMany("Negative merchant receipt".into()))?;
+            totals.2 += u128::try_from(fee.unwrap_or(0))
+                .map_err(|_| DatabaseError::FindMany("Negative merchant invoice fee".into()))?;
+        }
+        Ok(routes
+            .into_iter()
+            .map(
+                |(route, (settled_invoices, received, fees))| swissknife_types::MerchantRevenue {
+                    route,
+                    settled_invoices,
+                    received_msat: received.to_string(),
+                    fee_msat: fees.to_string(),
+                },
+            )
+            .collect())
     }
 
     async fn update(&self, invoice: Invoice) -> Result<Invoice, DatabaseError> {
