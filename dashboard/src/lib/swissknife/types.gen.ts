@@ -418,6 +418,10 @@ export const ClientEventType = {
   INVOICE_PAID: 'invoice.paid',
   PAYMENT_ACCEPTED: 'payment.accepted',
   PAYMENT_PROCESSING: 'payment.processing',
+  WITHDRAWAL_PROCESSING: 'withdrawal.processing',
+  WITHDRAWAL_WAITING: 'withdrawal.waiting',
+  WITHDRAWAL_RECONCILING: 'withdrawal.reconciling',
+  WITHDRAWAL_BROADCAST: 'withdrawal.broadcast',
   PAYMENT_SETTLED: 'payment.settled',
   PAYMENT_FAILED: 'payment.failed',
 } as const;

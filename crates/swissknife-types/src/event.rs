@@ -37,6 +37,18 @@ pub enum ClientEventType {
     #[serde(rename = "payment.processing")]
     #[strum(serialize = "payment.processing")]
     PaymentProcessing,
+    #[serde(rename = "withdrawal.processing")]
+    #[strum(serialize = "withdrawal.processing")]
+    WithdrawalProcessing,
+    #[serde(rename = "withdrawal.waiting")]
+    #[strum(serialize = "withdrawal.waiting")]
+    WithdrawalWaiting,
+    #[serde(rename = "withdrawal.reconciling")]
+    #[strum(serialize = "withdrawal.reconciling")]
+    WithdrawalReconciling,
+    #[serde(rename = "withdrawal.broadcast")]
+    #[strum(serialize = "withdrawal.broadcast")]
+    WithdrawalBroadcast,
     #[serde(rename = "payment.settled")]
     #[strum(serialize = "payment.settled")]
     PaymentSettled,
