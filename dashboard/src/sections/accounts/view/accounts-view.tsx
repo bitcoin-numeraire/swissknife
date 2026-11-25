@@ -65,6 +65,7 @@ import { RoleBasedGuard } from 'src/auth/guard';
 
 import { LocalLoginCard } from './local-login-card';
 import { AccountDirectory } from './account-directory';
+import { SpendingPolicyCard } from './spending-policy-card';
 
 // ----------------------------------------------------------------------
 
@@ -482,6 +483,8 @@ function AccountDetailsView({ id }: { id: string }) {
                   </DetailCard>
                 </Grid>
               </Grid>
+
+              <SpendingPolicyCard key={account!.id} accountId={account!.id} />
 
               {CONFIG.auth.method === 'jwt' &&
                 account!.identity?.provider !== AuthProvider.OAUTH2 && (

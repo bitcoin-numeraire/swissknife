@@ -1094,5 +1094,27 @@
     "display_name": "Display name (optional)",
     "display_name_help": "How you would like to be greeted. You can change this in Settings.",
     "reset_display_name_help": "Leave blank to keep your current display name. Your assigned username stays the same."
+  },
+  "spending_policy": {
+    "title": "Spending budget",
+    "load_error": "Unable to load this budget.",
+    "loading": "Loading budget…",
+    "periods": "Includes fees and pending reservations. Periods start at midnight UTC. The week starts on Monday.",
+    "per_payment_msat": "Per payment",
+    "unlimited": "Unlimited",
+    "daily_msat": "Today",
+    "weekly_msat": "This week",
+    "monthly_msat": "This month",
+    "sats": "{{value}} sats",
+    "uncapped_usage": "{{used}} sats used · unlimited",
+    "usage": "{{used}} of {{cap}} sats",
+    "inactive": "This account has no active spending limit.",
+    "edit": "Edit limits",
+    "create": "Set spending limits",
+    "disable": "Disable budget",
+    "input_help": "Enter limits in sats, with up to three decimal places. Leave a field empty for unlimited spending in that period. Zero blocks spending.",
+    "cancel": "Cancel",
+    "save": "Save limits",
+    "disable_help": "Outgoing payments will be allowed without these limits. Previously charged usage is retained."
   }
 }

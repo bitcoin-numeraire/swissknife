@@ -9,6 +9,7 @@ export const endpointKeys = {
   },
   accounts: {
     list: 'listAccounts',
+    spendingPolicy: (id: string) => ['accountSpendingPolicy', id] as const,
     get: (id: string) => ['getAccount', id] as const,
   },
   accountWallet: {
