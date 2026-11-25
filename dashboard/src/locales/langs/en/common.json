@@ -1159,5 +1159,26 @@
     "cancel": "Cancel",
     "save": "Save limits",
     "disable_help": "Outgoing payments will be allowed without these limits. Previously charged usage is retained."
+  },
+  "spending_report": {
+    "title": "Spending report",
+    "description": "Current budget charges include pending reservations. Dates use UTC. By default the report covers the last 30 days.",
+    "interval": "Group by",
+    "day": "Day",
+    "week": "Week",
+    "wallet": "Wallet",
+    "all_wallets": "All wallets",
+    "key": "Credential ID (optional)",
+    "invalid_key": "Enter a complete credential UUID.",
+    "from": "From",
+    "through": "Through",
+    "invalid_range": "Select a range of up to 366 days.",
+    "error": "Could not load the spending report.",
+    "period": "Period beginning",
+    "payments": "Payments admitted",
+    "charged": "Budget used (sats)",
+    "empty": "No budgeted payments in this period.",
+    "csv": "Download CSV",
+    "json": "Download JSON"
   }
 }

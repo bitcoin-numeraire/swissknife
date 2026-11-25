@@ -1158,5 +1158,26 @@
     "cancel": "Annuler",
     "save": "Enregistrer les limites",
     "disable_help": "Les paiements sortants seront autorisés sans ces limites. Les dépenses déjà comptabilisées seront conservées."
+  },
+  "spending_report": {
+    "title": "Rapport de dépenses",
+    "description": "Les montants incluent les réservations en cours. Les dates sont en UTC. Par défaut, le rapport couvre les 30 derniers jours.",
+    "interval": "Regrouper par",
+    "day": "Jour",
+    "week": "Semaine",
+    "wallet": "Portefeuille",
+    "all_wallets": "Tous les portefeuilles",
+    "key": "Identifiant d’accès (facultatif)",
+    "invalid_key": "Saisissez un UUID d’accès complet.",
+    "from": "Du",
+    "through": "Au",
+    "invalid_range": "Sélectionnez une période de 366 jours au maximum.",
+    "error": "Impossible de charger le rapport de dépenses.",
+    "period": "Début de la période",
+    "payments": "Paiements admis",
+    "charged": "Budget utilisé (sats)",
+    "empty": "Aucun paiement soumis au budget sur cette période.",
+    "csv": "Télécharger le CSV",
+    "json": "Télécharger le JSON"
   }
 }
