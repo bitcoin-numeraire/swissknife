@@ -38,6 +38,7 @@ export const zBalance = z.object({
     .max(BigInt('9223372036854775807'), {
       error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
     }),
+  available_units: z.string().nullish(),
   fees_paid_msat: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
     error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
   }),
@@ -181,6 +182,17 @@ export const zCreateWalletRequest = z.object({
   asset_id: z.uuid(),
 });
 
+export const zCreditPurpose = z.enum(['opening', 'top_up']);
+
+export const zCreateWalletCredit = z.object({
+  account_id: z.uuid(),
+  amount_units: z.string(),
+  asset_id: z.uuid(),
+  purpose: zCreditPurpose,
+  reason: z.string(),
+  request_id: z.uuid(),
+});
+
 /**
  * Application error response
  */
@@ -225,7 +237,7 @@ export const zInvoiceStatus = z.enum(['Pending', 'Settled', 'Expired']);
 /**
  * The ledger a transaction settles on.
  */
-export const zLedger = z.enum(['Lightning', 'Internal', 'Onchain']);
+export const zLedger = z.enum(['Lightning', 'Internal', 'Onchain', 'Adjustment']);
 
 /**
  * Lightning Address
@@ -280,6 +292,8 @@ export const zInvoice = z.object({
     .nullish(),
   bitcoin_output: zBtcOutput.nullish(),
   created_at: z.iso.datetime(),
+  credit_amount_units: z.string().nullish(),
+  credit_purpose: zCreditPurpose.nullish(),
   description: z.string().nullish(),
   fee_msat: z.coerce
     .bigint()
@@ -499,6 +513,7 @@ export const zPermission = z.enum([
   'write:account',
   'read:wallet',
   'write:wallet',
+  'credit:wallet',
   'read:ln_address',
   'write:ln_address',
   'read:transaction',
@@ -750,6 +765,16 @@ export const zAccount = z.object({
   updated_at: z.iso.datetime().nullish(),
   wallets: z.array(zWallet),
 });
+
+export const zWalletCreditReceipt = zCreateWalletCredit.and(
+  z.object({
+    actor_account_id: z.uuid(),
+    api_key_id: z.uuid().nullish(),
+    created_at: z.iso.datetime(),
+    invoice_id: z.uuid(),
+    wallet_id: z.uuid(),
+  })
+);
 
 /**
  * A lightweight wallet summary with counts in place of the full lists.
@@ -1887,6 +1912,17 @@ export const zGetWalletPath = z.object({
  * Found
  */
 export const zGetWalletResponse = zWallet;
+
+export const zCreditWalletBody = zCreateWalletCredit;
+
+export const zCreditWalletPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Committed credit or matching replay
+ */
+export const zCreditWalletResponse = zWalletCreditReceipt;
 
 export const zExportWalletStatementPath = z.object({
   id: z.uuid(),

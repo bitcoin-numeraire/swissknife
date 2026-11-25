@@ -18,4 +18,5 @@ pub struct StatementEntry {
     pub amount_msat: Option<i64>,
     pub fee_msat: Option<i64>,
     pub description: Option<String>,
+    pub credit_purpose: Option<String>,
 }

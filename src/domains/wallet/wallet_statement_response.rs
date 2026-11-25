@@ -27,6 +27,7 @@ pub(super) fn statement_response(statement: WalletStatement) -> Result<Response,
             "gross_amount_msat",
             "fee_msat",
             "description",
+            "credit_purpose",
         ])
         .map_err(encode_error)?;
     let wallet = statement.wallet_id.to_string();
@@ -58,6 +59,7 @@ pub(super) fn statement_response(statement: WalletStatement) -> Result<Response,
                 &entry.amount_msat.map(|n| n.to_string()).unwrap_or_default(),
                 &entry.fee_msat.map(|n| n.to_string()).unwrap_or_default(),
                 &safe_description,
+                entry.credit_purpose.as_deref().unwrap_or_default(),
             ])
             .map_err(encode_error)?;
     }

@@ -23,6 +23,7 @@ mod query;
 mod system;
 mod transaction;
 mod wallet;
+mod wallet_credit;
 
 pub use account::{
     Account, AccountFilter, AccountPreferences, AuthIdentity, CreateAccountRequest, UpdateAccountPermissionsRequest,
@@ -58,3 +59,4 @@ pub use wallet::{
     Asset, Balance, Contact, CreateWalletRequest, Protocol, Wallet, WalletFilter, WalletOverview,
     WalletStatementPeriod, NATIVE_ASSET_REF,
 };
+pub use wallet_credit::{CreateWalletCredit, CreditPurpose, WalletCreditReceipt};

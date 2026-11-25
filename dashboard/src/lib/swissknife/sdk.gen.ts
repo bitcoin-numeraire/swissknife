@@ -15,6 +15,7 @@ import {
   createAccountWalletResponseTransformer,
   createApiKeyResponseTransformer,
   createLocalLoginResponseTransformer,
+  creditWalletResponseTransformer,
   generateBtcAddressResponseTransformer,
   generateInvoiceResponseTransformer,
   getAccountAddressResponseTransformer,
@@ -85,6 +86,9 @@ import type {
   CreateLocalLoginData,
   CreateLocalLoginErrors,
   CreateLocalLoginResponses,
+  CreditWalletData,
+  CreditWalletErrors,
+  CreditWalletResponses,
   DeleteAccountAddressData,
   DeleteAccountAddressErrors,
   DeleteAccountAddressResponses,
@@ -1837,6 +1841,23 @@ export const getWallet = <ThrowOnError extends boolean = false>(
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/wallets/{id}',
     ...options,
+  });
+
+/**
+ * Credit an explicitly selected account wallet in its smallest asset units.
+ */
+export const creditWallet = <ThrowOnError extends boolean = false>(
+  options: Options<CreditWalletData, ThrowOnError>
+): RequestResult<CreditWalletResponses, CreditWalletErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreditWalletResponses, CreditWalletErrors, ThrowOnError>({
+    responseTransformer: creditWalletResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/wallets/{id}/credits',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**

@@ -6,6 +6,7 @@ import type {
   CreateAccountWalletResponse,
   CreateApiKeyResponse,
   CreateLocalLoginResponse,
+  CreditWalletResponse,
   GenerateBtcAddressResponse,
   GenerateInvoiceResponse,
   GetAccountAddressResponse,
@@ -556,5 +557,15 @@ export const listWalletOverviewsResponseTransformer = async (
 
 export const getWalletResponseTransformer = async (data: any): Promise<GetWalletResponse> => {
   data = walletSchemaResponseTransformer(data);
+  return data;
+};
+
+const walletCreditReceiptSchemaResponseTransformer = (data: any) => {
+  data.created_at = new Date(data.created_at);
+  return data;
+};
+
+export const creditWalletResponseTransformer = async (data: any): Promise<CreditWalletResponse> => {
+  data = walletCreditReceiptSchemaResponseTransformer(data);
   return data;
 };

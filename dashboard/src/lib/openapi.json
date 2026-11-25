@@ -8438,6 +8438,99 @@
         }
       }
     },
+    "/v1/wallets/{id}/credits": {
+      "post": {
+        "tags": [
+          "Wallets"
+        ],
+        "summary": "Credit an explicitly selected account wallet in its smallest asset units.",
+        "operationId": "credit_wallet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Target wallet ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWalletCredit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Committed credit or matching replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletCreditReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Requires credit:wallet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Target wallet, account and asset do not match",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request conflict or opening credit already recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid amount or reason",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/wallets/{id}/statement": {
       "get": {
         "tags": [
@@ -8868,6 +8961,13 @@
             "description": "Amount available to spend.",
             "example": 989999000
           },
+          "available_units": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact available balance in the asset's smallest units for decimal-safe clients."
+          },
           "fees_paid_msat": {
             "type": "integer",
             "format": "int64",
@@ -8878,7 +8978,7 @@
           "received_msat": {
             "type": "integer",
             "format": "int64",
-            "description": "Total amount received",
+            "description": "Total amount received\nReceipts from payments and deposits. Operator credits are excluded from this volume.",
             "example": 1000000000,
             "minimum": 0
           },
@@ -9249,6 +9349,43 @@
           }
         }
       },
+      "CreateWalletCredit": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "account_id",
+          "asset_id",
+          "amount_units",
+          "purpose",
+          "reason"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount_units": {
+            "type": "string",
+            "description": "Positive integer in the selected asset's smallest units, encoded as a decimal string.",
+            "example": "1000000"
+          },
+          "asset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/CreditPurpose"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client-generated replay key. Keep this UUID when retrying the same operation."
+          }
+        }
+      },
       "CreateWalletRequest": {
         "type": "object",
         "description": "Create Wallet Request",
@@ -9270,6 +9407,13 @@
             "description": "Asset ID to enable for the account"
           }
         }
+      },
+      "CreditPurpose": {
+        "type": "string",
+        "enum": [
+          "opening",
+          "top_up"
+        ]
       },
       "ErrorResponse": {
         "type": "object",
@@ -9399,6 +9543,23 @@
             "format": "date-time",
             "description": "Date of creation in database"
           },
+          "credit_amount_units": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact incoming adjustment amount in the wallet asset's smallest units."
+          },
+          "credit_purpose": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CreditPurpose"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "description": {
             "type": [
               "string",
@@ -9499,7 +9660,8 @@
         "enum": [
           "Lightning",
           "Internal",
-          "Onchain"
+          "Onchain",
+          "Adjustment"
         ]
       },
       "LnAddress": {
@@ -10198,6 +10360,7 @@
           "write:account",
           "read:wallet",
           "write:wallet",
+          "credit:wallet",
           "read:ln_address",
           "write:ln_address",
           "read:transaction",
@@ -10662,6 +10825,47 @@
             "description": "Date of update in database"
           }
         }
+      },
+      "WalletCreditReceipt": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CreateWalletCredit"
+          },
+          {
+            "type": "object",
+            "required": [
+              "wallet_id",
+              "invoice_id",
+              "actor_account_id",
+              "created_at"
+            ],
+            "properties": {
+              "actor_account_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "api_key_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "invoice_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "wallet_id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ]
       },
       "WalletOverview": {
         "type": "object",

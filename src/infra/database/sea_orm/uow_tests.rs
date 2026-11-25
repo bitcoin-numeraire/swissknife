@@ -1083,3 +1083,61 @@ async fn onchain_deposit_emits_pending_then_paid_once() {
     assert_eq!(events[1].resource_id, stored.id);
     assert_eq!(events[1].data["status"], "Settled");
 }
+
+#[tokio::test]
+async fn wallet_credit_is_atomic_with_events_and_reservations() {
+    use super::wallet_credit_uow::SeaOrmWalletCreditUnitOfWork;
+    use crate::domains::{account::User, wallet::WalletCreditUnitOfWork};
+    use swissknife_types::{CreateWalletCredit, CreditPurpose};
+
+    let conn = connect().await;
+    let wallet_id = seed_wallet(&conn, 1000).await;
+    let target = Wallet::find_by_id(wallet_id).one(&conn).await.unwrap().unwrap();
+    let actor = User {
+        account_id: target.account_id,
+        ..Default::default()
+    };
+    let credit = SeaOrmWalletCreditUnitOfWork::new(conn.clone());
+    let request = CreateWalletCredit {
+        request_id: Uuid::new_v4(),
+        account_id: target.account_id,
+        asset_id: target.asset_id,
+        amount_units: 1100,
+        purpose: CreditPurpose::TopUp,
+        reason: "Credit atomicity".into(),
+    };
+
+    conn.execute_unprepared("ALTER TABLE client_event RENAME TO offline_client_event")
+        .await
+        .unwrap();
+    assert!(credit.post(wallet_id, &actor, request.clone()).await.is_err());
+    assert_eq!(balance(&conn, wallet_id).await, (1000, 0));
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM wallet_credit").await, 0);
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM invoice").await, 0);
+    conn.execute_unprepared("ALTER TABLE offline_client_event RENAME TO client_event")
+        .await
+        .unwrap();
+
+    let payments = uow(&conn);
+    let (posted, reserved) = tokio::join!(
+        credit.post(wallet_id, &actor, request.clone()),
+        payments.reserve(pending_payment(wallet_id, 300, 0), 300)
+    );
+    let receipt = posted.unwrap();
+    reserved.unwrap();
+    assert_eq!(balance(&conn, wallet_id).await, (1800, 300));
+    let replay = credit.post(wallet_id, &actor, request).await.unwrap();
+    assert_eq!(replay, receipt);
+    assert_eq!(balance(&conn, wallet_id).await, (1800, 300));
+    let event = ClientEventEntity::find()
+        .filter(client_event::Column::ResourceId.eq(receipt.invoice_id))
+        .one(&conn)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(event.event_type, ClientEventType::InvoicePaid.to_string());
+    assert_eq!(event.payload["ledger"], "Adjustment");
+    assert_eq!(event.payload["credit_purpose"], "top_up");
+    assert!(event.payload.get("actor_account_id").is_none());
+    assert_eq!(count(&conn, "SELECT COUNT(*) AS count FROM wallet_credit").await, 1);
+}

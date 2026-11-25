@@ -198,11 +198,16 @@ export type Balance = {
    */
   available_msat: number;
   /**
+   * Exact available balance in the asset's smallest units for decimal-safe clients.
+   */
+  available_units?: string | null;
+  /**
    * Total fees paid
    */
   fees_paid_msat: number;
   /**
    * Total amount received
+   * Receipts from payments and deposits. Operator credits are excluded from this volume.
    */
   received_msat: number;
   /**
@@ -487,6 +492,21 @@ export type CreateLocalLoginRequest = {
   username: string;
 };
 
+export type CreateWalletCredit = {
+  account_id: string;
+  /**
+   * Positive integer in the selected asset's smallest units, encoded as a decimal string.
+   */
+  amount_units: string;
+  asset_id: string;
+  purpose: CreditPurpose;
+  reason: string;
+  /**
+   * Client-generated replay key. Keep this UUID when retrying the same operation.
+   */
+  request_id: string;
+};
+
 /**
  * Create Wallet Request
  */
@@ -500,6 +520,10 @@ export type CreateWalletRequest = {
    */
   asset_id: string;
 };
+
+export const CreditPurpose = { OPENING: 'opening', TOP_UP: 'top_up' } as const;
+
+export type CreditPurpose = (typeof CreditPurpose)[keyof typeof CreditPurpose];
 
 /**
  * Application error response
@@ -583,6 +607,11 @@ export type Invoice = {
    */
   created_at: Date;
   /**
+   * Exact incoming adjustment amount in the wallet asset's smallest units.
+   */
+  credit_amount_units?: string | null;
+  credit_purpose?: CreditPurpose | null;
+  /**
    * Description
    */
   description?: string | null;
@@ -660,6 +689,7 @@ export const Ledger = {
   LIGHTNING: 'Lightning',
   INTERNAL: 'Internal',
   ONCHAIN: 'Onchain',
+  ADJUSTMENT: 'Adjustment',
 } as const;
 
 /**
@@ -1078,6 +1108,7 @@ export const Permission = {
   WRITE_ACCOUNT: 'write:account',
   READ_WALLET: 'read:wallet',
   WRITE_WALLET: 'write:wallet',
+  CREDIT_WALLET: 'credit:wallet',
   READ_LN_ADDRESS: 'read:ln_address',
   WRITE_LN_ADDRESS: 'write:ln_address',
   READ_TRANSACTION: 'read:transaction',
@@ -1366,6 +1397,14 @@ export type Wallet = {
    * Date of update in database
    */
   updated_at?: Date | null;
+};
+
+export type WalletCreditReceipt = CreateWalletCredit & {
+  actor_account_id: string;
+  api_key_id?: string | null;
+  created_at: Date;
+  invoice_id: string;
+  wallet_id: string;
 };
 
 /**
@@ -5433,6 +5472,52 @@ export type GetWalletResponses = {
 };
 
 export type GetWalletResponse = GetWalletResponses[keyof GetWalletResponses];
+
+export type CreditWalletData = {
+  body: CreateWalletCredit;
+  path: {
+    /**
+     * Target wallet ID
+     */
+    id: string;
+  };
+  query?: never;
+  url: '/v1/wallets/{id}/credits';
+};
+
+export type CreditWalletErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Requires credit:wallet
+   */
+  403: ErrorResponse;
+  /**
+   * Target wallet, account and asset do not match
+   */
+  404: ErrorResponse;
+  /**
+   * Request conflict or opening credit already recorded
+   */
+  409: ErrorResponse;
+  /**
+   * Invalid amount or reason
+   */
+  422: ErrorResponse;
+};
+
+export type CreditWalletError = CreditWalletErrors[keyof CreditWalletErrors];
+
+export type CreditWalletResponses = {
+  /**
+   * Committed credit or matching replay
+   */
+  200: WalletCreditReceipt;
+};
+
+export type CreditWalletResponse = CreditWalletResponses[keyof CreditWalletResponses];
 
 export type ExportWalletStatementData = {
   body?: never;

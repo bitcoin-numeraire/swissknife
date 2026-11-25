@@ -131,6 +131,12 @@ impl From<InvoiceModel> for Invoice {
             amount_received_msat: model.amount_received_msat.map(|v| v as u64),
             timestamp: model.timestamp.and_utc(),
             ledger: model.ledger.parse().expect(ASSERTION_MSG),
+            credit_amount_units: model
+                .credit_purpose
+                .as_ref()
+                .and(model.amount_received_msat)
+                .map(|n| n.to_string()),
+            credit_purpose: model.credit_purpose.map(|v| v.parse().expect(ASSERTION_MSG)),
             status,
             fee_msat: model.fee_msat.map(|v| v as u64),
             payment_time: model.payment_time.map(|t| t.and_utc()),
@@ -235,6 +241,7 @@ impl From<WalletModel> for Wallet {
             label: model.label,
             balance: Balance {
                 available_msat: model.available_amount,
+                available_units: Some(model.available_amount.to_string()),
                 reserved_msat: model.reserved_amount as u64,
                 ..Default::default()
             },

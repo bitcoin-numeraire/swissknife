@@ -179,7 +179,7 @@ where
             .select_only()
             .column(InvoiceColumn::WalletId)
             .column_as(
-                Expr::cust("CAST(SUM(invoice.amount_received_msat) AS BIGINT)"),
+                Expr::cust("CAST(SUM(CASE WHEN invoice.ledger = 'Adjustment' THEN 0 ELSE invoice.amount_received_msat END) AS BIGINT)"),
                 "received_msat",
             )
             .column_as(InvoiceColumn::Id.count(), "n_invoices")
@@ -250,6 +250,7 @@ where
                     fees_paid_msat: fees_paid_msat.unwrap_or(0) as u64,
                     reserved_msat: wallet_model.reserved_amount as u64,
                     available_msat: wallet_model.available_amount,
+                    available_units: Some(wallet_model.available_amount.to_string()),
                 },
                 n_payments: n_payments as u32,
                 n_invoices: n_invoices as u32,
@@ -313,14 +314,14 @@ where
             db.get_database_backend(),
             r#"
             SELECT id, created_at, payment_time, 'out' AS direction, ledger, status,
-                   amount_msat, fee_msat, description
+                   amount_msat, fee_msat, description, NULL AS credit_purpose
             FROM payment
             WHERE wallet_id = $1 AND created_at >= $2 AND created_at < $3
             UNION ALL
             SELECT id, created_at, payment_time, 'in' AS direction, ledger,
                    CASE WHEN payment_time IS NOT NULL THEN 'Settled'
                         WHEN expires_at < $4 THEN 'Expired' ELSE 'Pending' END AS status,
-                   COALESCE(amount_received_msat, amount_msat) AS amount_msat, fee_msat, description
+                   COALESCE(amount_received_msat, amount_msat) AS amount_msat, fee_msat, description, credit_purpose
             FROM invoice
             WHERE wallet_id = $1 AND created_at >= $2 AND created_at < $3
             ORDER BY created_at, id, direction
@@ -351,6 +352,7 @@ where
                     amount_msat: row.try_get("", "amount_msat")?,
                     fee_msat: row.try_get("", "fee_msat")?,
                     description: row.try_get("", "description")?,
+                    credit_purpose: row.try_get("", "credit_purpose")?,
                 })
             })
             .collect::<Result<Vec<_>, sea_orm::DbErr>>()
@@ -449,7 +451,7 @@ where
             .filter(InvoiceColumn::WalletId.eq(id))
             .select_only()
             .column_as(
-                Expr::cust("CAST(SUM(invoice.amount_received_msat) AS BIGINT)"),
+                Expr::cust("CAST(SUM(CASE WHEN invoice.ledger = 'Adjustment' THEN 0 ELSE invoice.amount_received_msat END) AS BIGINT)"),
                 "received_msat",
             )
             .into_tuple::<Option<i64>>()
@@ -476,6 +478,7 @@ where
             fees_paid_msat: fees_paid_msat.unwrap_or(0) as u64,
             reserved_msat: reserved_msat as u64,
             available_msat,
+            available_units: Some(available_msat.to_string()),
         })
     }
 
