@@ -725,3 +725,38 @@ impl BitcoinWallet for LndGrpcClient {
         self.network
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod pay {
+        use super::*;
+
+        #[tokio::test]
+        async fn an_establishment_timeout_leaves_the_payment_outcome_unknown() {
+            // A balanced channel with no endpoints stays pending without opening a socket.
+            let (transport, _endpoints) = Channel::balance_channel::<usize>(1);
+            let channel = InterceptedService::new(
+                transport,
+                MacaroonInterceptor {
+                    macaroon: "test".parse().unwrap(),
+                },
+            );
+            let client = LndGrpcClient {
+                client: LightningClient::new(channel.clone()),
+                invoices: InvoicesClient::new(channel.clone()),
+                router: RouterClient::new(channel.clone()),
+                wallet: WalletKitClient::new(channel),
+                fee_limit_msat: 0,
+                payment_timeout: Duration::ZERO,
+                reorg_buffer_blocks: 0,
+                network: BtcNetwork::Regtest,
+            };
+            let result = client.pay("invoice".into(), None, 0, "timeout".into()).await;
+            assert!(
+                matches!(result, Err(LightningError::PaymentOutcomeUnknown(reason)) if reason == "Payment timed out")
+            );
+        }
+    }
+}
