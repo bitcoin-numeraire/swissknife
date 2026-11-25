@@ -1,4 +1,18 @@
 {
+  "agent_activity": {
+    "title": "Spese degli agenti",
+    "updated": "Aggiornato alle {{time}}",
+    "load_error": "Impossibile caricare le spese degli agenti.",
+    "credential": "Credenziale",
+    "current": "Ultimi 60 minuti",
+    "previous": "60 minuti precedenti",
+    "sats": "{{amount}} sat",
+    "payments_one": "{{count}} pagamento",
+    "payments_other": "{{count}} pagamenti",
+    "empty": "Nelle ultime due ore non sono stati registrati pagamenti delegati.",
+    "back": "Precedente",
+    "next": "Successiva"
+  },
   "payment_review": {
     "title": "Approvazioni dei pagamenti",
     "load_error": "Impossibile caricare i pagamenti da esaminare.",
