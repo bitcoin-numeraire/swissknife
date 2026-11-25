@@ -847,6 +847,10 @@
     "title": "Nouveau portefeuille",
     "account_id": "ID du compte",
     "asset_id": "ID de l'actif",
+    "loading_assets": "Chargement des actifs disponibles…",
+    "no_assets": "Ce compte possède un portefeuille pour chaque actif disponible.",
+    "no_matches": "Aucun actif correspondant",
+    "asset_load_error": "Impossible de charger les actifs disponibles pour ce compte.",
     "success_wallet_registration": "Portefeuille enregistré avec succès"
   },
   "register_ln_address": {

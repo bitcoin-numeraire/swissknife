@@ -39,9 +39,10 @@ function accountOptionLabel(account: Account) {
 
 type Props = {
   name?: 'account_id';
+  onAccountChange?: VoidFunction;
 };
 
-export function AccountSelect({ name = 'account_id' }: Props) {
+export function AccountSelect({ name = 'account_id', onAccountChange }: Props) {
   const { t } = useTranslate();
   const { watch, setValue } = useFormContext();
   const { accounts, accountsLoading, accountsError } = useListAccounts();
@@ -64,9 +65,10 @@ export function AccountSelect({ name = 'account_id' }: Props) {
       filterOptions={filterAccounts}
       getOptionLabel={(option: Account) => accountOptionLabel(option)}
       isOptionEqualToValue={(option: Account, value: Account) => option.id === value.id}
-      onChange={(_, account: Account | null) =>
-        setValue(name, account?.id ?? null, { shouldValidate: true })
-      }
+      onChange={(_, account: Account | null) => {
+        setValue(name, account?.id ?? null, { shouldValidate: true });
+        onAccountChange?.();
+      }}
       renderOption={(props: HTMLAttributes<HTMLLIElement> & { key: Key }, account: Account) => {
         const { key, ...optionProps } = props;
         const identity = account.identity;

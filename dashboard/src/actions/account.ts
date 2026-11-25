@@ -24,7 +24,7 @@ export function useListAccounts(enabled = true) {
 }
 
 export function useGetAccount(id: string) {
-  const result = useSWR(endpointKeys.accounts.get(id), () =>
+  const result = useSWR(id ? endpointKeys.accounts.get(id) : null, () =>
     getAccountById<true>({ path: { id } })
   );
 

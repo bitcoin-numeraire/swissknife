@@ -848,6 +848,10 @@
     "title": "Register New Wallet",
     "account_id": "Account ID",
     "asset_id": "Asset ID",
+    "loading_assets": "Loading available assets…",
+    "no_assets": "This account has a wallet for every available asset.",
+    "no_matches": "No matching assets",
+    "asset_load_error": "Could not load the assets available to this account.",
     "success_wallet_registration": "Wallet registered successfully"
   },
   "register_ln_address": {
