@@ -57,6 +57,10 @@ Dashboard public settings are set at build time; see [dashboard configuration](d
 
 The all-in-one image bundles the backend API and dashboard in a single container:
 
+For local login, generate a signing secret once with `openssl rand -hex 32`.
+Persist it in your deployment's secret store as `SWISSKNIFE_JWT__SECRET`.
+Keep the same value across restarts. Changing it signs users out.
+
 ```bash
 docker pull bitcoinnumeraire/swissknife:0.3.5
 docker run -p 3000:3000 bitcoinnumeraire/swissknife:0.3.5

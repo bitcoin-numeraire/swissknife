@@ -11,6 +11,7 @@ release notes when a tag is published.
 ### Fixed
 
 - The all-in-one image opens its local wallet and API by default.
+- Local authentication requires a deployment-specific signing secret.
 
 ## [0.3.5] - 2026-11-21
 

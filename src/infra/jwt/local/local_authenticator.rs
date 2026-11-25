@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::application::errors::AuthenticationError;
+use crate::application::errors::{AuthenticationError, ConfigError};
 use crate::domains::account::{Account, AuthClaims};
 use crate::infra::jwt::JWTAuthenticator;
 use async_trait::async_trait;
@@ -25,13 +25,16 @@ pub struct LocalAuthenticator {
 }
 
 impl LocalAuthenticator {
-    pub async fn new(config: JwtConfig) -> Result<Self, AuthenticationError> {
+    pub async fn new(config: JwtConfig) -> Result<Self, ConfigError> {
+        if matches!(config.secret.trim(), "" | "CHANGE_ME" | "HERE_YOUR_JWT_SECRET") {
+            return Err(ConfigError::InvalidLocalJwtSecret);
+        }
         Ok(Self {
             token_expiry: config.token_expiry,
             encoding_key: EncodingKey::from_secret(config.secret.as_ref())
-                .map_err(|e| AuthenticationError::EncodeJWT(e.to_string()))?,
+                .map_err(|_| ConfigError::InvalidLocalJwtSecret)?,
             decoding_key: DecodingKey::from_secret(config.secret.as_ref())
-                .map_err(|e| AuthenticationError::DecodeJWTKey(e.to_string()))?,
+                .map_err(|_| ConfigError::InvalidLocalJwtSecret)?,
         })
     }
 }
@@ -65,5 +68,22 @@ impl JWTAuthenticator for LocalAuthenticator {
             .map_err(|e| AuthenticationError::DecodeJWT(e.to_string()))?;
 
         Ok(token_data.claims)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn rejects_missing_and_example_secrets_before_serving() {
+        for value in ["", "  ", "CHANGE_ME", "HERE_YOUR_JWT_SECRET"] {
+            let result = LocalAuthenticator::new(JwtConfig {
+                token_expiry: Duration::from_secs(60),
+                secret: value.to_owned(),
+            })
+            .await;
+            assert!(matches!(result, Err(ConfigError::InvalidLocalJwtSecret)));
+        }
     }
 }
