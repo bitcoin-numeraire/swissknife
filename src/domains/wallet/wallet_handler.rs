@@ -28,7 +28,7 @@ use super::{Wallet, WalletFilter, WalletOverview};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(register_wallet, list_wallets, list_wallet_overviews, get_wallet, delete_wallet, delete_wallets),
+    paths(register_wallet, list_wallets, list_wallet_overviews, get_wallet, delete_wallet, export_wallet_statement, delete_wallets),
     components(schemas(Wallet, WalletOverview, CreateWalletRequest)),
     tags(
         (name = "Wallets", description = "Wallet management endpoints. Require `read:wallet` or `write:wallet` permissions.")
@@ -43,8 +43,32 @@ pub fn router() -> Router<Arc<AppServices>> {
         .route("/", get(list_wallets))
         .route("/overviews", get(list_wallet_overviews))
         .route("/{id}", get(get_wallet))
+        .route("/{id}/statement", get(export_wallet_statement))
         .route("/{id}", delete(delete_wallet))
         .route("/", delete(delete_wallets))
+}
+
+/// Download wallet activity as a CSV statement. The date interval applies to transaction creation.
+#[utoipa::path(
+    get, path = "/{id}/statement", tag = "Wallets", context_path = CONTEXT_PATH,
+    params(("id" = Uuid, Path, description = "Wallet ID"), swissknife_types::WalletStatementPeriod),
+    responses(
+        (status = 200, description = "Wallet activity, oldest first", content_type = "text/csv", body = String),
+        (status = 400, description = "Invalid date interval", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Transaction read permission required", body = ErrorResponse),
+        (status = 404, description = "Wallet not found", body = ErrorResponse)
+    )
+)]
+async fn export_wallet_statement(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(wallet_id): Path<Uuid>,
+    Query(period): Query<swissknife_types::WalletStatementPeriod>,
+) -> Result<axum::response::Response, ApplicationError> {
+    user.check_permission(Permission::ReadTransaction)?;
+    let statement = services.wallet.statement(wallet_id, None, period).await?;
+    super::wallet_statement_response::statement_response(statement)
 }
 
 /// Register a new wallet

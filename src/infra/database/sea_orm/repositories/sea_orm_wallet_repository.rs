@@ -1,9 +1,9 @@
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{NaiveDateTime, Utc};
 use sea_orm::{
     sea_query::{Expr, OnConflict},
-    ColumnTrait, DatabaseConnection, EntityTrait, ExprTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
-    QueryTrait, Set,
+    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, ExprTrait, ModelTrait, QueryFilter, QueryOrder,
+    QuerySelect, QueryTrait, Set, Statement,
 };
 use uuid::Uuid;
 
@@ -14,7 +14,10 @@ use crate::{
     application::errors::DatabaseError,
     domains::{
         payment::PaymentStatus,
-        wallet::{Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletRepository},
+        wallet::{
+            Balance, Contact, StatementEntry, Wallet, WalletFilter, WalletOverview, WalletRepository, WalletStatement,
+            WalletStatementPeriod,
+        },
     },
     infra::database::sea_orm::models::{
         contact::ContactModel,
@@ -285,6 +288,79 @@ where
         self.find_by_account_and_asset(account_id, asset_id)
             .await?
             .ok_or_else(|| DatabaseError::Insert("wallet was not available after idempotent provisioning".to_string()))
+    }
+
+    async fn find_statement(
+        &self,
+        wallet_id: Uuid,
+        account_id: Option<Uuid>,
+        period: WalletStatementPeriod,
+    ) -> Result<Option<WalletStatement>, DatabaseError> {
+        let db = self.db.connection();
+        let Some((wallet, Some(asset))) = WalletEntity::find_by_id(wallet_id)
+            .apply_if(account_id, |q, owner| q.filter(Column::AccountId.eq(owner)))
+            .find_also_related(AssetEntity)
+            .one(db)
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?
+        else {
+            return Ok(None);
+        };
+
+        // The UNION reads both directions from a single database snapshot. Positional
+        // parameters are shared by PostgreSQL and SQLite and first appear in bind order.
+        let query = Statement::from_sql_and_values(
+            db.get_database_backend(),
+            r#"
+            SELECT id, created_at, payment_time, 'out' AS direction, ledger, status,
+                   amount_msat, fee_msat, description
+            FROM payment
+            WHERE wallet_id = $1 AND created_at >= $2 AND created_at < $3
+            UNION ALL
+            SELECT id, created_at, payment_time, 'in' AS direction, ledger,
+                   CASE WHEN payment_time IS NOT NULL THEN 'Settled'
+                        WHEN expires_at < $4 THEN 'Expired' ELSE 'Pending' END AS status,
+                   COALESCE(amount_received_msat, amount_msat) AS amount_msat, fee_msat, description
+            FROM invoice
+            WHERE wallet_id = $1 AND created_at >= $2 AND created_at < $3
+            ORDER BY created_at, id, direction
+        "#,
+            [
+                wallet_id.into(),
+                period.from.naive_utc().into(),
+                period.until.naive_utc().into(),
+                Utc::now().naive_utc().into(),
+            ],
+        );
+        let rows = db
+            .query_all_raw(query)
+            .await
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+        let entries = rows
+            .into_iter()
+            .map(|row| {
+                Ok(StatementEntry {
+                    id: row.try_get("", "id")?,
+                    created_at: row.try_get::<NaiveDateTime>("", "created_at")?.and_utc(),
+                    payment_time: row
+                        .try_get::<Option<NaiveDateTime>>("", "payment_time")?
+                        .map(|t| t.and_utc()),
+                    direction: row.try_get("", "direction")?,
+                    ledger: row.try_get("", "ledger")?,
+                    status: row.try_get("", "status")?,
+                    amount_msat: row.try_get("", "amount_msat")?,
+                    fee_msat: row.try_get("", "fee_msat")?,
+                    description: row.try_get("", "description")?,
+                })
+            })
+            .collect::<Result<Vec<_>, sea_orm::DbErr>>()
+            .map_err(|e| DatabaseError::FindMany(e.to_string()))?;
+        Ok(Some(WalletStatement {
+            wallet_id: wallet.id,
+            asset_id: asset.id,
+            network: asset.network,
+            entries,
+        }))
     }
 
     async fn get_balance(&self, id: Uuid) -> Result<Balance, DatabaseError> {

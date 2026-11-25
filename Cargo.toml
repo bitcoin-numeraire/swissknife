@@ -78,6 +78,7 @@ bytes = "1.12.2"
 bitcoin = "=0.32.102"
 argon2 = "0.6.0"
 clap = { version = "4.6.8", features = ["derive"] }
+csv = "1"
 
 [build-dependencies]
 tonic-prost-build = "0.14.9"

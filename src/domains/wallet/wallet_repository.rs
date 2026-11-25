@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::application::errors::DatabaseError;
 
-use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview};
+use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletStatement, WalletStatementPeriod};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -18,6 +18,12 @@ pub trait WalletRepository: Send + Sync {
     async fn find_many(&self, filter: WalletFilter) -> Result<Vec<Wallet>, DatabaseError>;
     async fn find_many_overview(&self) -> Result<Vec<WalletOverview>, DatabaseError>;
     async fn upsert(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, DatabaseError>;
+    async fn find_statement(
+        &self,
+        wallet_id: Uuid,
+        account_id: Option<Uuid>,
+        period: WalletStatementPeriod,
+    ) -> Result<Option<WalletStatement>, DatabaseError>;
     async fn get_balance(&self, id: Uuid) -> Result<Balance, DatabaseError>;
     /// Credit available balance for incoming funds.
     async fn credit(&self, id: Uuid, amount_msat: u64) -> Result<(), DatabaseError>;

@@ -64,7 +64,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         list_account_wallets,
         create_account_wallet,
         get_account_wallet,
-        get_wallet_balance,
+        get_wallet_balance, export_account_wallet_statement,
         new_wallet_btc_address,
         list_wallet_btc_addresses,
         new_wallet_invoice,
@@ -131,6 +131,7 @@ pub fn account_router() -> Router<Arc<AppServices>> {
         .route("/wallets", post(create_account_wallet))
         .route("/wallets/{wallet_id}", get(get_account_wallet))
         .route("/wallets/{wallet_id}/balance", get(get_wallet_balance))
+        .route("/wallets/{wallet_id}/statement", get(export_account_wallet_statement))
         .route("/wallets/{wallet_id}/bitcoin/addresses", get(list_wallet_btc_addresses))
         .route("/wallets/{wallet_id}/bitcoin/addresses", post(new_wallet_btc_address))
         .route("/wallets/{wallet_id}/invoices", post(new_wallet_invoice))
@@ -788,6 +789,30 @@ async fn list_wallet_payments(
 
     query_params.wallet_id = Some(wallet_id);
     Ok(Json(services.payment.list(query_params).await?))
+}
+
+/// Download wallet activity as a CSV statement. The date interval applies to transaction creation.
+#[utoipa::path(
+    get, path = "/wallets/{wallet_id}/statement", tag = "Me", context_path = CONTEXT_PATH,
+    params(("wallet_id" = Uuid, Path, description = "Wallet ID"), swissknife_types::WalletStatementPeriod),
+    responses(
+        (status = 200, description = "Wallet activity, oldest first", content_type = "text/csv", body = String),
+        (status = 400, description = "Invalid date interval", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Wallet not found", body = ErrorResponse)
+    )
+)]
+async fn export_account_wallet_statement(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(wallet_id): Path<Uuid>,
+    Query(period): Query<swissknife_types::WalletStatementPeriod>,
+) -> Result<axum::response::Response, ApplicationError> {
+    let statement = services
+        .wallet
+        .statement(wallet_id, Some(user.account_id), period)
+        .await?;
+    super::wallet_statement_response::statement_response(statement)
 }
 
 /// Get a wallet payment.

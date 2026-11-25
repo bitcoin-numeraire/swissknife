@@ -6,7 +6,9 @@ use async_trait::async_trait;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
-use super::{Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletUseCases};
+use super::{
+    Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletStatement, WalletStatementPeriod, WalletUseCases,
+};
 
 pub struct WalletService {
     store: AppStore,
@@ -102,6 +104,22 @@ impl WalletUseCases for WalletService {
 
         debug!("Wallet overviews listed successfully");
         Ok(overviews)
+    }
+
+    async fn statement(
+        &self,
+        wallet_id: Uuid,
+        account_id: Option<Uuid>,
+        period: WalletStatementPeriod,
+    ) -> Result<WalletStatement, ApplicationError> {
+        if period.from >= period.until {
+            return Err(DataError::Malformed("The statement end must be after its start.".into()).into());
+        }
+        self.store
+            .wallet
+            .find_statement(wallet_id, account_id, period)
+            .await?
+            .ok_or_else(|| DataError::NotFound("Wallet not found.".into()).into())
     }
 
     async fn get_balance(&self, id: Uuid) -> Result<Balance, ApplicationError> {

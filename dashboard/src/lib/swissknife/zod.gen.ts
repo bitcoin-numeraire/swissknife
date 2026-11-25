@@ -1666,6 +1666,20 @@ export const zGetWalletPaymentPath = z.object({
  */
 export const zGetWalletPaymentResponse = zPayment;
 
+export const zExportAccountWalletStatementPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+export const zExportAccountWalletStatementQuery = z.object({
+  from: z.iso.datetime(),
+  until: z.iso.datetime(),
+});
+
+/**
+ * Wallet activity, oldest first
+ */
+export const zExportAccountWalletStatementResponse = z.string();
+
 export const zDeletePaymentsQuery = z.object({
   limit: z.coerce
     .bigint()
@@ -1841,3 +1855,17 @@ export const zGetWalletPath = z.object({
  * Found
  */
 export const zGetWalletResponse = zWallet;
+
+export const zExportWalletStatementPath = z.object({
+  id: z.uuid(),
+});
+
+export const zExportWalletStatementQuery = z.object({
+  from: z.iso.datetime(),
+  until: z.iso.datetime(),
+});
+
+/**
+ * Wallet activity, oldest first
+ */
+export const zExportWalletStatementResponse = z.string();
