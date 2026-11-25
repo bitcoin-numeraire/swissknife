@@ -1,7 +1,7 @@
 'use client';
 
 import type { ExternalToast } from 'src/components/snackbar';
-import type { Wallet, ClientEvent } from 'src/lib/swissknife';
+import type { Wallet, Account, ClientEvent } from 'src/lib/swissknife';
 
 import { useRef, useEffect } from 'react';
 
@@ -11,133 +11,153 @@ import IconButton from '@mui/material/IconButton';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
-import { fSats } from 'src/utils/format-number';
-
 import { useTranslate } from 'src/locales';
 import { ClientEventType } from 'src/lib/swissknife';
 
 import { Iconify } from 'src/components/iconify';
 import { toast, snackbarClasses } from 'src/components/snackbar';
 
-export type InvoiceEventNotification = {
-  eventId: string;
-  invoiceId: string;
-  kind: 'pending' | 'received';
-  amountMsat: number;
-  walletName: string;
-  rail: string;
-  description?: string;
-};
+import { dashboardSettings } from './account-selection';
+import { notificationPreferences } from './notification-preferences';
 
-function nonEmptyString(value: unknown) {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
+const eventKinds = {
+  [ClientEventType.INVOICE_PENDING]: 'pending',
+  [ClientEventType.INVOICE_PAID]: 'received',
+  [ClientEventType.PAYMENT_SETTLED]: 'sent',
+  [ClientEventType.PAYMENT_FAILED]: 'failed',
+} as const;
 
-function walletName(wallet: Wallet | undefined) {
-  return wallet?.label || wallet?.asset?.name || wallet?.asset?.display_ticker || 'Wallet';
-}
+export function accountEventNotification(event: ClientEvent, wallets: readonly Wallet[]) {
+  const kind = eventKinds[event.event_type];
+  if (!kind) return undefined;
 
-export function invoiceEventNotification(
-  event: ClientEvent,
-  wallets: readonly Wallet[]
-): InvoiceEventNotification | undefined {
-  if (
-    event.event_type !== ClientEventType.INVOICE_PENDING &&
-    event.event_type !== ClientEventType.INVOICE_PAID
-  ) {
-    return undefined;
-  }
-
-  const kind = event.event_type === ClientEventType.INVOICE_PENDING ? 'pending' : 'received';
-  const receivedAmount = event.data.amount_received_msat;
-  const requestedAmount = event.data.amount_msat;
-  const amountMsat =
-    kind === 'received' && typeof receivedAmount === 'number' ? receivedAmount : requestedAmount;
-
-  if (typeof amountMsat !== 'number' || !Number.isFinite(amountMsat) || amountMsat < 0) {
-    return undefined;
-  }
+  const incoming = kind === 'pending' || kind === 'received';
+  const amount =
+    (kind === 'received' ? event.data.amount_received_msat : null) ?? event.data.amount_msat;
+  const wallet = wallets.find((item) => item.id === event.wallet_id);
 
   return {
-    eventId: event.id,
-    invoiceId: event.resource_id,
     kind,
-    amountMsat,
-    walletName: walletName(wallets.find((wallet) => wallet.id === event.wallet_id)),
-    rail: nonEmptyString(event.data.ledger) ?? 'Bitcoin',
-    description: nonEmptyString(event.data.description),
+    incoming,
+    amountMsat:
+      typeof amount === 'number' && Number.isSafeInteger(amount) && amount >= 0
+        ? amount
+        : undefined,
+    walletName:
+      wallet?.label || wallet?.asset?.name || wallet?.asset?.display_ticker || event.wallet_id,
+    rail: typeof event.data.ledger === 'string' ? event.data.ledger : undefined,
+    description:
+      typeof event.data.description === 'string' ? event.data.description.trim() : undefined,
+    href: incoming
+      ? paths.wallet.invoice(event.resource_id, event.wallet_id)
+      : paths.wallet.payment(event.resource_id, event.wallet_id),
+    toastId: `account-event-${event.wallet_id}-${event.resource_id}`,
   };
 }
 
-export function collectUnseenInvoiceNotifications(
+export function collectUnseenNotifications(
   events: readonly ClientEvent[],
   wallets: readonly Wallet[],
-  seenEventIds: Set<string>
+  seen: Set<string>,
+  preferences: ReturnType<typeof notificationPreferences>
 ) {
-  const notifications: InvoiceEventNotification[] = [];
+  return events.flatMap((event) => {
+    if (seen.has(event.id)) return [];
+    seen.add(event.id);
+    const notification = accountEventNotification(event, wallets);
+    return notification && preferences[notification.incoming ? 'incoming' : 'outgoing']
+      ? [notification]
+      : [];
+  });
+}
 
-  for (const event of events) {
-    if (seenEventIds.has(event.id)) continue;
+export function formatEventSats(msat: number, locale: string) {
+  const exact = BigInt(msat);
+  const decimal =
+    `${exact / BigInt(1000)}.${(exact % BigInt(1000)).toString().padStart(3, '0')}` as `${number}`;
+  return Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(decimal);
+}
 
-    const notification = invoiceEventNotification(event, wallets);
-    if (!notification) continue;
-
-    seenEventIds.add(event.id);
-    notifications.push(notification);
+function playNotificationSound() {
+  try {
+    if (!window.AudioContext) return;
+    const context = new AudioContext();
+    if (context.state !== 'running') {
+      void context.close().catch(() => {});
+      return;
+    }
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.frequency.value = 660;
+    gain.gain.setValueAtTime(0.04, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.14);
+    oscillator.onended = () => {
+      void context.close().catch(() => {});
+    };
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.15);
+  } catch {
+    // Audio is optional when a device or its browser disallows playback.
   }
-
-  return notifications;
 }
 
 export function useAccountEventNotifications(
-  accountId: string | undefined,
+  account: Account | undefined,
   events: readonly ClientEvent[],
   wallets: readonly Wallet[]
 ) {
-  const { t } = useTranslate();
-  const notificationState = useRef<{ accountId?: string; seenEventIds: Set<string> }>({
-    seenEventIds: new Set(),
-  });
+  const { t, currentLang } = useTranslate();
+  const seen = useRef(new Set<string>());
+  const active = useRef(new Set<string>());
+  const accountId = account?.id;
+  const settings = account?.preferences?.dashboard_settings;
+
+  useEffect(() => {
+    const activeToasts = active.current;
+    seen.current = new Set();
+    return () => {
+      activeToasts.forEach((id) => toast.dismiss(id));
+      activeToasts.clear();
+    };
+  }, [accountId]);
 
   useEffect(() => {
     if (!accountId) return;
-
-    if (notificationState.current.accountId !== accountId) {
-      notificationState.current = { accountId, seenEventIds: new Set() };
-    }
-
-    const notifications = collectUnseenInvoiceNotifications(
-      events,
-      wallets,
-      notificationState.current.seenEventIds
-    );
-
+    const preferences = notificationPreferences(settings);
+    const hideAmounts = dashboardSettings(settings).hide_balances === true;
+    const notifications = collectUnseenNotifications(events, wallets, seen.current, preferences);
     for (const notification of notifications) {
-      const sats = fSats(notification.amountMsat / 1000);
+      const { kind, amountMsat, toastId, rail } = notification;
       const title =
-        notification.kind === 'pending'
-          ? t('event_notifications.incoming_title', { amount: sats })
-          : t('event_notifications.received_title', { amount: sats });
-      const rail = t(`event_notifications.rail.${notification.rail.toLowerCase()}`, {
-        defaultValue: notification.rail,
-      });
-      const description = [notification.walletName, rail, notification.description]
+        hideAmounts || amountMsat == null
+          ? t(`notification_inbox.${kind}`)
+          : t(`event_notifications.${kind}_title`, {
+              amount: formatEventSats(amountMsat, currentLang.numberFormat.code),
+            });
+      const description = [
+        notification.walletName,
+        rail && t(`event_notifications.rail.${rail.toLowerCase()}`, { defaultValue: rail }),
+        notification.description,
+      ]
         .filter(Boolean)
         .join(' · ');
-      const id = `invoice-event-${notification.invoiceId}`;
+      active.current.add(toastId);
       const options: ExternalToast = {
-        id,
+        id: toastId,
         description,
         duration: 12_000,
         position: 'top-center',
         className: snackbarClasses.payment,
+        onDismiss: () => active.current.delete(toastId),
+        onAutoClose: () => active.current.delete(toastId),
         action: (
           <Tooltip title={t('event_notifications.see_details')}>
             <IconButton
               component={RouterLink}
-              href={paths.wallet.invoice(notification.invoiceId)}
+              href={notification.href}
               aria-label={t('event_notifications.see_details')}
-              onClick={() => toast.dismiss(id)}
+              onClick={() => toast.dismiss(toastId)}
               sx={{ mr: 3, flexShrink: 0 }}
             >
               <Iconify icon="solar:eye-bold" />
@@ -145,12 +165,10 @@ export function useAccountEventNotifications(
           </Tooltip>
         ),
       };
-
-      if (notification.kind === 'pending') {
-        toast.info(title, options);
-      } else {
-        toast.success(title, options);
-      }
+      if (kind === 'failed') toast.error(title, options);
+      else if (kind === 'pending') toast.info(title, options);
+      else toast.success(title, options);
     }
-  }, [accountId, events, t, wallets]);
+    if (preferences.sound && notifications.length) playNotificationSound();
+  }, [accountId, currentLang.numberFormat.code, events, settings, t, wallets]);
 }

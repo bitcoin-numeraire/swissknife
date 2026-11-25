@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 
 import { endpointKeys } from 'src/actions/keys';
 import { streamAccountEvents } from 'src/lib/swissknife';
+import { isNotificationKey } from 'src/actions/notifications';
 
 const GLOBAL_EVENT_KEYS = new Set<unknown>([
   endpointKeys.account.get,
@@ -48,8 +49,8 @@ type AccountEventStreamConsumerOptions = {
   waitForReconnect?: (signal: AbortSignal) => Promise<void>;
 };
 
-export function isAccountEventCacheKey(key: unknown, event?: ClientEvent) {
-  if (GLOBAL_EVENT_KEYS.has(key)) return true;
+export function isAccountEventCacheKey(key: unknown, event?: ClientEvent, accountId?: string) {
+  if (GLOBAL_EVENT_KEYS.has(key) || isNotificationKey(key, accountId)) return true;
 
   return (
     Array.isArray(key) &&
@@ -189,7 +190,7 @@ export function useAccountEventStream(accountId: string | undefined) {
 
     const controller = new AbortController();
     const refreshCachedState = (event?: ClientEvent) =>
-      mutate((key) => isAccountEventCacheKey(key, event));
+      mutate((key) => isAccountEventCacheKey(key, event, accountId));
 
     void consumeAccountEventStreams({
       signal: controller.signal,

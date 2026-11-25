@@ -17,12 +17,13 @@ import { PaymentDetails } from '../payment-details';
 
 type Props = {
   id: string;
+  walletId?: string;
 };
 
-export function PaymentDetailsView({ id }: Props) {
+export function PaymentDetailsView({ id, walletId }: Props) {
   const { t } = useTranslate();
 
-  const { payment, paymentLoading, paymentError } = useGetWalletPayment(id);
+  const { payment, paymentLoading, paymentError } = useGetWalletPayment(id, walletId);
 
   const errors = [paymentError];
   const data = [payment];

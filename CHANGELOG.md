@@ -10,6 +10,7 @@ release notes when a tag is published.
 
 ### Added
 
+- The dashboard notification drawer shows unread payments across wallets, links to individual transactions and supports account-wide read and archive actions.
 - Account notifications list received, settled and failed payments with an unread count, pagination, read state and archiving.
 - Clients can update individual dashboard settings using `PATCH /v1/me/preferences`.
 - The wallet balance visibility toggle follows the account across devices.
