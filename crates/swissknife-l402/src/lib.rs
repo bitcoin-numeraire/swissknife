@@ -5,7 +5,7 @@ pub use bakery::{Bakery, InvalidCredential, PaidGrant};
 use async_trait::async_trait;
 use axum::{
     extract::{Request, State},
-    http::{header, HeaderValue, StatusCode},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
 };
@@ -35,6 +35,11 @@ pub enum GateError {
 pub trait InvoiceGate: Send + Sync {
     async fn invoice(&self) -> Result<ChallengeInvoice, GateError>;
     async fn redeem(&self, grant: &PaidGrant) -> Result<bool, GateError>;
+    /// Snapshot of uses remaining. None denotes an unmetered time pass.
+    /// Gates that do not support passive inspection leave the result unavailable.
+    async fn remaining_requests(&self, _grant: &PaidGrant) -> Result<Option<u64>, GateError> {
+        Err(GateError::Unavailable)
+    }
     /// For read-only resources, atomically claim usage after preparing a successful
     /// response. A competing request may already have claimed the last use.
     async fn record_success(&self, _grant: &PaidGrant) -> Result<bool, GateError> {
@@ -58,6 +63,42 @@ impl IntoResponse for GateError {
         };
         (status, [(header::CACHE_CONTROL, "private, no-store")]).into_response()
     }
+}
+
+/// Inspect an attenuated pass without a preimage. This never issues an invoice,
+/// claims a request or calls the paid resource.
+pub async fn pass_status(State(route): State<Arc<PaidRoute>>, headers: HeaderMap) -> Result<Response, GateError> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| GateError::Unavailable)?
+        .as_secs();
+    let mut values = headers.get_all("swissknife-l402-inspection").iter();
+    let token = values.next().and_then(|h| h.to_str().ok());
+    let inspected = match (token, values.next()) {
+        (Some(token), None) => route.bakery.inspect_status(&route.scope, token, now),
+        _ => Err(InvalidCredential),
+    };
+    let (code, state, remaining) = match inspected {
+        Ok(Some(grant)) => {
+            let remaining = route.gate.remaining_requests(&grant).await?;
+            let state = if remaining == Some(0) { "exhausted" } else { "active" };
+            (StatusCode::OK, state, remaining)
+        }
+        Ok(None) => (StatusCode::OK, "inactive", None),
+        Err(_) => (StatusCode::UNAUTHORIZED, "invalid", None),
+    };
+    let mut response = (
+        code,
+        [
+            (header::CACHE_CONTROL.as_str(), "private, no-store"),
+            ("swissknife-l402-status", state),
+        ],
+    )
+        .into_response();
+    if let Some(count) = remaining {
+        response.headers_mut().insert("swissknife-l402-remaining", count.into());
+    }
+    Ok(response)
 }
 
 /// Install with `axum::middleware::from_fn_with_state`. This middleware strips

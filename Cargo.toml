@@ -97,6 +97,7 @@ strip = true
 itest = []
 
 [dev-dependencies]
+libmacaroon = { version = "0.4.0", default-features = false }
 tokio = { version = "1.54.1", features = ["process"] }
 tempfile = "3"
 mockall = "0.15.0"

@@ -62,11 +62,39 @@ impl Bakery {
         let payment_hash = sha256::Hash::hash(&preimage).to_byte_array();
         let macaroon = Macaroon::deserialize(credential.macaroon.as_bytes()).map_err(|_| InvalidCredential)?;
         let id = macaroon.identifier();
-        if id.len() != 66 || id[..2] != [0, 0] || id[2..34] != payment_hash {
+        if id.get(2..34) != Some(payment_hash.as_slice()) {
             return Err(InvalidCredential);
         }
 
+        self.inspect_terms(scope, &macaroon, now, false)
+    }
+
+    pub(crate) fn inspect_status(
+        &self,
+        scope: &str,
+        token: &str,
+        now: u64,
+    ) -> Result<Option<PaidGrant>, InvalidCredential> {
+        if token.len() > 8192 {
+            return Err(InvalidCredential);
+        }
+        let macaroon = Macaroon::deserialize(token.as_bytes()).map_err(|_| InvalidCredential)?;
+        self.inspect_terms(scope, &macaroon, now, true)
+    }
+
+    fn inspect_terms(
+        &self,
+        scope: &str,
+        macaroon: &Macaroon,
+        now: u64,
+        status_only: bool,
+    ) -> Result<Option<PaidGrant>, InvalidCredential> {
+        let id = macaroon.identifier();
+        if id.len() != 66 || id[..2] != [0, 0] {
+            return Err(InvalidCredential);
+        }
         let mut verifier = Verifier::default();
+        let mut has_status_caveat = false;
         let mut has_scope = false;
         let mut has_expiry = false;
         let mut applies = true;
@@ -85,6 +113,8 @@ impl Bakery {
                     .ok_or(InvalidCredential)?;
                 has_expiry = true;
                 applies &= now < expiry;
+            } else if predicate == b"purpose=status" && status_only && !has_status_caveat {
+                has_status_caveat = true;
             } else {
                 return Err(InvalidCredential);
             }
@@ -92,17 +122,17 @@ impl Bakery {
             // whether the authentic credential authorizes or needs renewal.
             verifier.satisfy_exact(predicate);
         }
-        if !has_scope || !has_expiry {
+        if !has_scope || !has_expiry || has_status_caveat != status_only {
             return Err(InvalidCredential);
         }
         verifier
-            .verify(&macaroon, &self.root, &[])
+            .verify(macaroon, &self.root, &[])
             .map_err(|_| InvalidCredential)?;
         if !applies {
             return Ok(None);
         }
         Ok(Some(PaidGrant {
-            payment_hash,
+            payment_hash: id[2..34].try_into().map_err(|_| InvalidCredential)?,
             token_id: id[34..].try_into().map_err(|_| InvalidCredential)?,
         }))
     }

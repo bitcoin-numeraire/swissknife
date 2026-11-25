@@ -157,3 +157,39 @@ async fn rejects_invalid_proofs_without_invoicing_and_renews_authentic_passes() 
         StatusCode::OK
     );
 }
+
+#[test]
+fn inspection_checks_signed_terms_and_cannot_authorize_a_purchase() {
+    use libmacaroon::{Format, Macaroon};
+    let bakery = Bakery::new(&[41; 32]);
+    let hash = sha256::Hash::hash(&PREIMAGE).to_byte_array();
+    let issued = bakery.mint("monthly report", hash, 500).unwrap();
+    let mut restricted = Macaroon::deserialize(issued.as_bytes()).unwrap();
+    restricted.add_first_party_caveat("purpose=status").unwrap();
+    let token = restricted.serialize(Format::V2).unwrap();
+    assert!(bakery.inspect_status("monthly report", &issued, 100).is_err());
+    assert_eq!(
+        bakery
+            .inspect_status("monthly report", &token, 499)
+            .unwrap()
+            .unwrap()
+            .payment_hash,
+        hash
+    );
+    assert!(bakery.inspect_status("monthly report", &token, 500).unwrap().is_none());
+    assert!(Bakery::new(&[42; 32])
+        .inspect_status("monthly report", &token, 100)
+        .is_err());
+    use base64::{
+        engine::general_purpose::{STANDARD, URL_SAFE},
+        Engine as _,
+    };
+    let payment_macaroon = STANDARD.encode(URL_SAFE.decode(&token).unwrap());
+    let payment_header = L402Token::new(payment_macaroon, hex::encode(PREIMAGE)).to_header_value();
+    assert!(L402Token::from_header(&payment_header).is_ok());
+    assert!(bakery.verify("monthly report", &payment_header, 499).is_err());
+    restricted.add_first_party_caveat("purpose=status").unwrap();
+    assert!(bakery
+        .inspect_status("monthly report", &restricted.serialize(Format::V2).unwrap(), 499)
+        .is_err());
+}

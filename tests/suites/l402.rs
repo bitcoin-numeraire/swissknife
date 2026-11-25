@@ -6,6 +6,40 @@ use wiremock::{
     Mock, MockServer, ResponseTemplate,
 };
 
+fn inspection_token(original: &str) -> String {
+    let mut macaroon = libmacaroon::Macaroon::deserialize(original.as_bytes()).unwrap();
+    macaroon.add_first_party_caveat("purpose=status").unwrap();
+    macaroon.serialize(libmacaroon::Format::V2).unwrap()
+}
+
+async fn assert_pass_status(http: &Client, resource: &str, inspection: &str, state: &str, remaining: Option<u64>) {
+    let reply = http
+        .head(format!("{resource}/status"))
+        .header("SwissKnife-L402-Inspection", inspection)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        reply.status(),
+        if state == "invalid" {
+            StatusCode::UNAUTHORIZED
+        } else {
+            StatusCode::OK
+        }
+    );
+    assert_eq!(reply.headers()["swissknife-l402-status"], state);
+    assert_eq!(
+        reply
+            .headers()
+            .get("swissknife-l402-remaining")
+            .map(|v| v.to_str().unwrap().parse::<u64>().unwrap()),
+        remaining
+    );
+    assert_eq!(reply.headers()[header::CACHE_CONTROL], "private, no-store");
+    assert!(!reply.headers().contains_key(header::WWW_AUTHENTICATE));
+    assert!(reply.bytes().await.unwrap().is_empty());
+}
+
 #[tokio::test]
 async fn a_real_invoice_unlocks_only_the_selected_merchant_resource() {
     let app = TestApp::isolated("l402", &[]).await;
@@ -202,6 +236,9 @@ async fn a_paid_pack_survives_failure_restart_and_competing_replicas() {
         .unwrap();
     let preimage = Counterparty::for_provider(&app.provider).pay_for_preimage(invoice);
     let proof = format!("L402 {macaroon}:{preimage}");
+    let inspection = inspection_token(macaroon);
+    assert_pass_status(&http, &url(&app), macaroon, "invalid", None).await;
+    assert_pass_status(&http, &url(&app), &inspection, "active", Some(3)).await;
     let paid = |app: &TestApp| http.get(url(app)).header(header::AUTHORIZATION, &proof).send();
     // The mock's default 404 produces a gateway error and consumes no request.
     assert_eq!(paid(&app).await.unwrap().status(), StatusCode::BAD_GATEWAY);
@@ -213,6 +250,12 @@ async fn a_paid_pack_survives_failure_restart_and_competing_replicas() {
     assert_eq!(paid(&app).await.unwrap().text().await.unwrap(), "delivery");
     let app = app.restart("pack-resumed", &env).await;
     let replica = app.replica("pack-replica", &env).await;
+    assert_eq!(paid(&replica).await.unwrap().text().await.unwrap(), "delivery");
+    let before = upstream.received_requests().await.unwrap().len();
+    for server in [&app, &replica, &app] {
+        assert_pass_status(&http, &url(server), &inspection, "active", Some(1)).await;
+    }
+    assert_eq!(upstream.received_requests().await.unwrap().len(), before);
     let results = futures_util::future::join_all((0..8).map(|i| paid(if i % 2 == 0 { &app } else { &replica }))).await;
     let mut deliveries = 0;
     for response in results {
@@ -228,7 +271,8 @@ async fn a_paid_pack_survives_failure_restart_and_competing_replicas() {
             other => panic!("unexpected pack redemption status {other}"),
         }
     }
-    assert_eq!(deliveries, 2);
+    assert_eq!(deliveries, 1);
+    assert_pass_status(&http, &url(&replica), &inspection, "exhausted", Some(0)).await;
     let count = upstream.received_requests().await.unwrap().len();
     assert_eq!(paid(&replica).await.unwrap().status(), StatusCode::PAYMENT_REQUIRED);
     assert_eq!(count, upstream.received_requests().await.unwrap().len());
@@ -243,6 +287,7 @@ async fn a_paid_pack_survives_failure_restart_and_competing_replicas() {
     let mut enlarged = env;
     enlarged[5].1 = "10".into();
     let changed = app.restart("pack-new-terms", &enlarged).await;
+    assert_pass_status(&http, &url(&changed), &inspection, "inactive", None).await;
     assert_eq!(paid(&changed).await.unwrap().status(), StatusCode::PAYMENT_REQUIRED);
     changed.stop();
 }
@@ -607,6 +652,9 @@ async fn two_merchants_publish_independent_routes_and_honor_passes_during_a_sale
     let preimage = Counterparty::for_provider(&app.provider).pay_for_preimage(invoice);
     let proof = format!("L402 {macaroon}:{preimage}");
     let app = app.restart("published-restart", &env).await;
+    let inspection = inspection_token(macaroon);
+    assert_pass_status(&http, &url(&app, a.wallet.id), &inspection, "active", None).await;
+    assert_pass_status(&http, &url(&app, b.wallet.id), &inspection, "inactive", None).await;
     assert_eq!(
         http.get(url(&app, a.wallet.id)).send().await.unwrap().status(),
         StatusCode::NOT_FOUND
