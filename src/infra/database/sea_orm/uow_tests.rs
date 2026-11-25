@@ -1774,3 +1774,55 @@ async fn payment_admission_and_calendar_totals_after_multiple_ledger_sized_charg
         total + 1000
     );
 }
+
+#[tokio::test]
+async fn agent_activity_separates_adjacent_rolling_hours_and_sums_large_reservations_exactly() {
+    use super::{models::spending_entry, spending_policy_repository::SeaOrmSpendingPolicyRepository};
+    use crate::domains::agent::SpendingPolicyRepository;
+    let db = connect().await;
+    let wallet = seed_wallet(&db, 0).await;
+    let account = account_id(&db, wallet).await;
+    let repo = SeaOrmSpendingPolicyRepository(db.clone());
+    repo.replace(
+        account,
+        swissknife_types::SpendingLimits {
+            per_payment_msat: Some(100),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let key = Uuid::new_v4();
+    // Store exact microsecond timestamps on both PostgreSQL and SQLite.
+    let at = chrono::DateTime::from_timestamp_micros(Utc::now().timestamp_micros()).unwrap();
+    for (age_seconds, charge) in [
+        (7200, 9),
+        (7199, 3),
+        (3600, 7),
+        (3599, i64::MAX),
+        (1, i64::MAX),
+        (0, i64::MAX),
+        (-1, 11),
+    ] {
+        spending_entry::ActiveModel {
+            payment_id: Set(Uuid::new_v4()),
+            wallet_id: Set(Some(wallet)),
+            account_id: Set(account),
+            agent_key_id: Set(Some(key)),
+            charged_msat: Set(charge),
+            admitted_at: Set(at.naive_utc() - chrono::Duration::seconds(age_seconds)),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+    }
+    let page = repo.activity(account, at, None, 1).await.unwrap();
+    assert_eq!(page.as_of, at);
+    assert!(page.next_after.is_none());
+    let row = &page.items[0];
+    assert_eq!((row.previous_hour.payments, row.previous_hour.charged_msat), (2, 10));
+    assert_eq!(
+        (row.current_hour.payments, row.current_hour.charged_msat),
+        (3, 3 * i64::MAX as u128)
+    );
+}

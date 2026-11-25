@@ -100,6 +100,16 @@ impl From<hours::Model> for AgentSpendingHours {
 
 #[async_trait]
 impl SpendingPolicyRepository for SeaOrmSpendingPolicyRepository {
+    async fn activity(
+        &self,
+        account: Uuid,
+        as_of: chrono::DateTime<Utc>,
+        after: Option<Uuid>,
+        limit: u32,
+    ) -> Result<swissknife_types::AgentActivityPage, DatabaseError> {
+        super::agent_activity::page(&self.0, account, as_of, after, limit).await
+    }
+
     async fn reviewed(
         &self,
         key: &crate::domains::payment::SubmissionKey,

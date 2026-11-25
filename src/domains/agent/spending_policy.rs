@@ -14,6 +14,13 @@ use uuid::Uuid;
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait SpendingPolicyRepository: Send + Sync {
+    async fn activity(
+        &self,
+        account: Uuid,
+        as_of: chrono::DateTime<chrono::Utc>,
+        after: Option<Uuid>,
+        limit: u32,
+    ) -> Result<swissknife_types::AgentActivityPage, DatabaseError>;
     async fn reviewed(&self, key: &SubmissionKey) -> Result<Option<ReviewedPayment>, ApplicationError>;
     async fn pending_approvals(&self, account: Uuid) -> Result<Vec<PaymentApproval>, ApplicationError>;
     async fn approval(&self, account: Uuid, id: Uuid) -> Result<PaymentApproval, ApplicationError>;
@@ -36,6 +43,11 @@ pub trait SpendingPolicyRepository: Send + Sync {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait SpendingPolicyUseCases: Send + Sync {
+    async fn activity(
+        &self,
+        account: Uuid,
+        query: swissknife_types::AgentActivityQuery,
+    ) -> Result<swissknife_types::AgentActivityPage, ApplicationError>;
     async fn pending_approvals(&self, account: Uuid) -> Result<Vec<PaymentApproval>, ApplicationError>;
     async fn approval(&self, account: Uuid, id: Uuid) -> Result<PaymentApproval, ApplicationError>;
     async fn decide(
@@ -70,6 +82,18 @@ pub struct SpendingPolicyService(pub Arc<dyn SpendingPolicyRepository>);
 
 #[async_trait]
 impl SpendingPolicyUseCases for SpendingPolicyService {
+    async fn activity(
+        &self,
+        account: Uuid,
+        query: swissknife_types::AgentActivityQuery,
+    ) -> Result<swissknife_types::AgentActivityPage, ApplicationError> {
+        let limit = query.limit.unwrap_or(25);
+        if !(1..=100).contains(&limit) {
+            return Err(DataError::Validation("Request between 1 and 100 agent credentials per page".into()).into());
+        }
+        Ok(self.0.activity(account, chrono::Utc::now(), query.after, limit).await?)
+    }
+
     async fn pending_approvals(&self, account: Uuid) -> Result<Vec<PaymentApproval>, ApplicationError> {
         self.0.pending_approvals(account).await
     }

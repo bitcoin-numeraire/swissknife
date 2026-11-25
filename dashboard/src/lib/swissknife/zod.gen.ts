@@ -12,6 +12,30 @@ export const zAccountPreferences = z.object({
 });
 
 /**
+ * One trailing hour of policy-accounted payments, including live reservations.
+ */
+export const zAgentActivityHour = z.object({
+  charged_msat: z.string(),
+  payments: z.coerce.bigint().gte(BigInt(0)).max(BigInt('9223372036854775807'), {
+    error: 'Invalid value: Expected int64 to be <= 9223372036854775807',
+  }),
+});
+
+export const zAgentSpendingActivity = z.object({
+  agent_key_id: z.uuid(),
+  current_hour: zAgentActivityHour,
+  name: z.string().nullish(),
+  previous_hour: zAgentActivityHour,
+  wallet_id: z.uuid().nullish(),
+});
+
+export const zAgentActivityPage = z.object({
+  as_of: z.iso.datetime(),
+  items: z.array(zAgentSpendingActivity),
+  next_after: z.uuid().nullish(),
+});
+
+/**
  * UTC window for new payments submitted with a delegated wallet credential.
  */
 export const zAgentSpendingHours = z.object({
@@ -1138,6 +1162,21 @@ export const zCreateAccountBody = zCreateAccountRequest;
  * Created
  */
 export const zCreateAccountResponse = zAccount;
+
+export const zGetAgentSpendingActivityPath = z.object({
+  account_id: z.uuid(),
+});
+
+export const zGetAgentSpendingActivityQuery = z.object({
+  after: z.uuid().nullish(),
+  limit: z
+    .int()
+    .gte(0)
+    .max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    .nullish(),
+});
+
+export const zGetAgentSpendingActivityResponse = zAgentActivityPage;
 
 export const zClearAgentSpendingHoursPath = z.object({
   account_id: z.uuid(),

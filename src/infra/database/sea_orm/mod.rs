@@ -1,3 +1,4 @@
+mod agent_activity;
 mod agent_key_repository;
 mod config;
 mod models;

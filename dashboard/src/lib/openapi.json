@@ -594,6 +594,74 @@
         }
       }
     },
+    "/v1/accounts/{account_id}/agent-spending-activity": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Compare each active credential's charged spending in two consecutive rolling hours.",
+        "operationId": "get_agent_spending_activity",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Credentials per page, from 1 to 100. Defaults to 25.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentActivityPage"
+                }
+              }
+            }
+          },
+          "403": {},
+          "404": {},
+          "422": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
     "/v1/accounts/{account_id}/agent-spending-hours": {
       "get": {
         "tags": [
@@ -10584,6 +10652,51 @@
           }
         }
       },
+      "AgentActivityHour": {
+        "type": "object",
+        "description": "One trailing hour of policy-accounted payments, including live reservations.",
+        "required": [
+          "payments",
+          "charged_msat"
+        ],
+        "properties": {
+          "charged_msat": {
+            "type": "string"
+          },
+          "payments": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "AgentActivityPage": {
+        "type": "object",
+        "required": [
+          "as_of",
+          "items"
+        ],
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentSpendingActivity"
+            }
+          },
+          "next_after": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Continue strictly after this credential ID."
+          }
+        }
+      },
       "AgentKey": {
         "type": "object",
         "required": [
@@ -10615,6 +10728,40 @@
           },
           "wallet_id": {
             "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AgentSpendingActivity": {
+        "type": "object",
+        "required": [
+          "agent_key_id",
+          "current_hour",
+          "previous_hour"
+        ],
+        "properties": {
+          "agent_key_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "current_hour": {
+            "$ref": "#/components/schemas/AgentActivityHour"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Current credential label when its metadata still exists."
+          },
+          "previous_hour": {
+            "$ref": "#/components/schemas/AgentActivityHour"
+          },
+          "wallet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           }
         }

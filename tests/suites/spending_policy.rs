@@ -364,5 +364,68 @@ async fn rolling_velocity_is_atomic_per_credential_and_does_not_limit_owner_paym
             .available_msat,
         31000
     );
+    let activity = format!("/v1/accounts/{}/agent-spending-activity", owner.account.id);
+    let operator = Auth::Bearer(app.admin_token().await);
+    let restricted = app
+        .account_api_key(app.admin_token().await, owner.account.id, vec![])
+        .await;
+    assert_error(
+        &api.get(&activity, Auth::ApiKey(&restricted)).await,
+        StatusCode::FORBIDDEN,
+    );
+    assert_error(&api.get(&activity, first).await, StatusCode::UNAUTHORIZED);
+    assert_error(
+        &api.get(&format!("{activity}?limit=101"), operator).await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+    );
+    let page = api
+        .get(&format!("{activity}?limit=1"), operator)
+        .await
+        .parse::<swissknife_types::AgentActivityPage>();
+    assert_eq!(page.items.len(), 1);
+    let after = page.next_after.unwrap();
+    assert_eq!(after, page.items[0].agent_key_id);
+    let next = api
+        .get(&format!("{activity}?limit=1&after={after}"), operator)
+        .await
+        .parse::<swissknife_types::AgentActivityPage>();
+    assert!(next.next_after.is_none());
+    assert_eq!(next.items.len(), 1);
+    assert!(next.items[0].agent_key_id > after);
+    for row in page.items.iter().chain(&next.items) {
+        let credential = credentials.iter().find(|k| k.metadata.id == row.agent_key_id).unwrap();
+        assert_eq!(row.name.as_deref(), Some(credential.metadata.name.as_str()));
+        assert_eq!(row.wallet_id, Some(owner.wallet.id));
+        assert_eq!(row.current_hour.charged_msat, 10000);
+        assert_eq!(
+            row.current_hour.payments,
+            if row.agent_key_id == credentials[0].metadata.id {
+                2
+            } else {
+                1
+            }
+        );
+        assert_eq!((row.previous_hour.payments, row.previous_hour.charged_msat), (0, 0));
+    }
+    let revoke = format!("{wallet}/agent-keys/{}", credentials[0].metadata.id);
+    assert_status(&api.delete(&revoke, owner_auth).await, StatusCode::NO_CONTENT);
+    let all = api
+        .get(&activity, operator)
+        .await
+        .parse::<swissknife_types::AgentActivityPage>();
+    let revoked = all
+        .items
+        .iter()
+        .find(|row| row.agent_key_id == credentials[0].metadata.id)
+        .unwrap();
+    assert_eq!(revoked.name, None);
+    assert_eq!(revoked.current_hour.charged_msat, 10000);
+    let other = format!("/v1/accounts/{}/agent-spending-activity", recipient.account.id);
+    assert!(api
+        .get(&other, operator)
+        .await
+        .parse::<swissknife_types::AgentActivityPage>()
+        .items
+        .is_empty());
     app.stop();
 }

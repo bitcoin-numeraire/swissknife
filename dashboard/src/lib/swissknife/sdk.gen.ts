@@ -31,6 +31,7 @@ import {
   getAccountResponseTransformer,
   getAccountWalletResponseTransformer,
   getAddressResponseTransformer,
+  getAgentSpendingActivityResponseTransformer,
   getApiKeyResponseTransformer,
   getBtcAddressResponseTransformer,
   getInvoiceResponseTransformer,
@@ -219,6 +220,9 @@ import type {
   GetAddressData,
   GetAddressErrors,
   GetAddressResponses,
+  GetAgentSpendingActivityData,
+  GetAgentSpendingActivityErrors,
+  GetAgentSpendingActivityResponses,
   GetAgentSpendingHoursData,
   GetAgentSpendingHoursErrors,
   GetAgentSpendingHoursResponses,
@@ -561,6 +565,26 @@ export const createAccount = <ThrowOnError extends boolean = false>(
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Compare each active credential's charged spending in two consecutive rolling hours.
+ */
+export const getAgentSpendingActivity = <ThrowOnError extends boolean = false>(
+  options: Options<GetAgentSpendingActivityData, ThrowOnError>
+): RequestResult<GetAgentSpendingActivityResponses, GetAgentSpendingActivityErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetAgentSpendingActivityResponses,
+    GetAgentSpendingActivityErrors,
+    ThrowOnError
+  >({
+    responseTransformer: getAgentSpendingActivityResponseTransformer,
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/agent-spending-activity',
+    ...options,
   });
 
 /**
