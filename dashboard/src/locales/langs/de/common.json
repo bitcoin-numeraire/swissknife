@@ -1,4 +1,16 @@
 {
+  "merchant_revenue": {
+    "title": "Händlereinnahmen",
+    "from": "Von (UTC)",
+    "through": "Bis (UTC)",
+    "invalid_range": "Wähle einen Zeitraum von 1 bis 366 Tagen.",
+    "load_error": "Die Händlereinnahmen konnten nicht geladen werden.",
+    "route": "Route",
+    "count": "Beglichene Rechnungen",
+    "received": "Erhalten (msat)",
+    "fees": "Gebühren (msat)",
+    "empty": "In diesem Zeitraum wurden keine Händlerrechnungen beglichen."
+  },
   "wallet_credit": {
     "asset_units": "Asset-Einheiten",
     "opening": "Anfangsgutschrift",
@@ -1196,6 +1208,7 @@
     "load_error": "Das Budget konnte nicht geladen werden.",
     "loading": "Budget wird geladen …",
     "periods": "Gebühren und offene Reservierungen sind enthalten. Die Zeiträume beginnen um Mitternacht UTC. Die Woche beginnt am Montag.",
+    "agent_hourly_msat": "Pro Agent innerhalb einer gleitenden Stunde",
     "per_payment_msat": "Pro Zahlung",
     "unlimited": "Unbegrenzt",
     "daily_msat": "Heute",

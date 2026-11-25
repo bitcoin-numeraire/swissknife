@@ -1,4 +1,16 @@
 {
+  "merchant_revenue": {
+    "title": "Receitas do comerciante",
+    "from": "De (UTC)",
+    "through": "Até (UTC)",
+    "invalid_range": "Escolha um período de 1 a 366 dias.",
+    "load_error": "Não foi possível carregar as receitas do comerciante.",
+    "route": "Rota",
+    "count": "Faturas liquidadas",
+    "received": "Montante recebido (msat)",
+    "fees": "Comissões (msat)",
+    "empty": "Não foram liquidadas faturas do comerciante neste período."
+  },
   "wallet_credit": {
     "asset_units": "unidades do ativo",
     "opening": "Crédito inicial",
@@ -1196,6 +1208,7 @@
     "load_error": "Não foi possível carregar o orçamento.",
     "loading": "Carregando orçamento…",
     "periods": "Inclui taxas e valores reservados. Os períodos começam à meia-noite UTC. A semana começa na segunda-feira.",
+    "agent_hourly_msat": "Por agente nos últimos 60 minutos",
     "per_payment_msat": "Por pagamento",
     "unlimited": "Sem limite",
     "daily_msat": "Hoje",

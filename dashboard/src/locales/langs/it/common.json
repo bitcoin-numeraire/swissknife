@@ -1,4 +1,16 @@
 {
+  "merchant_revenue": {
+    "title": "Ricavi del commerciante",
+    "from": "Dal (UTC)",
+    "through": "Al (UTC)",
+    "invalid_range": "Scegli un periodo da 1 a 366 giorni.",
+    "load_error": "Impossibile caricare i ricavi del commerciante.",
+    "route": "Percorso",
+    "count": "Fatture saldate",
+    "received": "Importo ricevuto (msat)",
+    "fees": "Commissioni (msat)",
+    "empty": "Nessuna fattura del commerciante è stata saldata in questo periodo."
+  },
   "wallet_credit": {
     "asset_units": "unità dell’asset",
     "opening": "Accredito iniziale",
@@ -1196,6 +1208,7 @@
     "load_error": "Impossibile caricare il budget.",
     "loading": "Caricamento del budget…",
     "periods": "Include commissioni e importi prenotati. I periodi iniziano a mezzanotte UTC. La settimana inizia il lunedì.",
+    "agent_hourly_msat": "Per agente negli ultimi 60 minuti",
     "per_payment_msat": "Per pagamento",
     "unlimited": "Illimitato",
     "daily_msat": "Oggi",
