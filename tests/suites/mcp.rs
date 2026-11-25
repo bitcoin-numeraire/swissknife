@@ -116,6 +116,24 @@ async fn stdio_discovers_tools_and_resources_and_settles_an_approved_payment_onc
     let mut mcp = StdioWallet::start(&app, owner.wallet.id, &issued.key).await;
     mcp.request("resources/subscribe", json!({"uri":"wallet://payments/recent"}))
         .await;
+    let contact = json!({"ln_address":"billing@EXAMPLE.COM","label":"Supplier"});
+    assert_eq!(mcp.tool("add_contact", contact.clone()).await["isError"], true);
+    let editor: IssuedAgentKey = api.post(&keys,Auth::ApiKey(&owner.key),
+        json!({"name":"address editor","capabilities":{"manage_contacts":true},"expires_at":Utc::now()+ChronoDuration::hours(1)})).await.parse();
+    let mut book = StdioWallet::start(&app, owner.wallet.id, &editor.key).await;
+    let saved = book.tool("add_contact", contact.clone()).await;
+    assert_eq!(saved["structuredContent"]["ln_address"], "billing@example.com");
+    let replay = book.tool("add_contact", contact).await;
+    assert_eq!(saved["structuredContent"], replay["structuredContent"]);
+    assert_eq!(book.tool("list_saved_contacts", json!({})).await["isError"], true);
+    let list = mcp.tool("list_saved_contacts", json!({})).await;
+    assert_eq!(
+        list["structuredContent"]["contacts"],
+        json!([saved["structuredContent"]])
+    );
+    let history = mcp.tool("list_contacts", json!({})).await;
+    assert_eq!(history["structuredContent"]["contacts"], json!([]));
+    book.close().await;
     let listing = mcp.request("tools/list", json!({})).await;
     let names = listing["tools"].as_array().unwrap();
     for name in [
@@ -125,6 +143,8 @@ async fn stdio_discovers_tools_and_resources_and_settles_an_approved_payment_onc
         "send_payment",
         "get_payment",
         "list_contacts",
+        "add_contact",
+        "list_saved_contacts",
         "get_payment_submission",
         "get_lightning_address",
         "send_to_address",
