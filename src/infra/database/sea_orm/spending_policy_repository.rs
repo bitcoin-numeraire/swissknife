@@ -1,5 +1,6 @@
 use super::models::{
-    prelude::{SpendingEntry, SpendingPolicy as PolicyEntity},
+    agent_spending_hours as hours,
+    prelude::{AgentSpendingHours as HoursEntity, SpendingEntry, SpendingPolicy as PolicyEntity},
     spending_entry as entry, spending_policy as policy, wallet,
 };
 use crate::{
@@ -13,7 +14,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, ExprTrait,
     QueryFilter, QuerySelect, Set,
 };
-use swissknife_types::{Payment, SpendingLimits, SpendingPolicy, SpendingUsage};
+use swissknife_types::{AgentSpendingHours, Payment, SpendingLimits, SpendingPolicy, SpendingUsage};
 use uuid::Uuid;
 
 pub struct SeaOrmSpendingPolicyRepository(pub DatabaseConnection);
@@ -57,8 +58,56 @@ async fn usage(db: &impl ConnectionTrait, account: Uuid, today: NaiveDate) -> Re
     })
 }
 
+impl From<hours::Model> for AgentSpendingHours {
+    fn from(row: hours::Model) -> Self {
+        Self {
+            weekdays: (1..=7).filter(|day| row.weekdays & (1 << (day - 1)) != 0).collect(),
+            start_minute: row.start_minute as u16,
+            end_minute: row.end_minute as u16,
+        }
+    }
+}
+
 #[async_trait]
 impl SpendingPolicyRepository for SeaOrmSpendingPolicyRepository {
+    async fn hours(&self, account: Uuid) -> Result<Option<AgentSpendingHours>, DatabaseError> {
+        Ok(HoursEntity::find_by_id(account)
+            .one(&self.0)
+            .await
+            .map_err(db_error)?
+            .map(Into::into))
+    }
+
+    async fn set_hours(&self, account: Uuid, hours: Option<AgentSpendingHours>) -> Result<(), DatabaseError> {
+        let Some(window) = hours else {
+            HoursEntity::delete_by_id(account)
+                .exec(&self.0)
+                .await
+                .map_err(db_error)?;
+            return Ok(());
+        };
+        use hours::Column::*;
+        let weekdays = window
+            .weekdays
+            .into_iter()
+            .fold(0i16, |mask, day| mask | (1 << (day - 1)));
+        HoursEntity::insert(hours::ActiveModel {
+            account_id: Set(account),
+            weekdays: Set(weekdays),
+            start_minute: Set(window.start_minute as i16),
+            end_minute: Set(window.end_minute as i16),
+        })
+        .on_conflict(
+            OnConflict::column(AccountId)
+                .update_columns([Weekdays, StartMinute, EndMinute])
+                .to_owned(),
+        )
+        .exec(&self.0)
+        .await
+        .map_err(db_error)?;
+        Ok(())
+    }
+
     async fn report(
         &self,
         account: Uuid,
@@ -183,10 +232,20 @@ pub(super) async fn admit(
         .await
         .map_err(db_error)?
         .ok_or_else(|| DataError::NotFound("Wallet not found".into()))?;
+    let now = Utc::now();
+    if agent_key_id.is_some() {
+        if let Some(hours) = HoursEntity::find_by_id(account)
+            .lock_shared()
+            .one(tx)
+            .await
+            .map_err(db_error)?
+        {
+            crate::domains::agent::authorize_hours(&hours.into(), now)?;
+        }
+    }
     let Some(row) = locked_policy(tx, account).await?.filter(|row| row.enabled) else {
         return Ok(());
     };
-    let now = Utc::now();
     let limits = row.into();
     let used = usage(tx, account, now.date_naive()).await?;
     authorize_spending(&limits, &used, amount)?;

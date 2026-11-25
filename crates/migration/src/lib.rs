@@ -43,6 +43,7 @@ mod m20261125_185129_retain_payable_offer_owners;
 mod m20261125_191409_wallet_agent_keys;
 mod m20261125_193225_account_spending_policy;
 mod m20261125_201447_attribute_spending_entries;
+mod m20261125_203233_agent_spending_hours;
 
 pub struct Migrator;
 
@@ -93,6 +94,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261125_191409_wallet_agent_keys::Migration),
             Box::new(m20261125_193225_account_spending_policy::Migration),
             Box::new(m20261125_201447_attribute_spending_entries::Migration),
+            Box::new(m20261125_203233_agent_spending_hours::Migration),
         ]
     }
 }

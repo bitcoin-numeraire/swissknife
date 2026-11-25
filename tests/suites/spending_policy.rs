@@ -188,3 +188,96 @@ async fn delegated_spending_obeys_the_account_budget_on_all_rails_and_survives_r
         format!("period_start,payments,charged_msat\r\n{date},1,{charged}\r\n")
     );
 }
+
+#[tokio::test]
+async fn delegated_hours_apply_without_a_budget_and_owner_payments_stay_independent() {
+    use chrono::{Datelike, Duration as ChronoDuration, Utc};
+    let app = TestApp::isolated("agent-hours", &[]).await;
+    let admin = app.admin_token().await;
+    let operator = Auth::Bearer(admin);
+    let owner = app.create_account_with_wallet(admin, "scheduled-agent").await;
+    let api = app.api();
+    let owner_auth = Auth::ApiKey(&owner.key);
+    let path = format!("/v1/accounts/{}/agent-spending-hours", owner.account.id);
+    let wallet = format!("/v1/me/wallets/{}", owner.wallet.id);
+    let payments = format!("{wallet}/payments/submissions");
+    let key = api
+        .post(
+            &format!("{wallet}/agent-keys"),
+            owner_auth,
+            json!({
+                "name":"scheduled agent","capabilities":{"spend":true,"read":true},
+                "expires_at":Utc::now()+ChronoDuration::hours(1)
+            }),
+        )
+        .await
+        .parse::<IssuedAgentKey>();
+    let agent = Auth::WalletKey(&key.key);
+    let now = Utc::now();
+    let closed = json!({"weekdays":[(now+ChronoDuration::days(3)).weekday().number_from_monday()],"start_minute":0,"end_minute":1440});
+    let open = json!({"weekdays":[1,2,3,4,5,6,7],"start_minute":0,"end_minute":1440});
+    assert_error(&api.get(&path, operator).await, StatusCode::NOT_FOUND);
+    assert_error(&api.put(&path, agent, &open).await, StatusCode::UNAUTHORIZED);
+    let plain_key = app.account_api_key(admin, owner.account.id, vec![]).await;
+    assert_error(
+        &api.put(&path, Auth::ApiKey(&plain_key), &open).await,
+        StatusCode::FORBIDDEN,
+    );
+    for invalid in [
+        json!({"weekdays":[1,1],"start_minute":0,"end_minute":1440}),
+        json!({"weekdays":[8],"start_minute":0,"end_minute":1440}),
+        json!({"weekdays":[2],"start_minute":1440,"end_minute":10}),
+        json!({"weekdays":[3],"start_minute":5,"end_minute":5}),
+    ] {
+        assert_error(
+            &api.put(&path, operator, invalid).await,
+            StatusCode::UNPROCESSABLE_ENTITY,
+        );
+    }
+    assert_status(&api.put(&path, operator, &closed).await, StatusCode::NO_CONTENT);
+    app.fund_onchain(admin, owner.wallet.id, 50_000).await;
+    let app = app.restart("scheduled", &[]).await;
+    let api = app.api();
+    assert_eq!(api.get(&path, operator).await.body, closed);
+    let external = Counterparty::for_provider(&app.provider);
+    let make_request = |label: &str| json!({"input":external.invoice(17_000,&unique(label)),"idempotency_key":Uuid::new_v4(),"maximum_fee_msat":1000});
+    let request = make_request("scheduled-paid");
+    let denied = api.post(&payments, agent, &request).await;
+    assert_error(&denied, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(denied.body.to_string().contains("UTC spending hours"));
+    assert_eq!(
+        app.wallet_balance(app.admin_token().await, owner.wallet.id)
+            .await
+            .reserved_msat,
+        0
+    );
+    let own = api.post(&payments, owner_auth, make_request("owner-paid")).await;
+    assert_status(&own, StatusCode::ACCEPTED);
+    assert_status(&api.put(&path, operator, &open).await, StatusCode::NO_CONTENT);
+    let admitted = api.post(&payments, agent, &request).await;
+    assert_status(&admitted, StatusCode::ACCEPTED);
+    assert_status(&api.put(&path, operator, &closed).await, StatusCode::NO_CONTENT);
+    for response in [admitted, own] {
+        let submission = response.parse::<PaymentSubmission>();
+        wait_until(
+            Duration::from_secs(40),
+            "admitted payment settles outside hours",
+            || async {
+                api.get(&submission.status_url, owner_auth)
+                    .await
+                    .parse::<PaymentSubmission>()
+                    .state
+                    == PaymentExecutionState::Settled
+            },
+        )
+        .await;
+    }
+    let replay = api.post(&payments, agent, &request).await;
+    assert_eq!(
+        replay.parse::<PaymentSubmission>().state,
+        PaymentExecutionState::Settled
+    );
+    assert_status(&api.delete(&path, operator).await, StatusCode::NO_CONTENT);
+    assert_error(&api.get(&path, operator).await, StatusCode::NOT_FOUND);
+    app.stop();
+}

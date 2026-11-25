@@ -76,3 +76,15 @@ pub struct SpendingReportRow {
     /// Current amount charged, in exact decimal millisatoshis, including outstanding reservations.
     pub charged_msat: String,
 }
+
+/// UTC window for new payments submitted with a delegated wallet credential.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgentSpendingHours {
+    /// ISO weekdays on which the window starts (1 = Monday, 7 = Sunday).
+    pub weekdays: Vec<u8>,
+    /// Included UTC minute of day, from 0 to 1439.
+    pub start_minute: u16,
+    /// Excluded UTC minute of day, from 0 to 1440. An earlier end crosses midnight.
+    pub end_minute: u16,
+}

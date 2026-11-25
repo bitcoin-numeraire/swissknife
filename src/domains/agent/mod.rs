@@ -7,6 +7,8 @@ pub use agent_key_repository::*;
 pub use agent_key_service::*;
 pub use wallet_actor::{WalletAccess, WalletActor};
 
+mod spending_hours;
+pub(crate) use spending_hours::authorize_hours;
 mod spending_policy;
 pub mod spending_policy_handler;
 pub use spending_policy::*;
