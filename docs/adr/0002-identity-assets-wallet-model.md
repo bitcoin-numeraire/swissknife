@@ -501,5 +501,5 @@ Each step should be a focused PR. The wallet conversion and service cutover may 
 ## Open follow-ups
 
 - Local JWT multi-user API/UX for Umbrel, desktop, and mobile deployments: addressed by [ADR 0005](0005-local-jwt-credentials.md) (#338).
-- Decide the exact asset catalog source of truth for Taproot Assets metadata once a Taproot Assets adapter is implemented.
+- [ADR 0006](0006-taproot-asset-catalog.md) proposes the Taproot Assets catalog authority and the acceptance checks for its first provider adapter.
 - Design the account/master-key model for #115 without assuming one old wallet equals one user.
