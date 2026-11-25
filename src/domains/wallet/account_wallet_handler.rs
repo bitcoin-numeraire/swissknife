@@ -22,6 +22,7 @@ use swissknife_types::{
     PaymentFeeEstimate, PaymentSubmission, RegisterLnAddressRequest, SendPaymentRequest, SubmitPaymentRequest,
     UpdateAccountPreferencesRequest, UpdateAccountRequest, UpdateLnAddressRequest,
 };
+use swissknife_types::{SetWalletIdentity, WalletIdentity};
 
 use crate::{
     application::{
@@ -62,6 +63,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         get_account_api_key,
         revoke_account_api_key,
         revoke_account_api_keys,
+        get_wallet_identity, set_wallet_identity,
         list_account_wallets,
         create_account_wallet,
         get_account_wallet,
@@ -137,6 +139,10 @@ pub fn account_router() -> Router<Arc<AppServices>> {
         .route("/api-keys", delete(revoke_account_api_keys))
         .route("/wallets", get(list_account_wallets))
         .route("/wallets", post(create_account_wallet))
+        .route(
+            "/wallets/{wallet_id}/identity",
+            get(get_wallet_identity).put(set_wallet_identity),
+        )
         .route("/wallets/{wallet_id}", get(get_account_wallet))
         .route("/wallets/{wallet_id}/balance", get(get_wallet_balance))
         .route("/wallets/{wallet_id}/bitcoin/addresses", get(list_wallet_btc_addresses))
@@ -437,6 +443,48 @@ async fn patch_account_preferences(
                 user.account_id,
                 DashboardSettingsUpdate::Patch(payload.dashboard_settings),
             )
+            .await?,
+    ))
+}
+
+/// Get the public keys enrolled for this wallet.
+#[utoipa::path(
+    get, path = "/v1/me/wallets/{wallet_id}/identity", tag = "Me",
+    responses(
+        (status = 200, description = "Public identity keys, or null before enrollment", body = Option<WalletIdentity>),
+        (status = 401, description = "Authentication required", body = ErrorResponse),
+        (status = 404, description = "Wallet not found", body = ErrorResponse)
+    )
+)]
+async fn get_wallet_identity(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(wallet_id): Path<Uuid>,
+) -> Result<Json<Option<WalletIdentity>>, ApplicationError> {
+    Ok(Json(services.wallet.identity(user.account_id, wallet_id).await?))
+}
+
+/// Enroll or change the wallet's public identity with an optimistic concurrency check.
+#[utoipa::path(
+    put, path = "/v1/me/wallets/{wallet_id}/identity", tag = "Me", request_body = SetWalletIdentity,
+    responses(
+        (status = 200, description = "Current public identity", body = WalletIdentity),
+        (status = 401, description = "Authentication required", body = ErrorResponse),
+        (status = 404, description = "Wallet not found", body = ErrorResponse),
+        (status = 409, description = "Identity changed", body = ErrorResponse),
+        (status = 422, description = "Invalid public key", body = ErrorResponse)
+    )
+)]
+async fn set_wallet_identity(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(wallet_id): Path<Uuid>,
+    Json(request): Json<SetWalletIdentity>,
+) -> Result<Json<WalletIdentity>, ApplicationError> {
+    Ok(Json(
+        services
+            .wallet
+            .set_identity(user.account_id, wallet_id, request)
             .await?,
     ))
 }

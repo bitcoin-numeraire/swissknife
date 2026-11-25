@@ -59,5 +59,6 @@ pub use query::OrderDirection;
 pub use system::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
 pub use transaction::{Currency, Ledger};
 pub use wallet::{
-    Asset, Balance, Contact, CreateWalletRequest, Protocol, Wallet, WalletFilter, WalletOverview, NATIVE_ASSET_REF,
+    Asset, Balance, Contact, CreateWalletRequest, Protocol, SetWalletIdentity, Wallet, WalletFilter, WalletIdentity,
+    WalletOverview, NATIVE_ASSET_REF,
 };

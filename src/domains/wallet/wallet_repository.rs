@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use swissknife_types::{SetWalletIdentity, WalletIdentity};
 use uuid::Uuid;
 
 use crate::application::errors::DatabaseError;
@@ -18,6 +19,8 @@ pub trait WalletRepository: Send + Sync {
     async fn find_many(&self, filter: WalletFilter) -> Result<Vec<Wallet>, DatabaseError>;
     async fn find_many_overview(&self) -> Result<Vec<WalletOverview>, DatabaseError>;
     async fn upsert(&self, account_id: Uuid, asset_id: Uuid) -> Result<Wallet, DatabaseError>;
+    async fn identity(&self, wallet: Uuid) -> Result<Option<WalletIdentity>, DatabaseError>;
+    async fn set_identity(&self, wallet: Uuid, request: &SetWalletIdentity) -> Result<(), DatabaseError>;
     async fn get_balance(&self, id: Uuid) -> Result<Balance, DatabaseError>;
     /// Credit available balance for incoming funds.
     async fn credit(&self, id: Uuid, amount_msat: u64) -> Result<(), DatabaseError>;

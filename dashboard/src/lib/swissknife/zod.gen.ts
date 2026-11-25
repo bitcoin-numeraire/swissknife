@@ -856,6 +856,19 @@ export const zAccount = z.object({
   wallets: z.array(zWallet),
 });
 
+/**
+ * Public identity of a wallet. Recovery material stays with the wallet owner.
+ */
+export const zWalletIdentity = z.object({
+  nostr_pubkey: z.string(),
+  recovery_pubkey: z.string(),
+});
+
+export const zSetWalletIdentity = z.object({
+  expected: zWalletIdentity.nullish(),
+  identity: zWalletIdentity,
+});
+
 export const zWalletOffer = z.object({
   amount_msat: z.coerce
     .bigint()
@@ -1735,6 +1748,26 @@ export const zListContactsPath = z.object({
  * Success
  */
 export const zListContactsResponse = z.array(zContact);
+
+export const zGetWalletIdentityPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+/**
+ * Public identity keys, or null before enrollment
+ */
+export const zGetWalletIdentityResponse = zWalletIdentity.nullable();
+
+export const zSetWalletIdentityBody = zSetWalletIdentity;
+
+export const zSetWalletIdentityPath = z.object({
+  wallet_id: z.uuid(),
+});
+
+/**
+ * Current public identity
+ */
+export const zSetWalletIdentityResponse = zWalletIdentity;
 
 export const zDeleteExpiredInvoicesPath = z.object({
   wallet_id: z.uuid(),

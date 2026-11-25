@@ -309,3 +309,50 @@ mod delete {
         assert_error(&gone, StatusCode::NOT_FOUND);
     }
 }
+
+#[tokio::test]
+async fn wallet_identity_enrollment_is_scoped_and_rejects_concurrent_replacement() {
+    let app = app().await;
+    let admin = app.admin_token().await;
+    let owner = app.create_account_with_wallet(admin, "identity-owner").await;
+    let other = app.create_account_with_wallet(admin, "identity-other").await;
+    let auth = Auth::ApiKey(&owner.key);
+    let api = app.api();
+    let path = format!("/v1/me/wallets/{}/identity", owner.wallet.id);
+    let first = "17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917";
+    let second = "d41b22899549e1f3d335a31002cfd382174006e166d3e658e3a5eecdb6463573";
+    let thirds = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+    let initial = json!({"recovery_pubkey":first,"nostr_pubkey":first});
+    let setup = json!({"identity": initial});
+    assert_error(&api.get(&path, Auth::None).await, StatusCode::UNAUTHORIZED);
+    assert_error(
+        &api.put(&path, Auth::ApiKey(&other.key), &setup).await,
+        StatusCode::NOT_FOUND,
+    );
+    assert!(api.get(&path, auth).await.body.is_null());
+    let wrong = json!({"identity":{"recovery_pubkey": first,"nostr_pubkey": "ff".repeat(32)}});
+    assert_error(&api.put(&path, auth, wrong).await, StatusCode::UNPROCESSABLE_ENTITY);
+    let invalid = api
+        .put(&path, auth, json!({"identity":initial,"mnemonic":"not accepted"}))
+        .await;
+    assert!(invalid.status.is_client_error());
+    for _ in 0..2 {
+        assert_eq!(api.put(&path, auth, &setup).await.body, initial);
+    }
+    let a = json!({"identity":{"recovery_pubkey":first,"nostr_pubkey":second},"expected":initial});
+    let b = json!({"identity":{"recovery_pubkey":first,"nostr_pubkey":thirds},"expected":initial});
+    let (ra, rb) = tokio::join!(api.put(&path, auth, &a), api.put(&path, auth, &b));
+    let mut statuses = [ra.status.as_u16(), rb.status.as_u16()];
+    statuses.sort();
+    assert_eq!(statuses, [200, 409]);
+    assert_eq!(
+        api.get(&path, auth).await.body,
+        if ra.status.is_success() {
+            a["identity"].clone()
+        } else {
+            b["identity"].clone()
+        }
+    );
+    assert_error(&api.put(&path, auth, setup).await, StatusCode::CONFLICT);
+    assert_error(&api.get(&path, Auth::ApiKey(&other.key)).await, StatusCode::NOT_FOUND);
+}

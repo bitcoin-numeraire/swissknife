@@ -6125,6 +6125,145 @@
         }
       }
     },
+    "/v1/me/wallets/{wallet_id}/identity": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Get the public keys enrolled for this wallet.",
+        "operationId": "get_wallet_identity",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public identity keys, or null before enrollment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/WalletIdentity"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Wallet not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Enroll or change the wallet's public identity with an optimistic concurrency check.",
+        "operationId": "set_wallet_identity",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetWalletIdentity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Current public identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletIdentity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Wallet not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Identity changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid public key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me/wallets/{wallet_id}/invoices": {
       "get": {
         "tags": [
@@ -11635,6 +11774,29 @@
           }
         }
       },
+      "SetWalletIdentity": {
+        "type": "object",
+        "required": [
+          "identity"
+        ],
+        "properties": {
+          "expected": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WalletIdentity",
+                "description": "Current public values reviewed by the owner. Omit for initial enrollment."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "identity": {
+            "$ref": "#/components/schemas/WalletIdentity"
+          }
+        },
+        "additionalProperties": false
+      },
       "SetupInfo": {
         "type": "object",
         "description": "App setup info.",
@@ -11999,6 +12161,25 @@
             "description": "Date of update in database"
           }
         }
+      },
+      "WalletIdentity": {
+        "type": "object",
+        "description": "Public identity of a wallet. Recovery material stays with the wallet owner.",
+        "required": [
+          "recovery_pubkey",
+          "nostr_pubkey"
+        ],
+        "properties": {
+          "nostr_pubkey": {
+            "type": "string",
+            "description": "Currently selected Nostr x-only public key, including an owner's explicit override."
+          },
+          "recovery_pubkey": {
+            "type": "string",
+            "description": "NIP-06 account-zero x-only public key derived from the wallet's identity phrase."
+          }
+        },
+        "additionalProperties": false
       },
       "WalletOffer": {
         "type": "object",

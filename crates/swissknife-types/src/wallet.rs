@@ -184,3 +184,21 @@ pub struct WalletFilter {
     #[serde(default)]
     pub order_direction: OrderDirection,
 }
+
+/// Public identity of a wallet. Recovery material stays with the wallet owner.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WalletIdentity {
+    /// NIP-06 account-zero x-only public key derived from the wallet's identity phrase.
+    pub recovery_pubkey: String,
+    /// Currently selected Nostr x-only public key, including an owner's explicit override.
+    pub nostr_pubkey: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetWalletIdentity {
+    pub identity: WalletIdentity,
+    /// Current public values reviewed by the owner. Omit for initial enrollment.
+    pub expected: Option<WalletIdentity>,
+}

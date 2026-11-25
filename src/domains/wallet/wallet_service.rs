@@ -3,6 +3,7 @@ use crate::application::{
     errors::{ApplicationError, DataError},
 };
 use async_trait::async_trait;
+use swissknife_types::{SetWalletIdentity, WalletIdentity};
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
@@ -104,6 +105,32 @@ impl WalletUseCases for WalletService {
         Ok(overviews)
     }
 
+    async fn identity(&self, account: Uuid, wallet: Uuid) -> Result<Option<WalletIdentity>, ApplicationError> {
+        self.verify_ownership(account, wallet).await?;
+        Ok(self.store.wallet.identity(wallet).await?)
+    }
+
+    async fn set_identity(
+        &self,
+        account: Uuid,
+        wallet: Uuid,
+        mut request: SetWalletIdentity,
+    ) -> Result<WalletIdentity, ApplicationError> {
+        self.verify_ownership(account, wallet).await?;
+        for identity in std::iter::once(&mut request.identity).chain(request.expected.iter_mut()) {
+            for key in [&mut identity.recovery_pubkey, &mut identity.nostr_pubkey] {
+                *key = key
+                    .parse::<bitcoin::secp256k1::XOnlyPublicKey>()
+                    .map_err(|_| DataError::Validation("Expected an x-only secp256k1 public key".into()))?
+                    .to_string();
+            }
+        }
+        self.store.wallet.set_identity(wallet, &request).await?;
+        if self.store.wallet.identity(wallet).await?.as_ref() != Some(&request.identity) {
+            return Err(DataError::Conflict("Wallet identity changed; review its current public keys".into()).into());
+        }
+        Ok(request.identity)
+    }
     async fn get_balance(&self, id: Uuid) -> Result<Balance, ApplicationError> {
         trace!(%id, "Fetching balance");
 

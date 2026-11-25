@@ -1,3 +1,4 @@
+use crate::infra::database::sea_orm::models::{prelude::WalletIdentity as IdentityEntity, wallet_identity as identity};
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{
@@ -5,6 +6,7 @@ use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, ExprTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect,
     QueryTrait, Set,
 };
+use swissknife_types::{SetWalletIdentity, WalletIdentity};
 use uuid::Uuid;
 
 use super::SeaOrmConnection;
@@ -285,6 +287,47 @@ where
         self.find_by_account_and_asset(account_id, asset_id)
             .await?
             .ok_or_else(|| DatabaseError::Insert("wallet was not available after idempotent provisioning".to_string()))
+    }
+
+    async fn identity(&self, wallet: Uuid) -> Result<Option<WalletIdentity>, DatabaseError> {
+        let row = IdentityEntity::find_by_id(wallet)
+            .one(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::FindOne(e.to_string()))?;
+        Ok(row.map(|row| WalletIdentity {
+            recovery_pubkey: row.recovery_pubkey,
+            nostr_pubkey: row.nostr_pubkey,
+        }))
+    }
+
+    async fn set_identity(&self, wallet: Uuid, request: &SetWalletIdentity) -> Result<(), DatabaseError> {
+        let keys = &request.identity;
+        if let Some(previous) = request.expected.as_ref() {
+            IdentityEntity::update_many()
+                .filter(identity::Column::WalletId.eq(wallet))
+                .filter(identity::Column::RecoveryPubkey.eq(&previous.recovery_pubkey))
+                .filter(identity::Column::NostrPubkey.eq(&previous.nostr_pubkey))
+                .col_expr(
+                    identity::Column::RecoveryPubkey,
+                    Expr::value(keys.recovery_pubkey.clone()),
+                )
+                .col_expr(identity::Column::NostrPubkey, Expr::value(keys.nostr_pubkey.clone()))
+                .exec(self.db.connection())
+                .await
+                .map_err(|e| DatabaseError::Update(e.to_string()))?;
+        } else {
+            IdentityEntity::insert(identity::ActiveModel {
+                wallet_id: Set(wallet),
+                recovery_pubkey: Set(keys.recovery_pubkey.clone()),
+                nostr_pubkey: Set(keys.nostr_pubkey.clone()),
+            })
+            .on_conflict(OnConflict::column(identity::Column::WalletId).do_nothing().to_owned())
+            .try_insert()
+            .exec(self.db.connection())
+            .await
+            .map_err(|e| DatabaseError::Insert(e.to_string()))?;
+        }
+        Ok(())
     }
 
     async fn get_balance(&self, id: Uuid) -> Result<Balance, DatabaseError> {

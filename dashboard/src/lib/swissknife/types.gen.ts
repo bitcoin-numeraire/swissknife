@@ -1291,6 +1291,11 @@ export type SendPaymentRequest = {
   wallet_id?: string | null;
 };
 
+export type SetWalletIdentity = {
+  expected?: WalletIdentity | null;
+  identity: WalletIdentity;
+};
+
 /**
  * App setup info.
  */
@@ -1505,6 +1510,20 @@ export type Wallet = {
    * Date of update in database
    */
   updated_at?: Date | null;
+};
+
+/**
+ * Public identity of a wallet. Recovery material stays with the wallet owner.
+ */
+export type WalletIdentity = {
+  /**
+   * Currently selected Nostr x-only public key, including an owner's explicit override.
+   */
+  nostr_pubkey: string;
+  /**
+   * NIP-06 account-zero x-only public key derived from the wallet's identity phrase.
+   */
+  recovery_pubkey: string;
 };
 
 export type WalletOffer = {
@@ -4535,6 +4554,78 @@ export type ListContactsResponses = {
 };
 
 export type ListContactsResponse = ListContactsResponses[keyof ListContactsResponses];
+
+export type GetWalletIdentityData = {
+  body?: never;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/identity';
+};
+
+export type GetWalletIdentityErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Wallet not found
+   */
+  404: ErrorResponse;
+};
+
+export type GetWalletIdentityError = GetWalletIdentityErrors[keyof GetWalletIdentityErrors];
+
+export type GetWalletIdentityResponses = {
+  /**
+   * Public identity keys, or null before enrollment
+   */
+  200: WalletIdentity | null;
+};
+
+export type GetWalletIdentityResponse =
+  GetWalletIdentityResponses[keyof GetWalletIdentityResponses];
+
+export type SetWalletIdentityData = {
+  body: SetWalletIdentity;
+  path: {
+    wallet_id: string;
+  };
+  query?: never;
+  url: '/v1/me/wallets/{wallet_id}/identity';
+};
+
+export type SetWalletIdentityErrors = {
+  /**
+   * Authentication required
+   */
+  401: ErrorResponse;
+  /**
+   * Wallet not found
+   */
+  404: ErrorResponse;
+  /**
+   * Identity changed
+   */
+  409: ErrorResponse;
+  /**
+   * Invalid public key
+   */
+  422: ErrorResponse;
+};
+
+export type SetWalletIdentityError = SetWalletIdentityErrors[keyof SetWalletIdentityErrors];
+
+export type SetWalletIdentityResponses = {
+  /**
+   * Current public identity
+   */
+  200: WalletIdentity;
+};
+
+export type SetWalletIdentityResponse =
+  SetWalletIdentityResponses[keyof SetWalletIdentityResponses];
 
 export type DeleteExpiredInvoicesData = {
   body?: never;

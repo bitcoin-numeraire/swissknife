@@ -21,5 +21,6 @@ pub mod offer_receipt;
 pub mod payment;
 pub mod payment_command;
 pub mod wallet;
+pub mod wallet_identity;
 pub mod wallet_offer;
 pub mod withdrawal_command;

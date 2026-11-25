@@ -222,6 +222,9 @@ import type {
   GetWalletBalanceResponses,
   GetWalletData,
   GetWalletErrors,
+  GetWalletIdentityData,
+  GetWalletIdentityErrors,
+  GetWalletIdentityResponses,
   GetWalletInvoiceData,
   GetWalletInvoiceErrors,
   GetWalletInvoiceResponses,
@@ -342,6 +345,9 @@ import type {
   SetupCheckData,
   SetupCheckErrors,
   SetupCheckResponses,
+  SetWalletIdentityData,
+  SetWalletIdentityErrors,
+  SetWalletIdentityResponses,
   SignInData,
   SignInErrors,
   SignInResponses,
@@ -1522,6 +1528,38 @@ export const listContacts = <ThrowOnError extends boolean = false>(
     url: '/v1/me/wallets/{wallet_id}/contacts',
     ...options,
   });
+
+/**
+ * Get the public keys enrolled for this wallet.
+ */
+export const getWalletIdentity = <ThrowOnError extends boolean = false>(
+  options: Options<GetWalletIdentityData, ThrowOnError>
+): RequestResult<GetWalletIdentityResponses, GetWalletIdentityErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetWalletIdentityResponses, GetWalletIdentityErrors, ThrowOnError>(
+    {
+      security: [{ scheme: 'bearer', type: 'http' }],
+      url: '/v1/me/wallets/{wallet_id}/identity',
+      ...options,
+    }
+  );
+
+/**
+ * Enroll or change the wallet's public identity with an optimistic concurrency check.
+ */
+export const setWalletIdentity = <ThrowOnError extends boolean = false>(
+  options: Options<SetWalletIdentityData, ThrowOnError>
+): RequestResult<SetWalletIdentityResponses, SetWalletIdentityErrors, ThrowOnError> =>
+  (options.client ?? client).put<SetWalletIdentityResponses, SetWalletIdentityErrors, ThrowOnError>(
+    {
+      security: [{ scheme: 'bearer', type: 'http' }],
+      url: '/v1/me/wallets/{wallet_id}/identity',
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    }
+  );
 
 /**
  * Delete expired invoices for a wallet.
