@@ -23,6 +23,21 @@ pub struct WalletServer {
 
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+struct MerchantChallenge {
+    /// Full WWW-Authenticate challenge from the merchant's HTTP 402 response.
+    challenge: String,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct PaidChallenge {
+    /// Original WWW-Authenticate challenge, paired with the matching wallet payment.
+    challenge: String,
+    payment_id: String,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct InvoiceDetails {
     /// Signed BOLT11 invoice to inspect.
     invoice: String,
@@ -87,6 +102,26 @@ fn invoice(value: &str) -> anyhow::Result<Bolt11Invoice> {
         .trim()
         .parse::<Bolt11Invoice>()
         .context("Invalid signed BOLT11 invoice")
+}
+
+fn describe_invoice(invoice: &Bolt11Invoice) -> Value {
+    json!({
+        "payment_hash": invoice.payment_hash().to_string(),
+        "amount_msat": invoice.amount_milli_satoshis().map(|amount| amount.to_string()),
+        "network": invoice.currency().to_string(),
+        "description": invoice.description().to_string(),
+        "payee": invoice.recover_payee_pub_key().to_string(),
+        "expires_at_unix": invoice.expires_at().map(|time| time.as_secs()),
+        "expired": invoice.is_expired()
+    })
+}
+
+fn merchant_invoice(header: &str) -> anyhow::Result<(l402_proto::L402Challenge, Bolt11Invoice)> {
+    ensure!(header.len() <= 16384, "Merchant challenge is too large");
+    let challenge =
+        l402_proto::L402Challenge::from_header(header).map_err(|_| anyhow::anyhow!("Invalid L402 challenge"))?;
+    let invoice = invoice(&challenge.invoice)?;
+    Ok((challenge, invoice))
 }
 
 impl WalletServer {
@@ -190,17 +225,53 @@ impl WalletServer {
         annotations(read_only_hint = true)
     )]
     fn decode_invoice(&self, Parameters(args): Parameters<InvoiceDetails>) -> CallToolResult {
-        result(invoice(&args.invoice).map(|invoice| {
-            json!({
-                "payment_hash": invoice.payment_hash().to_string(),
-                "amount_msat": invoice.amount_milli_satoshis().map(|amount| amount.to_string()),
-                "network": invoice.currency().to_string(),
-                "description": invoice.description().to_string(),
-                "payee": invoice.recover_payee_pub_key().to_string(),
-                "expires_at_unix": invoice.expires_at().map(|time| time.as_secs()),
-                "expired": invoice.is_expired()
-            })
+        result(invoice(&args.invoice).map(|invoice| describe_invoice(&invoice)))
+    }
+
+    #[tool(
+        description = "Inspect a merchant's L402 challenge and signed invoice before requesting payment approval. This performs no network access or payment.",
+        annotations(read_only_hint = true)
+    )]
+    fn decode_l402_challenge(&self, Parameters(args): Parameters<MerchantChallenge>) -> CallToolResult {
+        result(merchant_invoice(&args.challenge).map(|(challenge, invoice)| {
+            let mut value = describe_invoice(&invoice);
+            value["invoice"] = json!(challenge.invoice);
+            value
         }))
+    }
+
+    #[tool(
+        description = "Create a private L402 Authorization header from a matching settled payment in this wallet. Only present it to the merchant that issued the challenge. This tool does not send it anywhere or initiate payment.",
+        annotations(read_only_hint = true)
+    )]
+    async fn create_l402_authorization(&self, Parameters(args): Parameters<PaidChallenge>) -> CallToolResult {
+        use bitcoin::hashes::{sha256, Hash};
+        result(
+            async {
+                let (challenge, invoice) = merchant_invoice(&args.challenge)?;
+                let id = Uuid::parse_str(&args.payment_id).context("Invalid payment UUID")?;
+                let payment = self.wallet.get(&format!("payments/{id}")).await?;
+                ensure!(payment["status"] == "Settled", "Payment has not settled");
+                let lightning = &payment["lightning"];
+                let hash = invoice.payment_hash().to_string();
+                ensure!(
+                    lightning["payment_hash"] == hash,
+                    "Payment does not match the challenged invoice"
+                );
+                let preimage = lightning["payment_preimage"]
+                    .as_str()
+                    .context("Wallet has no settled invoice preimage")?;
+                let mut bytes = [0u8; 32];
+                hex::decode_to_slice(preimage, &mut bytes).context("Invalid payment preimage")?;
+                ensure!(
+                    sha256::Hash::hash(&bytes).to_string() == hash,
+                    "Invalid payment preimage"
+                );
+                let token = l402_proto::L402Token::new(challenge.macaroon, preimage.to_owned());
+                Ok(json!({"authorization":token.to_header_value()}))
+            }
+            .await,
+        )
     }
 
     #[tool(
