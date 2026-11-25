@@ -276,6 +276,12 @@ impl LnClient for ClnGrpcClient {
             offer_recurrence: response.offer_recurrence.is_some(),
             offer_absolute_expiry: response.offer_absolute_expiry,
             invreq_chain: response.invreq_chain.map(hex::encode),
+            invreq_bip_353_name: response
+                .invreq_bip_353_name
+                .map(|n| crate::domains::payment::Bip353InvoiceName {
+                    name: n.name,
+                    domain: n.domain,
+                }),
             invoice_created_at: response.invoice_created_at,
             invoice_relative_expiry: response.invoice_relative_expiry.map(u64::from),
             invoice_amount_msat: response.invoice_amount_msat.map(|a| a.msat),
@@ -283,17 +289,42 @@ impl LnClient for ClnGrpcClient {
         })
     }
 
+    async fn bip353_instructions(
+        &self,
+        name: &str,
+    ) -> Result<crate::domains::payment::Bip353Instructions, LightningError> {
+        let r = self
+            .client
+            .clone()
+            .fetch_bip353(cln::Fetchbip353Request { address: name.into() })
+            .await
+            .map_err(|e| LightningError::InvalidPaymentTarget(e.message().into()))?
+            .into_inner();
+        Ok(crate::domains::payment::Bip353Instructions {
+            proof: r.proof,
+            instructions: r
+                .instructions
+                .into_iter()
+                .map(|i| crate::domains::payment::Bip353Instruction {
+                    offer: i.offer,
+                    offchain_amount_msat: i.offchain_amount_msat,
+                })
+                .collect(),
+        })
+    }
     async fn fetch_offer_invoice(
         &self,
         offer: &str,
         amount_msat: u64,
         note: Option<String>,
+        bip353: Option<String>,
     ) -> Result<String, LightningError> {
         let mut client = self.client.clone();
         let mut request = tonic::Request::new(cln::FetchinvoiceRequest {
             offer: offer.into(),
             amount_msat: Some(cln::Amount { msat: amount_msat }),
             payer_note: note,
+            bip353,
             ..Default::default()
         });
         // CLN's gRPC bridge serializes the optional RPC timeout as a float.

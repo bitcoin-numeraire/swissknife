@@ -193,6 +193,45 @@ describe('SendMoneyDrawer', () => {
     }
   );
 
+  it('requires a new review when a BIP353 name rotates before submission', async () => {
+    const input = '₿shop@example.test';
+    const quote = {
+      ledger: Ledger.LIGHTNING,
+      amount_msat: 42001,
+      maximum_fee_msat: 1000,
+      maximum_total_msat: 43001,
+      estimated_fee_msat: null,
+      estimated_total_msat: null,
+    };
+    const first = 'a'.repeat(64);
+    const second = 'b'.repeat(64);
+    vi.mocked(estimateWalletPaymentFee)
+      .mockResolvedValueOnce(response({ ...quote, resolved_offer_id: first }))
+      .mockResolvedValueOnce(response({ ...quote, resolved_offer_id: second }));
+    vi.mocked(submitWalletPayment).mockRejectedValueOnce({
+      status: '409 Conflict',
+      code: 'payment_target_changed',
+    });
+    renderSendDrawer(input);
+    const send = () => screen.getByRole('button', { name: 'send_money.send' });
+    expect(send()).toBeDisabled();
+    const review = () =>
+      fireEvent.click(screen.getByRole('button', { name: 'send_money.review_bolt12' }));
+    review();
+    await waitFor(() => expect(send()).toBeEnabled());
+    fireEvent.click(send());
+    await waitFor(() => expect(submitWalletPayment).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(send()).toBeDisabled());
+    expect(sessionStorage.length).toBe(0);
+    review();
+    await waitFor(() => expect(send()).toBeEnabled());
+    fireEvent.click(send());
+    await waitFor(() => expect(submitWalletPayment).toHaveBeenCalledTimes(2));
+    const bodies = vi.mocked(submitWalletPayment).mock.calls.map(([options]) => options?.body);
+    expect(bodies.map((body) => body?.expected_offer_id)).toEqual([first, second]);
+    expect(bodies[0]?.idempotency_key).not.toBe(bodies[1]?.idempotency_key);
+  });
+
   it('recovers the original request after losing its response and reopening the drawer', async () => {
     vi.setSystemTime(new Date((invoiceTimestamp + 1) * 1000));
     vi.mocked(submitWalletPayment).mockRejectedValueOnce(new TypeError('Lost response'));

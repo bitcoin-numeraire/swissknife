@@ -97,6 +97,12 @@ impl IntoResponse for AuthenticationError {
 impl IntoResponse for DataError {
     fn into_response(self) -> Response {
         let (error_message, status) = match self {
+            DataError::PaymentTargetChanged => {
+                let status = StatusCode::CONFLICT;
+                let mut body = generate_body(status, self.to_string());
+                body.code = Some(swissknife_types::ErrorCode::PaymentTargetChanged);
+                return (status, body).into_response();
+            }
             DataError::InternalTransferRequired => {
                 let status = StatusCode::UNPROCESSABLE_ENTITY;
                 let mut body = generate_body(status, self.to_string());

@@ -357,6 +357,7 @@ mod tests {
 
     fn fee_estimate() -> PaymentFeeEstimate {
         PaymentFeeEstimate {
+            resolved_offer_id: None,
             ledger: crate::application::composition::Ledger::Lightning,
             amount_msat: 1_000,
             estimated_fee_msat: Some(10),

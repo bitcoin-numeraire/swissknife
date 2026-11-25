@@ -126,6 +126,7 @@ type RecipientKind =
   | 'bip21'
   | 'bolt11'
   | 'bolt12-offer'
+  | 'bip353'
   | 'bolt12-invoice'
   | 'lightning-address'
   | 'lnurl'
@@ -351,6 +352,7 @@ function detectRecipientKind(input: string): RecipientKind {
   }
 
   const lightning = stripLightningScheme(paymentRequest).toLowerCase();
+  if (lightning.startsWith('₿')) return 'bip353';
   if (lightning.startsWith('lno1')) return 'bolt12-offer';
   if (lightning.startsWith('lni1')) return 'bolt12-invoice';
 
@@ -480,6 +482,7 @@ function railLabel(kind: RecipientKind, t: (key: string) => string) {
   if (kind === 'bitcoin') return t('send_money.request_type_onchain');
   if (kind === 'internal') return t('send_money.request_type_internal');
   if (kind === 'bolt11') return t('send_money.request_type_bolt11');
+  if (kind === 'bip353') return t('send_money.request_type_bip353');
   if (kind === 'bolt12-offer') return t('send_money.request_type_bolt12_offer');
   if (kind === 'bolt12-invoice') return t('send_money.request_type_bolt12_invoice');
   if (kind === 'lnurl') return t('send_money.request_type_lnurl');
@@ -742,8 +745,14 @@ export function SendMoneyDrawer({
     [amountUnit, amountValue, fiatPrices, state.currency]
   );
   const activeWalletId = walletId || selectedWalletId || (!isAdmin ? wallet?.id : '');
-  const isBolt12 = kind === 'bolt12-offer' || kind === 'bolt12-invoice';
-  const canSendComment = ['lnurl', 'lightning-address', 'internal', 'bolt12-offer'].includes(kind);
+  const isBolt12 = kind === 'bolt12-offer' || kind === 'bolt12-invoice' || kind === 'bip353';
+  const canSendComment = [
+    'lnurl',
+    'lightning-address',
+    'internal',
+    'bolt12-offer',
+    'bip353',
+  ].includes(kind);
   const {
     feeEstimate,
     isEstimatingFee,
@@ -847,6 +856,7 @@ export function SendMoneyDrawer({
     !hasInvalidBitcoinAddress &&
     !amountExceedsAvailable &&
     (!isBolt12 || Boolean(feeEstimate)) &&
+    (kind !== 'bip353' || Boolean(feeEstimate?.resolved_offer_id)) &&
     (!isOnchain || hasApprovedCap) &&
     !feeExceedsAvailable &&
     !needsWallet &&
@@ -938,6 +948,7 @@ export function SendMoneyDrawer({
             ? requestBody.input
             : (bitcoinRequest.lightning ?? stripLightningScheme(input)),
           idempotency_key: requestId(),
+          ...(kind === 'bip353' ? { expected_offer_id: feeEstimate?.resolved_offer_id } : {}),
           maximum_fee_msat: isOnchain
             ? (feeCapMsat ?? null)
             : (feeEstimate?.maximum_fee_msat ?? null),
@@ -968,7 +979,10 @@ export function SendMoneyDrawer({
               detectRecipientKind(request.input)
             );
           // Timeout, connectivity and server errors can occur after admission.
-          if (!local && !/^4(?:00|04|22)\b/.test(failure?.status ?? '')) throw error;
+          const targetChanged = failure?.code === ErrorCode.PAYMENT_TARGET_CHANGED;
+          if (targetChanged) resetFeeEstimate();
+          if (!local && !targetChanged && !/^4(?:00|04|22)\b/.test(failure?.status ?? ''))
+            throw error;
           sessionStorage.removeItem(scope);
           setUnconfirmed(undefined);
           if (!local) throw error;

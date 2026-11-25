@@ -5,6 +5,9 @@ pub enum DataError {
     #[error("This destination requires an internal wallet transfer")]
     InternalTransferRequired,
 
+    #[error("This BIP353 name now points to a different offer. Review the new payment instructions.")]
+    PaymentTargetChanged,
+
     #[error("Conflict: {0}")]
     Conflict(String),
 

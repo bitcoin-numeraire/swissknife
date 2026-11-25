@@ -529,7 +529,10 @@ export type CreateWalletRequest = {
   asset_id: string;
 };
 
-export const ErrorCode = { INTERNAL_TRANSFER_REQUIRED: 'internal_transfer_required' } as const;
+export const ErrorCode = {
+  INTERNAL_TRANSFER_REQUIRED: 'internal_transfer_required',
+  PAYMENT_TARGET_CHANGED: 'payment_target_changed',
+} as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
@@ -1153,6 +1156,10 @@ export type PaymentFeeEstimate = {
    * Amount plus the Lightning cap or current on-chain fee, in millisatoshis.
    */
   maximum_total_msat: number;
+  /**
+   * Signed offer selected for a BIP353 name. Pass back as `expected_offer_id` at submission.
+   */
+  resolved_offer_id?: string | null;
 };
 
 /**
@@ -1275,7 +1282,7 @@ export type SendPaymentRequest = {
    */
   comment?: string | null;
   /**
-   * Recipient. Can be a Bolt11 invoice, LNURL or LN Address.
+   * Recipient. Accepts BOLT11, BOLT12, an explicit ₿ BIP353 name, LNURL, Lightning Address, or Bitcoin address/URI.
    */
   input: string;
   /**
@@ -1351,6 +1358,10 @@ export type SignUpRequest = {
 export type SubmitPaymentRequest = {
   amount_msat?: number | null;
   comment?: string | null;
+  /**
+   * If supplied, the DNSSEC-verified BIP353 offer ID must still match the reviewed value.
+   */
+  expected_offer_id?: string | null;
   idempotency_key: string;
   input: string;
   /**

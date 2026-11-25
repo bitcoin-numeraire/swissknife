@@ -212,17 +212,29 @@ impl LnClient for ClnRestClient {
             .map_err(|e| LightningError::InvalidPaymentTarget(e.to_string()))
     }
 
+    async fn bip353_instructions(
+        &self,
+        name: &str,
+    ) -> Result<crate::domains::payment::Bip353Instructions, LightningError> {
+        self.post_request("fetchbip353", &serde_json::json!({"address":name}))
+            .await
+            .map_err(|e| LightningError::InvalidPaymentTarget(e.to_string()))
+    }
     async fn fetch_offer_invoice(
         &self,
         offer: &str,
         amount_msat: u64,
         note: Option<String>,
+        bip353: Option<String>,
     ) -> Result<String, LightningError> {
         #[derive(serde::Deserialize)]
         struct FetchedInvoice {
             invoice: String,
         }
         let mut request = serde_json::json!({"offer":offer,"amount_msat":amount_msat,"timeout":15});
+        if let Some(name) = bip353 {
+            request["bip353"] = name.into();
+        }
         if let Some(note) = note {
             request["payer_note"] = serde_json::Value::String(note.to_owned());
         }

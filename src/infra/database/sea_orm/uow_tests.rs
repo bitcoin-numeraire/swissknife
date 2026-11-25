@@ -1153,6 +1153,7 @@ async fn payment_commands_reserve_once_claim_once_and_retain_deleted_keys() {
     let wallet = seed_wallet(&conn, 100_000).await;
     let uow = SeaOrmPaymentUnitOfWork::new(conn.clone());
     let request = SubmitPaymentRequest {
+        expected_offer_id: None,
         idempotency_key: Uuid::new_v4(),
         wallet_id: None,
         input: "synthetic invoice".into(),
@@ -1212,6 +1213,7 @@ async fn payment_commands_reserve_once_claim_once_and_retain_deleted_keys() {
     let rejected = SubmissionKey::new(
         wallet,
         &SubmitPaymentRequest {
+            expected_offer_id: None,
             idempotency_key: Uuid::new_v4(),
             ..request
         },

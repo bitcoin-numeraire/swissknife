@@ -1,7 +1,7 @@
 use chrono::Utc;
 use serde::Deserialize;
 
-use super::PaymentService;
+use super::{payment_input::Bolt12Target, PaymentService};
 use crate::{
     application::errors::{ApplicationError, DataError},
     domains::bitcoin::BtcNetwork,
@@ -24,12 +24,60 @@ pub struct DecodedBolt12 {
     pub offer_recurrence: bool,
     pub offer_absolute_expiry: Option<u64>,
     pub invreq_chain: Option<String>,
+    pub invreq_bip_353_name: Option<Bip353InvoiceName>,
     pub invoice_created_at: Option<u64>,
     pub invoice_relative_expiry: Option<u64>,
     pub invoice_amount_msat: Option<u64>,
     pub invoice_payment_hash: Option<String>,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct Bip353InvoiceName {
+    pub name: Option<String>,
+    pub domain: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Bip353Instructions {
+    pub proof: String,
+    pub instructions: Vec<Bip353Instruction>,
+}
+#[derive(Debug, Deserialize)]
+pub struct Bip353Instruction {
+    pub offer: Option<String>,
+    pub offchain_amount_msat: Option<u64>,
+}
+
+impl Bip353Instructions {
+    pub(super) fn select(self, amount: Option<u64>) -> Result<(String, Option<u64>), DataError> {
+        if self.proof.is_empty()
+            || !self.proof.len().is_multiple_of(2)
+            || !self.proof.bytes().all(|b| b.is_ascii_hexdigit())
+        {
+            return Err(DataError::Validation(
+                "No validated DNSSEC proof was returned for this name".into(),
+            ));
+        }
+        let mut offers = self
+            .instructions
+            .into_iter()
+            .filter_map(|i| i.offer.map(|offer| (offer, i.offchain_amount_msat)));
+        let (offer, fixed) = offers
+            .next()
+            .ok_or_else(|| DataError::Validation("This name has no Lightning offer".into()))?;
+        if offers.next().is_some() || !offer.get(..4).is_some_and(|prefix| prefix.eq_ignore_ascii_case("lno1")) {
+            return Err(DataError::Validation(
+                "This name does not specify one unambiguous Lightning offer".into(),
+            ));
+        }
+        if fixed.zip(amount).is_some_and(|(fixed, approved)| fixed != approved) {
+            return Err(DataError::Validation(
+                "Approved amount differs from the DNSSEC payment instructions".into(),
+            ));
+        }
+        Ok((offer, fixed.or(amount)))
+    }
+}
 fn present<'de, D: serde::Deserializer<'de>>(de: D) -> Result<bool, D::Error> {
     Ok(Option::<serde::de::IgnoredAny>::deserialize(de)?.is_some())
 }
@@ -40,6 +88,7 @@ pub(super) struct ResolvedBolt12 {
     pub hash: String,
     pub amount_msat: u64,
     pub description: Option<String>,
+    pub bip353: Option<String>,
 }
 
 impl ResolvedBolt12 {
@@ -52,6 +101,7 @@ impl ResolvedBolt12 {
             description: comment.or_else(|| self.description.clone()),
             lightning: Some(super::LnPayment {
                 payment_hash: self.hash.clone(),
+                ln_address: self.bip353.as_ref().map(|name| format!("₿{name}")),
                 ..Default::default()
             }),
             ..Default::default()
@@ -120,6 +170,19 @@ impl DecodedBolt12 {
 }
 
 impl PaymentService {
+    pub(super) async fn expand_bolt12(
+        &self,
+        target: Bolt12Target,
+        amount: Option<u64>,
+    ) -> Result<(String, Option<u64>, Option<String>), ApplicationError> {
+        match target {
+            Bolt12Target::Encoded(input) => Ok((input, amount, None)),
+            Bolt12Target::Name(name) => {
+                let (offer, amount) = self.ln_client.bip353_instructions(&name).await?.select(amount)?;
+                Ok((offer, amount, Some(name)))
+            }
+        }
+    }
     /// Inspecting an offer for a fee preview does not contact its issuer or create an invoice.
     pub(super) async fn inspect_bolt12(
         &self,
@@ -152,18 +215,23 @@ impl PaymentService {
     pub(super) async fn resolve_bolt12(
         &self,
         wallet: uuid::Uuid,
-        input: String,
+        target: Bolt12Target,
         amount: Option<u64>,
         note: Option<&str>,
+        expected_id: Option<&str>,
     ) -> Result<ResolvedBolt12, ApplicationError> {
+        let (input, amount, name) = self.expand_bolt12(target, amount).await?;
         let (decoded, approved) = self.inspect_bolt12(wallet, &input, amount).await?;
+        if expected_id.is_some_and(|id| Some(id) != decoded.offer_id.as_deref()) {
+            return Err(DataError::PaymentTargetChanged.into());
+        }
         let (invoice, decoded) = if decoded.kind == "bolt12 offer" {
             let id = decoded
                 .offer_id
                 .ok_or_else(|| DataError::Validation("Missing BOLT12 offer ID".into()))?;
             let invoice = self
                 .ln_client
-                .fetch_offer_invoice(&input, approved, note.map(str::to_owned))
+                .fetch_offer_invoice(&input, approved, note.map(str::to_owned), name.clone())
                 .await?;
             let result = self.ln_client.decode_bolt12(&invoice).await?;
             result.validate(self.bitcoin_wallet.network())?;
@@ -179,6 +247,18 @@ impl PaymentService {
                 DataError::Validation("Returned BOLT12 invoice differs from the approved amount".into()).into(),
             );
         }
+        if let Some(name) = name.as_deref() {
+            let signed = decoded
+                .invreq_bip_353_name
+                .as_ref()
+                .and_then(|n| n.name.as_ref().zip(n.domain.as_ref()))
+                .map(|(user, domain)| format!("{user}@{domain}"));
+            if signed.as_deref() != Some(name) {
+                return Err(
+                    DataError::Validation("Signed invoice does not identify the approved BIP353 name".into()).into(),
+                );
+            }
+        }
         let hash = decoded
             .invoice_payment_hash
             .filter(|h| h.len() == 64 && h.bytes().all(|b| b.is_ascii_hexdigit()))
@@ -188,6 +268,50 @@ impl PaymentService {
             hash,
             amount_msat: approved,
             description: decoded.offer_description,
+            bip353: name,
         })
+    }
+}
+
+#[cfg(test)]
+mod bip353_tests {
+    use super::super::payment_input::bip353_name;
+    use super::*;
+
+    #[test]
+    fn validates_and_normalizes_dns_names() {
+        assert_eq!(bip353_name("Shop@Example.TEST").unwrap(), "shop@example.test");
+        assert!(bip353_name("xn--bcher-kva@example.test").is_ok());
+        for bad in [
+            "",
+            "a@@example.test",
+            "@example.test",
+            "x@example..test",
+            "u/extra@example.test",
+            "ä@example.test",
+            "a@evil.test/path",
+        ] {
+            assert!(bip353_name(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn enforces_one_proven_lightning_destination_and_signed_amount() {
+        let read = |value: serde_json::Value| serde_json::from_value::<Bip353Instructions>(value).unwrap();
+        use serde_json::json;
+        let data = json!({"proof":"1122","instructions":[{"onchain":"tb1qexample"},{"offer":"lno1offer","offchain_amount_msat":47001}]});
+        assert_eq!(
+            read(data.clone()).select(None).unwrap(),
+            ("lno1offer".into(), Some(47001))
+        );
+        assert!(read(data).select(Some(47000)).is_err());
+        for input in [
+            json!({"proof":"","instructions":[{"offer":"lno1offer"}]}),
+            json!({"proof":"gg","instructions":[{"offer":"lno1offer"}]}),
+            json!({"proof":"1122","instructions":[{"offer":"lno1a"},{"offer":"lno1b"}]}),
+            json!({"proof":"1122","instructions":[{"onchain":"tb1qexample"}]}),
+        ] {
+            assert!(read(input).select(Some(1)).is_err());
+        }
     }
 }
