@@ -316,6 +316,11 @@
     "welcome_name": "Bienvenue, {{name}}"
   },
   "send_money": {
+    "accepted": "Paiement accepté",
+    "processing": "Paiement en cours",
+    "submitting": "Envoi du paiement…",
+    "confirm_submission": "La réponse du serveur reste à confirmer. Renvoyez la demande initiale pour connaître son état.",
+    "recover_submission": "Renvoyer la demande initiale",
     "title": "Envoyer",
     "to": "Vers",
     "scan_qr": "Scanner QR",

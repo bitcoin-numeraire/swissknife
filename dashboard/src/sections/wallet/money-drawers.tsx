@@ -50,6 +50,7 @@ import { useTranslate } from 'src/locales';
 import { useListWallets } from 'src/actions/wallet';
 import { useAccountContext } from 'src/contexts/account';
 import { useListBtcAddresses } from 'src/actions/btc-addresses';
+import { usePaymentSubmission } from 'src/actions/payment-submissions';
 import {
   useActiveWallet,
   useGetWalletInvoice,
@@ -59,10 +60,12 @@ import {
   pay,
   Ledger,
   walletPay,
+  ErrorCode,
   type Wallet,
   type Contact,
   type Invoice,
   type Payment,
+  submitPayment,
   InvoiceStatus,
   BtcAddressType,
   type LnAddress,
@@ -73,8 +76,11 @@ import {
   newWalletInvoice,
   estimatePaymentFee,
   generateBtcAddress,
+  submitWalletPayment,
   newWalletBtcAddress,
+  type PaymentSubmission,
   estimateWalletPaymentFee,
+  type SubmitPaymentRequest,
 } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
@@ -652,6 +658,22 @@ function SendDetailRow({ label, value }: { label: string; value?: string | numbe
 
 // ----------------------------------------------------------------------
 
+function paymentRequestId() {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  // Self-hosted dashboards on local HTTP still support getRandomValues.
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = 64 + (bytes[6] % 16);
+  bytes[8] = 128 + (bytes[8] % 64);
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20),
+  ].join('-');
+}
+
 const PAYMENT_FEEDBACK = {
   Pending: { color: 'warning', icon: 'solar:clock-circle-bold', title: 'send_money.pending' },
   Settled: { color: 'success', icon: 'solar:check-circle-bold', title: 'send_money.sent' },
@@ -678,8 +700,14 @@ export function SendMoneyDrawer({
   const [amountValue, setAmountValue] = useState('');
   const [amountUnit, setAmountUnit] = useState<AmountUnit>('sats');
   const [comment, setComment] = useState('');
-  const [payment, setPayment] = useState<Payment>();
-  const paymentFeedback = PAYMENT_FEEDBACK[payment?.status ?? 'Pending'];
+  const { account } = useAccountContext();
+  const [immediatePayment, setImmediatePayment] = useState<Payment>();
+  const [receipt, setReceipt] = useState<{ scope: string; submission: PaymentSubmission }>();
+  const [unconfirmed, setUnconfirmed] = useState<{
+    scope: string;
+    request: SubmitPaymentRequest;
+  }>();
+  const sendInFlight = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nowMs, setNowMs] = useState(0);
   const [selectedWalletId, setSelectedWalletId] = useState(walletId ?? '');
@@ -718,6 +746,38 @@ export function SendMoneyDrawer({
   const amountExceedsAvailable =
     balance != null && amountSats > 0 && amountMSats > Math.max(balance, 0);
   const activeWalletId = walletId || selectedWalletId || (!isAdmin ? wallet?.id : '');
+  const scope =
+    account?.id && activeWalletId
+      ? [
+          'swissknife.payment-submission',
+          account.id,
+          activeWalletId,
+          isAdmin ? 'admin' : 'wallet',
+        ].join('.')
+      : undefined;
+  const accepted = scope && receipt?.scope === scope ? receipt.submission : undefined;
+  const pendingRequest = scope && unconfirmed?.scope === scope ? unconfirmed.request : undefined;
+  const { data: liveSubmission } = usePaymentSubmission(
+    account?.id,
+    activeWalletId,
+    isAdmin,
+    accepted
+  );
+  const payment = liveSubmission?.payment ?? accepted?.payment ?? immediatePayment;
+  const paymentFeedback = PAYMENT_FEEDBACK[payment?.status ?? 'Pending'];
+  const useBackground = kind === 'lnurl' || kind === 'lightning-address' || hasLightningInvoice;
+
+  useEffect(() => {
+    if (!open || !scope) return;
+    try {
+      const value = sessionStorage.getItem(scope);
+      setUnconfirmed(
+        value ? { scope, request: JSON.parse(value) as SubmitPaymentRequest } : undefined
+      );
+    } catch (error) {
+      handleActionError(error);
+    }
+  }, [open, scope]);
   const canSendComment = kind === 'lnurl' || kind === 'lightning-address' || kind === 'internal';
   const requestBody = useMemo(
     () => ({
@@ -757,7 +817,8 @@ export function SendMoneyDrawer({
     !hasInvalidBitcoinAddress &&
     !amountExceedsAvailable &&
     !feeExceedsAvailable &&
-    !needsWallet;
+    !needsWallet &&
+    (!useBackground || Boolean(scope));
   const canEstimateFee =
     kind !== 'unknown' &&
     kind !== 'internal' &&
@@ -821,30 +882,82 @@ export function SendMoneyDrawer({
     setAmountValue('');
     setAmountUnit('sats');
     setComment('');
-    setPayment(undefined);
+    setImmediatePayment(undefined);
+    setReceipt(undefined);
     resetFeeEstimate();
     setSelectedWalletId(walletId ?? '');
     onClose();
   }, [onClose, resetFeeEstimate, walletId]);
 
   const handlePay = async () => {
+    if (sendInFlight.current || !activeWalletId) return;
+    sendInFlight.current = true;
+    setIsSubmitting(true);
+
     try {
-      setIsSubmitting(true);
+      const background = Boolean(pendingRequest) || useBackground;
+      let body = requestBody;
+      if (background) {
+        if (!scope) return;
+        const request: SubmitPaymentRequest = pendingRequest ?? {
+          ...requestBody,
+          input: bitcoinRequest.lightning ?? stripLightningScheme(input),
+          idempotency_key: paymentRequestId(),
+          maximum_fee_msat: feeEstimate?.maximum_fee_msat ?? null,
+        };
+        setInput(request.input);
+        // Persist exactly what the user approved before issuing a request. Reloading or
+        // reopening the drawer can then recover a lost response even after the wallet debit.
+        sessionStorage.setItem(scope, JSON.stringify(request));
+        setUnconfirmed({ scope, request });
+        let local = false;
+        try {
+          const { data } = isAdmin
+            ? await submitPayment({
+                body: { ...request, wallet_id: activeWalletId },
+                throwOnError: true,
+              })
+            : await submitWalletPayment({
+                path: { wallet_id: activeWalletId },
+                body: request,
+                throwOnError: true,
+              });
+          setReceipt({ scope, submission: data });
+        } catch (error) {
+          const failure = error as { code?: unknown; status?: string } | null;
+          local =
+            failure?.code === ErrorCode.INTERNAL_TRANSFER_REQUIRED &&
+            ['bolt11', 'lightning-address', 'internal'].includes(
+              detectRecipientKind(request.input)
+            );
+          // Timeout, connectivity and server errors can occur after admission.
+          if (!local && !/^4(?:00|04|22)\b/.test(failure?.status ?? '')) throw error;
+          sessionStorage.removeItem(scope);
+          setUnconfirmed(undefined);
+          if (!local) throw error;
+        }
+        sessionStorage.removeItem(scope);
+        setUnconfirmed(undefined);
+        if (!local) {
+          onSuccess?.();
+          return;
+        }
+        body = {
+          input: request.input,
+          amount_msat: request.amount_msat ?? null,
+          comment: request.comment ?? null,
+        };
+      }
+
       const { data } = isAdmin
-        ? await pay({ body: { ...requestBody, wallet_id: activeWalletId! } })
-        : await walletPay({
-            path: { wallet_id: activeWalletId! },
-            body: {
-              input: requestBody.input,
-              comment: requestBody.comment,
-              amount_msat: requestBody.amount_msat,
-            },
-          });
-      setPayment(data);
+        ? await pay({ body: { ...body, wallet_id: activeWalletId }, throwOnError: true })
+        : await walletPay({ path: { wallet_id: activeWalletId }, body, throwOnError: true });
+      setImmediatePayment(data);
       onSuccess?.();
     } catch (error) {
       handleActionError(error);
     } finally {
+      sendInFlight.current = false;
       setIsSubmitting(false);
     }
   };
@@ -926,7 +1039,15 @@ export function SendMoneyDrawer({
                 <Iconify icon={paymentFeedback.icon} width={42} />
               </Box>
               <Stack spacing={1}>
-                <Typography variant="h5">{t(paymentFeedback.title)}</Typography>
+                <Typography variant="h5">
+                  {t(
+                    liveSubmission?.state === 'accepted'
+                      ? 'send_money.accepted'
+                      : liveSubmission?.state === 'processing'
+                        ? 'send_money.processing'
+                        : paymentFeedback.title
+                  )}
+                </Typography>
                 <SatsWithIcon amountMSats={payment.amount_msat} variant="h4" />
                 <Typography variant="body2" color="text.secondary">
                   {truncateText(input, 42)}
@@ -939,6 +1060,21 @@ export function SendMoneyDrawer({
               </Stack>
               <Button variant="contained" color="inherit" onClick={handleClose}>
                 {t('done')}
+              </Button>
+            </Stack>
+          ) : pendingRequest ? (
+            <Stack spacing={2}>
+              <Alert severity="info">
+                {t(isSubmitting ? 'send_money.submitting' : 'send_money.confirm_submission')}
+              </Alert>
+              <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
+                {truncateText(pendingRequest.input, 54)}
+              </Typography>
+              {pendingRequest.amount_msat != null && (
+                <SatsWithIcon amountMSats={pendingRequest.amount_msat} />
+              )}
+              <Button variant="contained" loading={isSubmitting} onClick={handlePay}>
+                {t('send_money.recover_submission')}
               </Button>
             </Stack>
           ) : (

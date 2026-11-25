@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- The send drawer tracks background Lightning payments and recovers the original request after a lost response.
+
 - External Lightning payments support idempotent background submission, a wallet-scoped status resource and resumable execution events.
 
 - The dashboard notification drawer shows unread payments across wallets, links to individual transactions and supports account-wide read and archive actions.

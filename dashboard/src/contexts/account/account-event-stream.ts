@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { endpointKeys } from 'src/actions/keys';
 import { streamAccountEvents } from 'src/lib/swissknife';
 import { isNotificationKey } from 'src/actions/notifications';
+import { paymentSubmissionKey } from 'src/actions/payment-submissions';
 
 const GLOBAL_EVENT_KEYS = new Set<unknown>([
   endpointKeys.account.get,
@@ -50,6 +51,12 @@ type AccountEventStreamConsumerOptions = {
 };
 
 export function isAccountEventCacheKey(key: unknown, event?: ClientEvent, accountId?: string) {
+  if (Array.isArray(key) && key[0] === paymentSubmissionKey) {
+    return (
+      key[3] === accountId &&
+      (!event || (key[1] === event.wallet_id && key[2] === event.resource_id))
+    );
+  }
   if (GLOBAL_EVENT_KEYS.has(key) || isNotificationKey(key, accountId)) return true;
 
   return (

@@ -1,3 +1,4 @@
+import { SWRConfig } from 'swr';
 import { decode } from 'light-bolt11-decoder';
 import { it, vi, expect, describe, afterEach, beforeEach } from 'vitest';
 import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
@@ -11,8 +12,13 @@ import {
   walletPay,
   type Payment,
   PaymentStatus,
+  submitPayment,
   estimatePaymentFee,
+  submitWalletPayment,
+  getPaymentSubmission,
+  type PaymentSubmission,
   estimateWalletPaymentFee,
+  getWalletPaymentSubmission,
 } from 'src/lib/swissknife';
 
 import { SendMoneyDrawer } from './money-drawers';
@@ -25,11 +31,18 @@ vi.mock('src/locales', () => ({
 vi.mock('src/components/settings', () => ({
   useSettingsContext: () => ({ state: { currency: 'USD', displayUnit: 'sats' } }),
 }));
+vi.mock('src/contexts/account', () => ({
+  useAccountContext: () => ({ account: { id: 'alice' } }),
+}));
 vi.mock('src/actions/account-wallet', () => ({
   useActiveWallet: () => ({ wallet: { id: 'wallet-1' } }),
 }));
 vi.mock(import('src/lib/swissknife'), async (importOriginal) => ({
   ...(await importOriginal()),
+  submitPayment: vi.fn(),
+  submitWalletPayment: vi.fn(),
+  getPaymentSubmission: vi.fn(),
+  getWalletPaymentSubmission: vi.fn(),
   pay: vi.fn(),
   walletPay: vi.fn(),
   estimatePaymentFee: vi.fn(),
@@ -52,24 +65,27 @@ const invoiceExpiryMs = (invoiceTimestamp + invoiceDetails.expiry) * 1000;
 
 function renderSendDrawer(input = unified, isAdmin = false) {
   return render(
-    <ThemeProvider theme={createTheme()}>
-      <SendMoneyDrawer
-        open
-        isAdmin={isAdmin}
-        walletId="wallet-1"
-        balance={100_000_000}
-        contacts={[]}
-        fiatPrices={{ USD: 100_000 }}
-        initialInput={input}
-        onClose={vi.fn()}
-      />
-    </ThemeProvider>
+    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+      <ThemeProvider theme={createTheme()}>
+        <SendMoneyDrawer
+          open
+          isAdmin={isAdmin}
+          walletId="wallet-1"
+          balance={100_000_000}
+          contacts={[]}
+          fiatPrices={{ USD: 100_000 }}
+          initialInput={input}
+          onClose={vi.fn()}
+        />
+      </ThemeProvider>
+    </SWRConfig>
   );
 }
 
 describe('SendMoneyDrawer', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    sessionStorage.clear();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-19T00:00:00Z'));
     const quote = {
@@ -88,6 +104,15 @@ describe('SendMoneyDrawer', () => {
       ledger: Ledger.ONCHAIN,
       status: PaymentStatus.PENDING,
     } as Payment;
+    const receipt = {
+      state: 'accepted',
+      payment: { ...payment, wallet_id: 'wallet-1' },
+      status_url: '/v1/payments/submissions/payment-1',
+    } as PaymentSubmission;
+    vi.mocked(submitWalletPayment).mockResolvedValue(response(receipt));
+    vi.mocked(submitPayment).mockResolvedValue(response(receipt));
+    vi.mocked(getWalletPaymentSubmission).mockResolvedValue(response(receipt));
+    vi.mocked(getPaymentSubmission).mockResolvedValue(response(receipt));
     vi.mocked(walletPay).mockResolvedValue(response(payment));
     vi.mocked(pay).mockResolvedValue(response(payment));
   });
@@ -96,10 +121,18 @@ describe('SendMoneyDrawer', () => {
 
   describe.each([false, true])('payment feedback (admin: %s)', (isAdmin) => {
     it.each([
-      { status: PaymentStatus.PENDING, title: 'send_money.pending' },
-      { status: PaymentStatus.SETTLED, title: 'send_money.sent' },
-      { status: PaymentStatus.FAILED, title: 'transaction_details.failed' },
-    ])('shows $status from a successful HTTP response', async ({ status, title }) => {
+      {
+        status: PaymentStatus.PENDING,
+        state: 'processing' as const,
+        title: 'send_money.processing',
+      },
+      { status: PaymentStatus.SETTLED, state: 'settled' as const, title: 'send_money.sent' },
+      {
+        status: PaymentStatus.FAILED,
+        state: 'failed' as const,
+        title: 'transaction_details.failed',
+      },
+    ])('shows $status from a successful HTTP response', async ({ status, state, title }) => {
       vi.setSystemTime(new Date((invoiceTimestamp + 1) * 1000));
       const payment = {
         id: 'payment-1',
@@ -107,14 +140,15 @@ describe('SendMoneyDrawer', () => {
         ledger: Ledger.LIGHTNING,
         status,
       } as Payment;
-      vi.mocked(walletPay).mockResolvedValue(response(payment));
-      vi.mocked(pay).mockResolvedValue(response(payment));
+      const receipt = { state, payment, status_url: '/v1/payments/submissions/payment-1' };
+      vi.mocked(getWalletPaymentSubmission).mockResolvedValue(response(receipt));
+      vi.mocked(getPaymentSubmission).mockResolvedValue(response(receipt));
       renderSendDrawer(unified, isAdmin);
 
       fireEvent.click(screen.getByRole('button', { name: 'send_money.send' }));
 
       expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument();
-      expect(isAdmin ? pay : walletPay).toHaveBeenCalledOnce();
+      expect(isAdmin ? submitPayment : submitWalletPayment).toHaveBeenCalledOnce();
       if (status !== PaymentStatus.SETTLED) {
         expect(screen.queryByText('send_money.sent')).not.toBeInTheDocument();
       }
@@ -123,6 +157,36 @@ describe('SendMoneyDrawer', () => {
         expect(screen.queryByRole('button', { name: 'send_money.send' })).not.toBeInTheDocument();
       }
     });
+  });
+
+  it('recovers the original request after losing its response and reopening the drawer', async () => {
+    vi.setSystemTime(new Date((invoiceTimestamp + 1) * 1000));
+    vi.mocked(submitWalletPayment).mockRejectedValueOnce(new TypeError('Lost response'));
+    const first = renderSendDrawer();
+    fireEvent.click(screen.getByRole('button', { name: 'send_money.send' }));
+    expect(await screen.findByText('send_money.confirm_submission')).toBeInTheDocument();
+    first.unmount();
+    renderSendDrawer('');
+    fireEvent.click(await screen.findByRole('button', { name: 'send_money.recover_submission' }));
+    expect(await screen.findByRole('heading', { name: 'send_money.accepted' })).toBeInTheDocument();
+    const requests = vi.mocked(submitWalletPayment).mock.calls.map(([options]) => options?.body);
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toEqual(requests[1]);
+    expect(walletPay).not.toHaveBeenCalled();
+    expect(sessionStorage.length).toBe(0);
+  });
+
+  it('uses the instant wallet path only after the server identifies a local invoice', async () => {
+    vi.setSystemTime(new Date((invoiceTimestamp + 1) * 1000));
+    vi.mocked(submitWalletPayment).mockRejectedValueOnce({
+      status: '422 Unprocessable Entity',
+      code: 'internal_transfer_required',
+    });
+    renderSendDrawer();
+    fireEvent.click(screen.getByRole('button', { name: 'send_money.send' }));
+    await waitFor(() => expect(walletPay).toHaveBeenCalledOnce());
+    expect(vi.mocked(walletPay).mock.calls[0][0]?.body.input).toBe(invoice);
+    expect(sessionStorage.length).toBe(0);
   });
 
   it('blocks quote and send until the payer explicitly selects an on-chain request', () => {
@@ -160,6 +224,7 @@ describe('SendMoneyDrawer', () => {
       fireEvent.click(screen.getByRole('button', { name: 'send_money.send_onchain' }));
       await waitFor(() => expect(send).toHaveBeenCalledOnce());
       expect(vi.mocked(send).mock.calls[0][0]).toEqual({
+        throwOnError: true,
         ...(!isAdmin && { path: { wallet_id: 'wallet-1' } }),
         body: {
           input: onchain,
@@ -230,9 +295,10 @@ describe('SendMoneyDrawer', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'send_money.estimate_fee' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'send_money.send' }));
-    await waitFor(() => expect(walletPay).toHaveBeenCalledOnce());
-    expect(vi.mocked(walletPay).mock.calls[0][0]?.body).toEqual({
-      input: unified,
+    await waitFor(() => expect(submitWalletPayment).toHaveBeenCalledOnce());
+    expect(vi.mocked(submitWalletPayment).mock.calls[0][0]?.body).toMatchObject({
+      idempotency_key: expect.any(String),
+      input: invoice,
       amount_msat: 2_000_000,
       comment: null,
     });

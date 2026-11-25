@@ -317,6 +317,11 @@
     "welcome_name": "Welcome, {{name}}"
   },
   "send_money": {
+    "accepted": "Payment accepted",
+    "processing": "Payment processing",
+    "submitting": "Submitting payment…",
+    "confirm_submission": "The server response is unconfirmed. Retry the original request to recover its status.",
+    "recover_submission": "Retry original request",
     "title": "Send",
     "to": "To",
     "scan_qr": "Scan QR",
