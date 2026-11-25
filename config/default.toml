@@ -82,7 +82,7 @@ leeway = "60s"
 
 [jwt]
 token_expiry = "1h"
-secret = "CHANGE_ME" # Recommended to use secret instead
+secret = "" # Set SWISSKNIFE_JWT__SECRET for local authentication.
 
 # Database
 [database]
