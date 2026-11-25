@@ -48,6 +48,7 @@ import {
   listWalletsResponseTransformer,
   newWalletBtcAddressResponseTransformer,
   newWalletInvoiceResponseTransformer,
+  patchAccountPreferencesResponseTransformer,
   payResponseTransformer,
   registerAccountAddressResponseTransformer,
   registerAddressResponseTransformer,
@@ -243,6 +244,9 @@ import type {
   NewWalletInvoiceData,
   NewWalletInvoiceErrors,
   NewWalletInvoiceResponses,
+  PatchAccountPreferencesData,
+  PatchAccountPreferencesErrors,
+  PatchAccountPreferencesResponses,
   PayData,
   PayErrors,
   PayResponses,
@@ -1235,6 +1239,31 @@ export const getAccountPreferences = <ThrowOnError extends boolean = false>(
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/me/preferences',
     ...options,
+  });
+
+/**
+ * Merge selected dashboard settings for the authenticated account.
+ *
+ * Each supplied object merges recursively. Null removes a key and arrays replace the previous
+ * array. Concurrent updates to different keys preserve both changes. An object patch applied to a
+ * legacy scalar starts from an empty object.
+ */
+export const patchAccountPreferences = <ThrowOnError extends boolean = false>(
+  options: Options<PatchAccountPreferencesData, ThrowOnError>
+): RequestResult<PatchAccountPreferencesResponses, PatchAccountPreferencesErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    PatchAccountPreferencesResponses,
+    PatchAccountPreferencesErrors,
+    ThrowOnError
+  >({
+    responseTransformer: patchAccountPreferencesResponseTransformer,
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/me/preferences',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
 
 /**

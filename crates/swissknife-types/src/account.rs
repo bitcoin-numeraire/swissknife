@@ -86,6 +86,14 @@ pub struct UpdateAccountPreferencesRequest {
     pub dashboard_settings: Value,
 }
 
+/// Merge selected fields into the authenticated account's dashboard settings.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PatchAccountPreferencesRequest {
+    /// Object merge patch. Null removes a key. Omitted keys keep their values.
+    #[schema(example = json!({ "hide_balances": true }))]
+    pub dashboard_settings: std::collections::BTreeMap<String, Value>,
+}
+
 /// Create an account.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateAccountRequest {

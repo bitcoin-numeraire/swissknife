@@ -5195,6 +5195,69 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Merge selected dashboard settings for the authenticated account.",
+        "description": "Each supplied object merges recursively. Null removes a key and arrays replace the previous\narray. Concurrent updates to different keys preserve both changes. An object patch applied to a\nlegacy scalar starts from an empty object.",
+        "operationId": "patch_account_preferences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchAccountPreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"401 Unauthorized\",\n    \"reason\": \"Invalid credentials\"\n}\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid settings object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"422 Unprocessable Entity\",\n    \"reason\": \"Validation failed: ...\"\n}\n"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": "\n{\n    \"status\": \"500 Internal Server Error\",\n    \"reason\": \"Internal server error, Please contact your administrator or try later\"\n}\n"
+              }
+            }
+          }
+        }
       }
     },
     "/v1/me/wallets": {
@@ -9734,6 +9797,26 @@
           "Asc",
           "Desc"
         ]
+      },
+      "PatchAccountPreferencesRequest": {
+        "type": "object",
+        "description": "Merge selected fields into the authenticated account's dashboard settings.",
+        "required": [
+          "dashboard_settings"
+        ],
+        "properties": {
+          "dashboard_settings": {
+            "type": "object",
+            "description": "Object merge patch. Null removes a key. Omitted keys keep their values.",
+            "additionalProperties": {},
+            "propertyNames": {
+              "type": "string"
+            },
+            "example": {
+              "hide_balances": true
+            }
+          }
+        }
       },
       "Payment": {
         "type": "object",

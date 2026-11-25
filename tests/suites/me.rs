@@ -148,6 +148,57 @@ mod preferences {
     use super::*;
 
     #[tokio::test]
+    async fn concurrent_patches_preserve_other_keys_and_account_isolation() {
+        let app = app().await;
+        let admin = app.admin_token().await;
+        let alice = app.create_account_with_wallet(admin, "preferences-patch").await;
+        let bob = app.create_account_with_wallet(admin, "preferences-other").await;
+        let url = "/v1/me/preferences";
+        let api = app.api();
+        let before = api
+            .put(
+                url,
+                Auth::ApiKey(&alice.key),
+                json!({"dashboard_settings":{"layout":{"density":"compact","old":true},"currency":"CHF"}}),
+            )
+            .await;
+        assert_status(&before, StatusCode::OK);
+        let (privacy, layout) = tokio::join!(
+            api.patch(
+                url,
+                Auth::ApiKey(&alice.key),
+                json!({"dashboard_settings":{"hide_balances":true}})
+            ),
+            api.patch(
+                url,
+                Auth::ApiKey(&alice.key),
+                json!({"dashboard_settings":{"layout":{"old":null,"mode":"list"}}})
+            )
+        );
+        assert_status(&privacy, StatusCode::OK);
+        assert_status(&layout, StatusCode::OK);
+        let result = api
+            .get(url, Auth::ApiKey(&alice.key))
+            .await
+            .parse::<AccountPreferences>();
+        assert_eq!(
+            result.dashboard_settings,
+            json!({"hide_balances":true,"currency":"CHF","layout":{"density":"compact","mode":"list"}})
+        );
+        assert_eq!(
+            api.get(url, Auth::ApiKey(&bob.key))
+                .await
+                .parse::<AccountPreferences>()
+                .dashboard_settings,
+            json!({})
+        );
+        let denied = api
+            .patch(url, Auth::None, json!({"dashboard_settings":{"hide_balances":false}}))
+            .await;
+        assert_error(&denied, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
     async fn get_and_replace_dashboard_settings() {
         let app = app().await;
         let token = app.admin_token().await;

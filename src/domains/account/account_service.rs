@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use serde_json::Value;
 use tracing::{debug, info, trace};
 use uuid::Uuid;
 
@@ -8,7 +7,10 @@ use crate::application::{
     errors::{ApplicationError, DataError},
 };
 
-use super::{Account, AccountFilter, AccountPreferences, AccountUseCases, CreateAccountRequest, Permission};
+use super::{
+    Account, AccountFilter, AccountPreferences, AccountUseCases, CreateAccountRequest, DashboardSettingsUpdate,
+    Permission,
+};
 
 pub struct AccountService {
     store: AppStore,
@@ -99,7 +101,7 @@ impl AccountUseCases for AccountService {
     async fn update_preferences(
         &self,
         id: Uuid,
-        dashboard_settings: Value,
+        dashboard_settings: DashboardSettingsUpdate,
     ) -> Result<AccountPreferences, ApplicationError> {
         debug!(%id, "Updating account preferences");
 

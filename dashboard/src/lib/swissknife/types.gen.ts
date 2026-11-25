@@ -955,6 +955,18 @@ export const OrderDirection = { ASC: 'Asc', DESC: 'Desc' } as const;
 export type OrderDirection = (typeof OrderDirection)[keyof typeof OrderDirection];
 
 /**
+ * Merge selected fields into the authenticated account's dashboard settings.
+ */
+export type PatchAccountPreferencesRequest = {
+  /**
+   * Object merge patch. Null removes a key. Omitted keys keep their values.
+   */
+  dashboard_settings: {
+    [key: string]: unknown;
+  };
+};
+
+/**
  * An outgoing payment, over Lightning, on-chain, or internal to the instance.
  */
 export type Payment = {
@@ -3838,6 +3850,41 @@ export type GetAccountPreferencesResponses = {
 
 export type GetAccountPreferencesResponse =
   GetAccountPreferencesResponses[keyof GetAccountPreferencesResponses];
+
+export type PatchAccountPreferencesData = {
+  body: PatchAccountPreferencesRequest;
+  path?: never;
+  query?: never;
+  url: '/v1/me/preferences';
+};
+
+export type PatchAccountPreferencesErrors = {
+  /**
+   * Unauthorized
+   */
+  401: ErrorResponse;
+  /**
+   * Invalid settings object
+   */
+  422: ErrorResponse;
+  /**
+   * Internal Server Error
+   */
+  500: ErrorResponse;
+};
+
+export type PatchAccountPreferencesError =
+  PatchAccountPreferencesErrors[keyof PatchAccountPreferencesErrors];
+
+export type PatchAccountPreferencesResponses = {
+  /**
+   * Updated
+   */
+  200: AccountPreferences;
+};
+
+export type PatchAccountPreferencesResponse =
+  PatchAccountPreferencesResponses[keyof PatchAccountPreferencesResponses];
 
 export type UpdateAccountPreferencesData = {
   body: UpdateAccountPreferencesRequest;

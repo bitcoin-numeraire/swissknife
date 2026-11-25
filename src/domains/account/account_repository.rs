@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::application::errors::DatabaseError;
 
-use super::{Account, AccountFilter, AccountPreferences, AuthProvider, Permission};
+use super::{Account, AccountFilter, AccountPreferences, AuthProvider, DashboardSettingsUpdate, Permission};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -27,7 +27,7 @@ pub trait AccountRepository: Send + Sync {
     async fn update_preferences(
         &self,
         id: Uuid,
-        dashboard_settings: serde_json::Value,
+        dashboard_settings: DashboardSettingsUpdate,
     ) -> Result<Option<AccountPreferences>, DatabaseError>;
     async fn delete_many(&self, filter: AccountFilter) -> Result<u64, DatabaseError>;
 }

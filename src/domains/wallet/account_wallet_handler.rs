@@ -18,9 +18,9 @@ use uuid::Uuid;
 
 use swissknife_types::{
     Account, AccountPreferences, ClientEvent, ClientEventStreamQuery, ClientEventType, CreateApiKeyRequest,
-    CreateWalletRequest, ErrorResponse, NewBtcAddressRequest, NewInvoiceRequest, PaymentFeeEstimate,
-    RegisterLnAddressRequest, SendPaymentRequest, UpdateAccountPreferencesRequest, UpdateAccountRequest,
-    UpdateLnAddressRequest,
+    CreateWalletRequest, ErrorResponse, NewBtcAddressRequest, NewInvoiceRequest, PatchAccountPreferencesRequest,
+    PaymentFeeEstimate, RegisterLnAddressRequest, SendPaymentRequest, UpdateAccountPreferencesRequest,
+    UpdateAccountRequest, UpdateLnAddressRequest,
 };
 
 use crate::{
@@ -33,7 +33,7 @@ use crate::{
         errors::{ApplicationError, DataError},
     },
     domains::{
-        account::{ApiKey, ApiKeyFilter, User},
+        account::{ApiKey, ApiKeyFilter, DashboardSettingsUpdate, User},
         bitcoin::{BtcAddress, BtcAddressFilter},
         invoice::{Invoice, InvoiceFilter, InvoiceStatus},
         ln_address::{LnAddress, LnAddressFilter},
@@ -52,6 +52,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         update_current_account,
         get_account_preferences,
         update_account_preferences,
+        patch_account_preferences,
         get_account_address,
         register_account_address,
         update_account_address,
@@ -86,6 +87,7 @@ use super::{Balance, Contact, Wallet, WalletFilter};
         ClientEventStreamQuery,
         UpdateAccountRequest,
         UpdateAccountPreferencesRequest,
+        PatchAccountPreferencesRequest,
         CreateWalletRequest,
         Wallet,
         Balance,
@@ -117,7 +119,10 @@ pub fn account_router() -> Router<Arc<AppServices>> {
         .route("/events", get(stream_account_events))
         .route("/", put(update_current_account))
         .route("/preferences", get(get_account_preferences))
-        .route("/preferences", put(update_account_preferences))
+        .route(
+            "/preferences",
+            put(update_account_preferences).patch(patch_account_preferences),
+        )
         .route("/lightning-address", get(get_account_address))
         .route("/lightning-address", post(register_account_address))
         .route("/lightning-address", put(update_account_address))
@@ -386,7 +391,44 @@ async fn update_account_preferences(
     Ok(Json(
         services
             .account
-            .update_preferences(user.account_id, payload.dashboard_settings)
+            .update_preferences(
+                user.account_id,
+                DashboardSettingsUpdate::Replace(payload.dashboard_settings),
+            )
+            .await?,
+    ))
+}
+
+/// Merge selected dashboard settings for the authenticated account.
+///
+/// Each supplied object merges recursively. Null removes a key and arrays replace the previous
+/// array. Concurrent updates to different keys preserve both changes. An object patch applied to a
+/// legacy scalar starts from an empty object.
+#[utoipa::path(
+    patch,
+    path = "/preferences",
+    tag = "Me",
+    context_path = CONTEXT_PATH,
+    request_body = PatchAccountPreferencesRequest,
+    responses(
+        (status = 200, description = "Updated", body = AccountPreferences),
+        (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
+        (status = 422, description = "Invalid settings object", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
+        (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
+    )
+)]
+async fn patch_account_preferences(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Json(payload): Json<PatchAccountPreferencesRequest>,
+) -> Result<Json<AccountPreferences>, ApplicationError> {
+    Ok(Json(
+        services
+            .account
+            .update_preferences(
+                user.account_id,
+                DashboardSettingsUpdate::Patch(payload.dashboard_settings),
+            )
             .await?,
     ))
 }
