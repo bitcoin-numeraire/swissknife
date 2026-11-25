@@ -9,7 +9,7 @@ use axum::{
 };
 use utoipa::OpenApi;
 
-use swissknife_types::ErrorResponse;
+use swissknife_types::{ErrorResponse, ReceiveIdentity};
 
 use crate::{
     application::{composition::AppServices, docs::INTERNAL_EXAMPLE, errors::ApplicationError},
@@ -20,8 +20,8 @@ use super::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(readiness_check, health_check, version_check, setup_check, mark_welcome_complete),
-    components(schemas(HealthCheck, HealthStatus, VersionInfo, SetupInfo)),
+    paths(readiness_check, health_check, version_check, setup_check, receive_identity, mark_welcome_complete),
+    components(schemas(HealthCheck, HealthStatus, VersionInfo, SetupInfo, ReceiveIdentity)),
     tags(
         (name = "System", description = "System related endpoints")
     )
@@ -33,6 +33,7 @@ pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/health", get(health_check))
         .route("/ready", get(readiness_check))
+        .route("/receive-identity", get(receive_identity))
         .route("/version", get(version_check))
         .route("/setup", get(setup_check))
         .route("/mark-welcome-complete", post(mark_welcome_complete))
@@ -112,6 +113,13 @@ async fn version_check(State(services): State<Arc<AppServices>>) -> Json<Version
 async fn setup_check(State(services): State<Arc<AppServices>>) -> Result<Json<SetupInfo>, ApplicationError> {
     let info = services.system.setup_check().await?;
     Ok(info.into())
+}
+
+/// Public address domain and LNURL-pay discovery base configured by the operator.
+#[utoipa::path(get, path = "/receive-identity", tag = "System", context_path = CONTEXT_PATH,
+    responses((status = 200, description = "Public receiving identity", body = ReceiveIdentity)))]
+async fn receive_identity(State(services): State<Arc<AppServices>>) -> Json<ReceiveIdentity> {
+    services.lnurl.receive_identity().into()
 }
 
 /// Marks the welcome flow as completed

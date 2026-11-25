@@ -1,7 +1,7 @@
 # App
 invoice_expiry = "12h"
-domain = "numeraire.tech"
-host = "https://api.numeraire.tech"
+domain = "localhost"
+host = "http://localhost:3000"
 bitcoin_address_type = "p2wpkh"
 ln_provider = "cln_grpc"
 auth_provider = "jwt"

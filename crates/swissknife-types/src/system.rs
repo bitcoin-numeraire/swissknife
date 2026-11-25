@@ -52,3 +52,12 @@ pub struct VersionInfo {
     #[schema(example = "2024-07-03T18:13:09.093289+00:00")]
     pub build_time: String,
 }
+
+/// Public receiving identity advertised by this instance.
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReceiveIdentity {
+    /// Domain used for Lightning Addresses and local recipient recognition.
+    pub domain: Option<String>,
+    /// Base URL for LNURL-pay discovery. Append the URL-encoded username.
+    pub lnurl_base_url: Option<String>,
+}

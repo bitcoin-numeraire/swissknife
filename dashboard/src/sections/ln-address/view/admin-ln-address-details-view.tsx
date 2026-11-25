@@ -9,6 +9,7 @@ import { useTranslate } from 'src/locales';
 import { Permission } from 'src/lib/swissknife';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetLnAddress } from 'src/actions/ln-addresses';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 
 import { ErrorView } from 'src/components/error/error-view';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export function AdminLnAddressDetailsView({ id }: Props) {
+  const receiveIdentity = useReceiveIdentity();
   const { t } = useTranslate();
 
   const { lnAddress, lnAddressLoading, lnAddressError } = useGetLnAddress(id);
@@ -42,7 +44,7 @@ export function AdminLnAddressDetailsView({ id }: Props) {
         ) : (
           <>
             <CustomBreadcrumbs
-              heading={`${displayLnAddress(lnAddress!.username)}`}
+              heading={`${displayLnAddress(lnAddress!.username, receiveIdentity.domain)}`}
               links={[
                 {
                   name: t('accounts'),
@@ -51,7 +53,7 @@ export function AdminLnAddressDetailsView({ id }: Props) {
                   name: t('lightning_addresses'),
                   href: paths.admin.lnAddresses,
                 },
-                { name: displayLnAddress(lnAddress!.username) },
+                { name: displayLnAddress(lnAddress!.username, receiveIdentity.domain) },
               ]}
               sx={{ mb: { xs: 3, md: 5 } }}
             />

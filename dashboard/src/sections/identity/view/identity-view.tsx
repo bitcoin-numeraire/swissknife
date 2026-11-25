@@ -34,6 +34,7 @@ import { bitcoinAddressExplorerUrl } from 'src/utils/bitcoin-explorer';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 import { BtcAddressType, newWalletBtcAddress } from 'src/lib/swissknife';
 import { useActiveWallet, useListWalletBtcAddresses } from 'src/actions/account-wallet';
 
@@ -102,6 +103,7 @@ function BitcoinAddressValue({ address }: { address: string }) {
 // ----------------------------------------------------------------------
 
 export function IdentityView() {
+  const receiveIdentity = useReceiveIdentity();
   const { t } = useTranslate();
   const { copy } = useCopyToClipboard();
   const searchParams = useSearchParams();
@@ -126,8 +128,12 @@ export function IdentityView() {
   const failed = shouldFail(errors, data, isLoading);
 
   const lnAddress = wallet?.ln_address;
-  const displayAddress = lnAddress ? displayLnAddress(lnAddress.username) : '';
-  const identityLnurl = lnAddress ? encodeLNURL(lnAddress.username) : '';
+  const displayAddress = lnAddress
+    ? displayLnAddress(lnAddress.username, receiveIdentity.domain)
+    : '';
+  const identityLnurl = lnAddress
+    ? encodeLNURL(lnAddress.username, receiveIdentity.lnurl_base_url)
+    : '';
   const nostrDisplay = useMemo(() => npub(lnAddress?.nostr_pubkey), [lnAddress?.nostr_pubkey]);
   const unusedAddressForType = useMemo(
     () => btcAddresses?.find((address) => address.address_type === addressType && !address.used),
@@ -211,7 +217,7 @@ export function IdentityView() {
                       {t('identity_view.hero_subheader')}
                     </Typography>
                   </Stack>
-                  {!displayAddress && (
+                  {!lnAddress && (
                     <Button
                       onClick={registerDrawer.onTrue}
                       variant="contained"
@@ -305,7 +311,7 @@ export function IdentityView() {
             <Box sx={{ p: 3 }}>
               {tab === 'lightning' && (
                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
-                  {displayAddress && (
+                  {identityLnurl && (
                     <Box
                       sx={{
                         p: 2,
@@ -333,25 +339,16 @@ export function IdentityView() {
                         {t('identity_view.reusable_address')}
                       </Typography>
                       {displayAddress ? (
-                        <>
-                          <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
-                            <Typography variant="h4" noWrap>
-                              {displayAddress}
-                            </Typography>
-                            <CopyButton value={displayAddress} title={t('copy')} />
-                          </Stack>
-                          {identityLnurl && (
-                            <Button
-                              color="inherit"
-                              variant="outlined"
-                              onClick={handleCopyIdentityLnurl}
-                              startIcon={<Iconify icon="solar:copy-bold" />}
-                              sx={{ alignSelf: 'flex-start' }}
-                            >
-                              {t('identity_view.copy_lnurl')}
-                            </Button>
-                          )}
-                        </>
+                        <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
+                          <Typography variant="h4" noWrap>
+                            {displayAddress}
+                          </Typography>
+                          <CopyButton value={displayAddress} title={t('copy')} />
+                        </Stack>
+                      ) : lnAddress ? (
+                        <Typography color="text.secondary">
+                          {t('identity_view.domain_needed')}
+                        </Typography>
                       ) : (
                         <Box
                           sx={[
@@ -387,6 +384,17 @@ export function IdentityView() {
                             </Button>
                           </Stack>
                         </Box>
+                      )}
+                      {identityLnurl && (
+                        <Button
+                          color="inherit"
+                          variant="outlined"
+                          onClick={handleCopyIdentityLnurl}
+                          startIcon={<Iconify icon="solar:copy-bold" />}
+                          sx={{ alignSelf: 'flex-start' }}
+                        >
+                          {t('identity_view.copy_lnurl')}
+                        </Button>
                       )}
                     </Stack>
 

@@ -8,6 +8,7 @@ import { displayLnAddress } from 'src/utils/lnurl';
 import { handleActionError } from 'src/utils/errors';
 
 import { useListWallets } from 'src/actions/wallet';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 
 import { RHFAutocomplete } from 'src/components/hook-form';
 
@@ -22,13 +23,15 @@ function walletFieldValue(wallet: Wallet, name: WalletSelectProps['name']) {
   return name === 'wallet_id' ? wallet.id : wallet.account_id;
 }
 
-function walletOptionLabel(wallet: Wallet) {
-  if (wallet.ln_address?.username) return displayLnAddress(wallet.ln_address.username);
+function walletOptionLabel(wallet: Wallet, domain?: string | null) {
+  if (domain && wallet.ln_address?.username)
+    return displayLnAddress(wallet.ln_address.username, domain);
 
   return wallet.label ?? wallet.account_id;
 }
 
 export function WalletSelectDropdown({ name = 'wallet_id', linkedAccountName }: WalletSelectProps) {
+  const receiveIdentity = useReceiveIdentity();
   const { wallets, walletsError, walletsLoading } = useListWallets();
   const { setValue } = useFormContext();
 
@@ -49,7 +52,7 @@ export function WalletSelectDropdown({ name = 'wallet_id', linkedAccountName }: 
         getOptionLabel={(option: string) => {
           const wallet = wallets.find((item) => walletFieldValue(item, name) === option);
 
-          return wallet ? walletOptionLabel(wallet) : option;
+          return wallet ? walletOptionLabel(wallet, receiveIdentity.domain) : option;
         }}
         onChange={(_, newValue) => {
           setValue(name, newValue, { shouldValidate: true });

@@ -33,6 +33,7 @@ import { endpointKeys } from 'src/actions/keys';
 import { useGetWallet } from 'src/actions/wallet';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useFetchFiatPrices } from 'src/actions/mempool-space';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 import { Protocol, Permission, deleteWallet } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
@@ -77,9 +78,10 @@ type WalletTransaction = {
   status: string;
 };
 
-function walletName(wallet: Wallet) {
+function walletName(wallet: Wallet, domain?: string | null) {
   if (wallet.label) return wallet.label;
-  if (wallet.ln_address?.username) return displayLnAddress(wallet.ln_address.username);
+  if (domain && wallet.ln_address?.username)
+    return displayLnAddress(wallet.ln_address.username, domain);
   if (wallet.asset) return `${wallet.asset.display_ticker} · ${wallet.asset.network}`;
 
   return wallet.id;
@@ -271,6 +273,7 @@ function RecentTransactionRow({ transaction }: { transaction: WalletTransaction 
 }
 
 export function WalletDetailsView({ id }: Props) {
+  const receiveIdentity = useReceiveIdentity();
   const { t } = useTranslate();
   const router = useRouter();
   const { user } = useAuthContext();
@@ -329,7 +332,7 @@ export function WalletDetailsView({ id }: Props) {
         ) : (
           <>
             <CustomBreadcrumbs
-              heading={walletName(wallet!)}
+              heading={walletName(wallet!, receiveIdentity.domain)}
               links={[
                 { name: t('wallets') },
                 { name: t('wallets_directory'), href: paths.admin.wallets },
@@ -396,7 +399,9 @@ export function WalletDetailsView({ id }: Props) {
                           useFlexGap
                           sx={{ alignItems: 'center', flexWrap: 'wrap' }}
                         >
-                          <Typography variant="h4">{walletName(wallet!)}</Typography>
+                          <Typography variant="h4">
+                            {walletName(wallet!, receiveIdentity.domain)}
+                          </Typography>
                           <Label variant="soft" color="info">
                             {wallet!.asset
                               ? `${wallet!.asset.display_ticker} · ${wallet!.asset.network}`
@@ -479,7 +484,7 @@ export function WalletDetailsView({ id }: Props) {
                       label={t('lightning_address')}
                       value={
                         wallet!.ln_address?.username ? (
-                          displayLnAddress(wallet!.ln_address.username)
+                          displayLnAddress(wallet!.ln_address.username, receiveIdentity.domain)
                         ) : canWriteLnAddresses && wallet!.asset?.protocol === Protocol.BITCOIN ? (
                           <Button
                             size="small"
@@ -494,7 +499,7 @@ export function WalletDetailsView({ id }: Props) {
                       }
                       copyValue={
                         wallet!.ln_address?.username
-                          ? displayLnAddress(wallet!.ln_address.username)
+                          ? displayLnAddress(wallet!.ln_address.username, receiveIdentity.domain)
                           : undefined
                       }
                       href={

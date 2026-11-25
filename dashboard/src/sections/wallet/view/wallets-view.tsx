@@ -42,6 +42,7 @@ import { endpointKeys } from 'src/actions/keys';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useListWalletOverviews } from 'src/actions/wallet';
 import { Permission, deleteWallet } from 'src/lib/swissknife';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -90,17 +91,20 @@ export function walletReadiness(wallet: WalletOverview): Exclude<WalletReadiness
   return 'missing';
 }
 
-export function walletMatchesSearch(wallet: WalletOverview, query: string) {
+export function walletMatchesSearch(wallet: WalletOverview, query: string, domain?: string | null) {
   const normalizedQuery = query.trim().toLowerCase();
 
   if (!normalizedQuery) return true;
 
-  const lnAddress = wallet.ln_address?.username ? displayLnAddress(wallet.ln_address.username) : '';
+  const lnAddress = wallet.ln_address?.username
+    ? displayLnAddress(wallet.ln_address.username, domain)
+    : '';
 
   return [
     wallet.id,
     wallet.account_id,
     wallet.label,
+    wallet.ln_address?.username,
     lnAddress,
     wallet.asset?.code,
     wallet.asset?.display_ticker,
@@ -138,9 +142,10 @@ function compactId(id: string) {
   return id.length > 20 ? `${id.slice(0, 8)}...${id.slice(-6)}` : id;
 }
 
-function walletName(wallet: WalletOverview) {
+function walletName(wallet: WalletOverview, domain?: string | null) {
   if (wallet.label) return wallet.label;
-  if (wallet.ln_address?.username) return displayLnAddress(wallet.ln_address.username);
+  if (domain && wallet.ln_address?.username)
+    return displayLnAddress(wallet.ln_address.username, domain);
   if (wallet.asset) return `${wallet.asset.display_ticker} · ${wallet.asset.network}`;
   return compactId(wallet.id);
 }
@@ -249,6 +254,7 @@ export function WalletsView() {
 }
 
 function WalletsDirectoryView() {
+  const receiveIdentity = useReceiveIdentity();
   const { t } = useTranslate();
   const theme = useTheme();
   const table = useTable({ defaultRowsPerPage: 25 });
@@ -270,11 +276,11 @@ function WalletsDirectoryView() {
         wallets.filter(
           (wallet) =>
             (readinessFilter === 'all' || walletReadiness(wallet) === readinessFilter) &&
-            walletMatchesSearch(wallet, query)
+            walletMatchesSearch(wallet, query, receiveIdentity.domain)
         ),
         sort
       ),
-    [query, readinessFilter, sort, wallets]
+    [query, readinessFilter, receiveIdentity.domain, sort, wallets]
   );
   const walletsInPage = filteredWallets.slice(
     table.page * table.rowsPerPage,
@@ -475,7 +481,7 @@ function WalletsDirectoryView() {
                             <TableCell>
                               <Stack spacing={0.25} sx={{ minWidth: 180 }}>
                                 <Typography variant="subtitle2" noWrap>
-                                  {walletName(wallet)}
+                                  {walletName(wallet, receiveIdentity.domain)}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary" noWrap>
                                   {compactId(wallet.id)}
@@ -524,7 +530,10 @@ function WalletsDirectoryView() {
                                 </Label>
                                 {wallet.ln_address?.username && (
                                   <Typography variant="caption" color="text.secondary" noWrap>
-                                    {displayLnAddress(wallet.ln_address.username)}
+                                    {displayLnAddress(
+                                      wallet.ln_address.username,
+                                      receiveIdentity.domain
+                                    )}
                                   </Typography>
                                 )}
                               </Stack>

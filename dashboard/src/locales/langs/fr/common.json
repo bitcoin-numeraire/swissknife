@@ -476,6 +476,7 @@
     "copy_transaction_id": "Copier l'ID de transaction"
   },
   "identity_view": {
+    "domain_needed": "Demandez à votre administrateur de configurer le domaine public des adresses Lightning de cette installation.",
     "title": "Hub identité",
     "hero_title": "Ta couche publique de réception",
     "hero_subheader": "Sépare les identités réutilisables des demandes de paiement ponctuelles. Partage l'adresse humaine, conserve l'adresse on-chain inutilisée actuelle jusqu'à réception de fonds, et connecte Nostr seulement si tu veux une vérification publique.",

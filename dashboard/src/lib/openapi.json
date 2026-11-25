@@ -7694,6 +7694,27 @@
         }
       }
     },
+    "/v1/system/receive-identity": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Public address domain and LNURL-pay discovery base configured by the operator.",
+        "operationId": "receive_identity",
+        "responses": {
+          "200": {
+            "description": "Public receiving identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiveIdentity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/system/setup": {
       "get": {
         "tags": [
@@ -9939,6 +9960,26 @@
           "bitcoin",
           "taproot_assets"
         ]
+      },
+      "ReceiveIdentity": {
+        "type": "object",
+        "description": "Public receiving identity advertised by this instance.",
+        "properties": {
+          "domain": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Domain used for Lightning Addresses and local recipient recognition."
+          },
+          "lnurl_base_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Base URL for LNURL-pay discovery. Append the URL-encoded username."
+          }
+        }
       },
       "RegisterLnAddressRequest": {
         "type": "object",

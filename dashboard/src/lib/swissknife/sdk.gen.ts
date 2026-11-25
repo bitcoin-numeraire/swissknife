@@ -248,6 +248,8 @@ import type {
   PayResponses,
   ReadinessCheckData,
   ReadinessCheckResponses,
+  ReceiveIdentityData,
+  ReceiveIdentityResponses,
   RegisterAccountAddressData,
   RegisterAccountAddressErrors,
   RegisterAccountAddressResponses,
@@ -1663,6 +1665,18 @@ export const readinessCheck = <ThrowOnError extends boolean = false>(
   (options?.client ?? client).get<ReadinessCheckResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/system/ready',
+    ...options,
+  });
+
+/**
+ * Public address domain and LNURL-pay discovery base configured by the operator.
+ */
+export const receiveIdentity = <ThrowOnError extends boolean = false>(
+  options?: Options<ReceiveIdentityData, ThrowOnError>
+): RequestResult<ReceiveIdentityResponses, unknown, ThrowOnError> =>
+  (options?.client ?? client).get<ReceiveIdentityResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/system/receive-identity',
     ...options,
   });
 

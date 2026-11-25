@@ -9,8 +9,8 @@ import InputAdornment from '@mui/material/InputAdornment';
 
 import { handleActionError } from 'src/utils/errors';
 
-import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 import { zRegisterLnAddressRequest } from 'src/lib/swissknife/zod.gen';
 import { registerAddress, registerAccountAddress } from 'src/lib/swissknife';
 
@@ -27,6 +27,7 @@ type Props = {
 };
 
 export function RegisterLnAddressForm({ onSuccess, isAdmin, accountId }: Props) {
+  const receiveIdentity = useReceiveIdentity();
   const { t } = useTranslate();
 
   const methods = useForm({
@@ -74,7 +75,11 @@ export function RegisterLnAddressForm({ onSuccess, isAdmin, accountId }: Props) 
           }}
           slotProps={{
             input: {
-              endAdornment: <InputAdornment position="end">@{CONFIG.domain}</InputAdornment>,
+              endAdornment: (
+                <InputAdornment position="end">
+                  {receiveIdentity.domain ? `@${receiveIdentity.domain}` : undefined}
+                </InputAdornment>
+              ),
             },
           }}
         />

@@ -22,10 +22,10 @@ import { handleActionError } from 'src/utils/errors';
 import { truncateText } from 'src/utils/format-string';
 import { encodeLNURL, displayLnAddress } from 'src/utils/lnurl';
 
-import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { useAccountContext } from 'src/contexts/account';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 import { deleteAddress, deleteAccountAddress } from 'src/lib/swissknife';
 
 import { Label } from 'src/components/label';
@@ -50,11 +50,12 @@ type Props = {
 };
 
 export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
+  const receiveIdentity = useReceiveIdentity();
   const { t } = useTranslate();
   const router = useRouter();
   const { activeWalletId } = useAccountContext();
-  const lnAddressDisplay = displayLnAddress(lnAddress.username);
-  const encodedLnurl = encodeLNURL(lnAddress.username);
+  const lnAddressDisplay = displayLnAddress(lnAddress.username, receiveIdentity.domain);
+  const encodedLnurl = encodeLNURL(lnAddress.username, receiveIdentity.lnurl_base_url);
   const nostrDisplay = npub(lnAddress.nostr_pubkey);
 
   const onDelete = useCallback(
@@ -89,7 +90,9 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
         }}
       >
         <Stack direction="row" spacing={1} sx={{ width: 1, flexGrow: 1 }}>
-          <CopyButton value={lnAddressDisplay} title={t('ln_address_details.copy')} />
+          {lnAddressDisplay && (
+            <CopyButton value={lnAddressDisplay} title={t('ln_address_details.copy')} />
+          )}
 
           <Tooltip title={t('send')}>
             <IconButton onClick={() => toast.info(t('coming_soon'))}>
@@ -155,7 +158,7 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
                       {t('ln_address_details.title')}
                     </Typography>
                     <Typography variant="h3" sx={{ fontWeight: 500, wordBreak: 'break-word' }}>
-                      {lnAddressDisplay}
+                      {lnAddressDisplay || lnAddress.username}
                     </Typography>
                     <Typography variant="body1" color="text.secondary">
                       {t('ln_address_details.subtitle')}
@@ -171,7 +174,10 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4 }}>
-                    <MetricTile title={t('ln_address_details.domain')} value={CONFIG.domain} />
+                    <MetricTile
+                      title={t('ln_address_details.domain')}
+                      value={receiveIdentity.domain ?? ''}
+                    />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4 }}>
                     <MetricTile
@@ -205,7 +211,7 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
                     sx={{ alignItems: 'center', justifyContent: 'space-between' }}
                   >
                     <Typography variant="subtitle2">{t('ln_address_details.lnurl_pay')}</Typography>
-                    <CopyButton value={encodedLnurl} title={t('copy')} />
+                    {encodedLnurl && <CopyButton value={encodedLnurl} title={t('copy')} />}
                   </Stack>
 
                   <Box
@@ -217,15 +223,17 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
                       placeItems: 'center',
                     }}
                   >
-                    <QRCode
-                      value={lnAddressDisplay}
-                      size={260}
-                      logoImage="/logo/logo_square_negative.svg"
-                      removeQrCodeBehindLogo
-                      logoPaddingStyle="circle"
-                      eyeRadius={5}
-                      logoPadding={3}
-                    />
+                    {encodedLnurl && (
+                      <QRCode
+                        value={encodedLnurl}
+                        size={260}
+                        logoImage="/logo/logo_square_negative.svg"
+                        removeQrCodeBehindLogo
+                        logoPaddingStyle="circle"
+                        eyeRadius={5}
+                        logoPadding={3}
+                      />
+                    )}
                   </Box>
 
                   <Stack
@@ -236,7 +244,7 @@ export function LnAddressDetails({ lnAddress, isAdmin }: Props) {
                     <Typography variant="body2" sx={{ minWidth: 0, wordBreak: 'break-word' }}>
                       {lnAddressDisplay}
                     </Typography>
-                    <CopyButton value={lnAddressDisplay} title={t('copy')} />
+                    {lnAddressDisplay && <CopyButton value={lnAddressDisplay} title={t('copy')} />}
                   </Stack>
                 </Stack>
               </Card>

@@ -35,6 +35,7 @@ import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { useGetAccount } from 'src/actions/account';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useReceiveIdentity } from 'src/actions/receive-identity';
 import {
   Permission,
   AuthProvider,
@@ -144,9 +145,10 @@ function WalletBalance({ wallet }: { wallet: Wallet }) {
 }
 
 function AccountWalletCard({ wallet }: { wallet: Wallet }) {
+  const receiveIdentity = useReceiveIdentity();
   const { t } = useTranslate();
   const lnAddress = wallet.ln_address?.username
-    ? displayLnAddress(wallet.ln_address.username)
+    ? displayLnAddress(wallet.ln_address.username, receiveIdentity.domain)
     : t('wallets_view.missing');
 
   return (
