@@ -1,4 +1,16 @@
 {
+  "merchant_revenue": {
+    "title": "Ingresos del comercio",
+    "from": "Desde (UTC)",
+    "through": "Hasta (UTC)",
+    "invalid_range": "Elige un período de 1 a 366 días.",
+    "load_error": "No se pudieron cargar los ingresos del comercio.",
+    "route": "Ruta",
+    "count": "Facturas liquidadas",
+    "received": "Importe recibido (msat)",
+    "fees": "Comisiones (msat)",
+    "empty": "No se liquidaron facturas del comercio en este período."
+  },
   "wallet_credit": {
     "asset_units": "unidades del activo",
     "opening": "Abono inicial",
@@ -1196,6 +1208,7 @@
     "load_error": "No se pudo cargar el presupuesto.",
     "loading": "Cargando presupuesto…",
     "periods": "Incluye las comisiones y las reservas pendientes. Los períodos comienzan a medianoche UTC. La semana comienza el lunes.",
+    "agent_hourly_msat": "Por agente en los últimos 60 minutos",
     "per_payment_msat": "Por pago",
     "unlimited": "Sin límite",
     "daily_msat": "Hoy",
