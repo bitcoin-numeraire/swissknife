@@ -147,7 +147,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
 
       - name: Download tracefiles from this run
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           pattern: coverage-cell-*
           path: coverage-cells
