@@ -159,3 +159,135 @@ async fn stdio_discovers_tools_and_resources_and_settles_an_approved_payment_onc
     assert_eq!(mcp.tool("get_balance", json!({})).await["isError"], true);
     mcp.close().await;
 }
+
+#[tokio::test]
+async fn streamable_http_uses_a_separate_transport_credential_and_enforces_wallet_permissions() {
+    let app = TestApp::isolated("mcp-http", &[]).await;
+    let owner = app
+        .create_account_with_wallet(app.admin_token().await, "mcp-http-owner")
+        .await;
+    let api = app.api();
+    let keys = format!("/v1/me/wallets/{}/agent-keys", owner.wallet.id);
+    let issued = api
+        .post(
+            &keys,
+            Auth::ApiKey(&owner.key),
+            json!({"name":"remote read","capabilities":{"read":true},
+        "expires_at":Utc::now()+ChronoDuration::hours(1)}),
+        )
+        .await
+        .parse::<IssuedAgentKey>();
+    let token = hex::encode([23; 32]);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_swissknife"))
+        .args([
+            "mcp",
+            "--server",
+            &app.base_url,
+            "--wallet",
+            &owner.wallet.id.to_string(),
+            "--http-listen",
+            "127.0.0.1:0",
+        ])
+        .env("SWISSKNIFE_MCP_WALLET_KEY", &issued.key)
+        .env("SWISSKNIFE_MCP_HTTP_TOKEN", &token)
+        .stdin(Stdio::null())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let mut log = BufReader::new(child.stderr.take().unwrap()).lines();
+    let line = timeout(Duration::from_secs(10), log.next_line())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let url = line.strip_prefix("Serving wallet MCP on ").unwrap();
+    let http = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .unwrap();
+    let call = |method: &str, params: Value| {
+        http.post(url)
+            .header("Accept", "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", "2025-11-25")
+            .json(&json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}))
+    };
+    for bad in ["", "wrong", issued.key.as_str()] {
+        assert_eq!(
+            call("tools/list", json!({}))
+                .bearer_auth(bad)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    assert_eq!(
+        call("tools/list", json!({}))
+            .bearer_auth(&token)
+            .header("Origin", "https://unrelated.example")
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        call("tools/list", json!({}))
+            .bearer_auth(&token)
+            .header("Host", "unrelated.example")
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    async fn rpc(request: reqwest::RequestBuilder, token: &str) -> Value {
+        let response = request.bearer_auth(token).send().await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        let content_type = response.headers()["content-type"].to_str().unwrap().to_owned();
+        let text = response.text().await.unwrap();
+        let message: Value = if content_type.starts_with("text/event-stream") {
+            text.lines()
+                .filter_map(|line| line.strip_prefix("data:"))
+                .filter_map(|data| serde_json::from_str::<Value>(data.trim()).ok())
+                .find(|value| value["id"] == 1)
+                .unwrap()
+        } else {
+            serde_json::from_str(&text).unwrap()
+        };
+        assert!(message.get("error").is_none(), "{message}");
+        message["result"].clone()
+    }
+    let init = rpc(
+        call(
+            "initialize",
+            json!({"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"remote-test","version":"1"}}),
+        ),
+        &token,
+    )
+    .await;
+    assert!(init["capabilities"]["tools"].is_object());
+    let balance = rpc(call("tools/call", json!({"name":"get_balance","arguments":{}})), &token).await;
+    assert_eq!(balance["structuredContent"]["available_msat"], "0");
+    let invoice = rpc(
+        call(
+            "tools/call",
+            json!({"name":"create_invoice","arguments":{"amount_msat":"5000","description":"unpermitted"}}),
+        ),
+        &token,
+    )
+    .await;
+    assert_eq!(invoice["isError"], true);
+    assert_status(
+        &api.delete(&format!("{keys}/{}", issued.metadata.id), Auth::ApiKey(&owner.key))
+            .await,
+        StatusCode::NO_CONTENT,
+    );
+    let revoked = rpc(call("tools/call", json!({"name":"get_balance","arguments":{}})), &token).await;
+    assert_eq!(revoked["isError"], true);
+    child.kill().await.unwrap();
+    app.stop();
+}

@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Connect remote MCP clients to a selected wallet over authenticated Streamable HTTP behind a TLS proxy or through a private tunnel.
+
 - Operators can sell time-limited access to a fixed HTTP resource for a Lightning invoice credited to a selected wallet.
 
 - Connect an MCP client to a single SwissKnife wallet over stdio to inspect balances, issue invoices, and submit and track approved Lightning payments.
