@@ -1,24 +1,29 @@
+use super::resources::{LegacySubscriptions, ResourceFeeds, WalletResource};
 use super::wallet::WalletClient;
 use anyhow::{ensure, Context};
 use lightning_invoice::Bolt11Invoice;
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{
-        CallToolResult, ListResourcesResult, PaginatedRequestParams, ReadResourceRequestParams, ReadResourceResponse,
-        ReadResourceResult, Resource, ResourceContents, ServerCapabilities, ServerConfig,
+        CallToolResult, InitializeRequestParams, InitializeResult, ListResourcesResult, PaginatedRequestParams,
+        ReadResourceRequestParams, ReadResourceResponse, ReadResourceResult, Resource, ResourceContents,
+        ServerCapabilities, ServerConfig, SubscribeRequestParams, SubscriptionFilter, UnsubscribeRequestParams,
     },
     schemars,
-    service::RequestContext,
+    service::{RequestContext, SubscriptionContext},
     tool, tool_handler, tool_router, ErrorData, RoleServer, ServerHandler,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct WalletServer {
     wallet: WalletClient,
     tool_router: ToolRouter<Self>,
+    feeds: ResourceFeeds,
+    legacy: Arc<LegacySubscriptions>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -125,10 +130,12 @@ fn merchant_invoice(header: &str) -> anyhow::Result<(l402_proto::L402Challenge, 
 }
 
 impl WalletServer {
-    pub fn new(wallet: WalletClient) -> Self {
+    pub(super) fn new(wallet: WalletClient, feeds: ResourceFeeds) -> Self {
         Self {
             wallet,
             tool_router: Self::tool_router(),
+            feeds,
+            legacy: Arc::default(),
         }
     }
     async fn submit(&self, args: ApprovedPayment, kind: Target) -> anyhow::Result<Value> {
@@ -362,17 +369,72 @@ impl WalletServer {
 #[tool_handler(router=self.tool_router)]
 impl ServerHandler for WalletServer {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().build())
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_resources_subscribe().build())
             .with_instructions("This connection selects one wallet. Amounts are exact decimal millisatoshi strings. Obtain approval for the principal and maximum fee before spending. Keep the same payment UUID and terms if a response is lost.")
     }
+    async fn initialize(
+        &self,
+        request: InitializeRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<InitializeResult, ErrorData> {
+        context.peer.set_peer_info(request.clone());
+        let mut result = self.negotiate_initialize(&request)?;
+        // Legacy HTTP here is stateless. Only stdio keeps a connection for legacy notifications.
+        if context.extensions.get::<axum::http::request::Parts>().is_some() {
+            if let Some(resources) = &mut result.capabilities.resources {
+                resources.subscribe = None;
+            }
+        }
+        Ok(result)
+    }
+
+    fn accepted_subscription_filter(&self, requested: &SubscriptionFilter) -> Option<SubscriptionFilter> {
+        Some(ResourceFeeds::filter(requested))
+    }
+
+    async fn listen(&self, context: SubscriptionContext) -> Result<(), ErrorData> {
+        self.feeds.listen(&self.wallet, context).await
+    }
+
+    async fn subscribe(
+        &self,
+        request: SubscribeRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<(), ErrorData> {
+        if context.extensions.get::<axum::http::request::Parts>().is_some() {
+            return Err(ErrorData::invalid_request(
+                "Use subscriptions/listen over Streamable HTTP",
+                None,
+            ));
+        }
+        self.legacy
+            .subscribe(
+                WalletResource::parse(&request.uri)?,
+                &self.feeds,
+                &self.wallet,
+                context.peer,
+            )
+            .await
+    }
+
+    async fn unsubscribe(
+        &self,
+        request: UnsubscribeRequestParams,
+        _: RequestContext<RoleServer>,
+    ) -> Result<(), ErrorData> {
+        self.legacy.unsubscribe(WalletResource::parse(&request.uri)?).await;
+        Ok(())
+    }
+
     async fn list_resources(
         &self,
         _: Option<PaginatedRequestParams>,
         _: RequestContext<RoleServer>,
     ) -> Result<ListResourcesResult, ErrorData> {
         Ok(ListResourcesResult::with_all_items(vec![
-            Resource::new("wallet://balance", "Wallet balance").with_mime_type("application/json"),
-            Resource::new("wallet://payments/recent", "Recent outgoing payments").with_mime_type("application/json"),
+            Resource::new(WalletResource::Balance.uri(), "Wallet balance").with_mime_type("application/json"),
+            Resource::new(WalletResource::RecentPayments.uri(), "Recent outgoing payments")
+                .with_mime_type("application/json"),
         ]))
     }
     async fn read_resource(
@@ -380,12 +442,7 @@ impl ServerHandler for WalletServer {
         request: ReadResourceRequestParams,
         _: RequestContext<RoleServer>,
     ) -> Result<ReadResourceResponse, ErrorData> {
-        let value = match request.uri.as_str() {
-            "wallet://balance" => self.wallet.get("balance").await,
-            "wallet://payments/recent" => self.wallet.recent(20, 0).await,
-            _ => return Err(ErrorData::resource_not_found("Unknown wallet resource", None)),
-        }
-        .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let value = WalletResource::parse(&request.uri)?.read(&self.wallet).await?;
         Ok(ReadResourceResult::new(vec![
             ResourceContents::text(value.to_string(), request.uri).with_mime_type("application/json")
         ])
