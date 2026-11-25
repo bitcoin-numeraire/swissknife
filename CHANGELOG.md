@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Administrative transaction lists include wallet labels and asset details according to the reader’s permissions.
+
 - Authenticated clients can discover available wallet assets through `GET /v1/assets`.
 - Export wallet activity as a UTC date-range CSV with exact millisatoshi amounts and fees.
 

@@ -60,6 +60,20 @@ export type AccountPreferences = {
 };
 
 /**
+ * An administrative invoice retains the original invoice fields on the wire.
+ */
+export type AdminInvoiceSummary = Invoice & {
+  wallet_display?: TransactionWalletDisplay | null;
+};
+
+/**
+ * An administrative payment retains the original payment fields on the wire.
+ */
+export type AdminPaymentSummary = Payment & {
+  wallet_display?: TransactionWalletDisplay | null;
+};
+
+/**
  * API Key
  */
 export type ApiKey = {
@@ -1209,6 +1223,20 @@ export type SignUpRequest = {
    * digits, dots, underscores, or hyphens.
    */
   username: string;
+};
+
+/**
+ * Wallet presentation fields attached to administrative transaction listings.
+ */
+export type TransactionWalletDisplay = {
+  account_id?: string | null;
+  account_label?: string | null;
+  account_subject?: string | null;
+  display_ticker: string;
+  network: string;
+  username?: string | null;
+  wallet_id: string;
+  wallet_label?: string | null;
 };
 
 /**
@@ -2891,7 +2919,7 @@ export type ListInvoicesResponses = {
   /**
    * Success
    */
-  200: Array<Invoice>;
+  200: Array<AdminInvoiceSummary>;
 };
 
 export type ListInvoicesResponse = ListInvoicesResponses[keyof ListInvoicesResponses];
@@ -4858,7 +4886,7 @@ export type ListPaymentsResponses = {
   /**
    * Success
    */
-  200: Array<Payment>;
+  200: Array<AdminPaymentSummary>;
 };
 
 export type ListPaymentsResponse = ListPaymentsResponses[keyof ListPaymentsResponses];

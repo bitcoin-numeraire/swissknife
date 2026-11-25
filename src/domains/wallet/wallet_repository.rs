@@ -24,6 +24,11 @@ pub trait WalletRepository: Send + Sync {
         account_id: Option<Uuid>,
         period: WalletStatementPeriod,
     ) -> Result<Option<WalletStatement>, DatabaseError>;
+    async fn transaction_displays(
+        &self,
+        ids: &[Uuid],
+        include_account: bool,
+    ) -> Result<Vec<swissknife_types::TransactionWalletDisplay>, DatabaseError>;
     async fn get_balance(&self, id: Uuid) -> Result<Balance, DatabaseError>;
     /// Credit available balance for incoming funds.
     async fn credit(&self, id: Uuid, amount_msat: u64) -> Result<(), DatabaseError>;

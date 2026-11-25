@@ -8,7 +8,7 @@ use axum::{
 use utoipa::OpenApi;
 use uuid::Uuid;
 
-use swissknife_types::{ErrorResponse, NewInvoiceRequest};
+use swissknife_types::{AdminInvoiceSummary, ErrorResponse, NewInvoiceRequest};
 
 use crate::{
     application::{
@@ -122,7 +122,7 @@ async fn get_invoice(
     context_path = CONTEXT_PATH,
     params(InvoiceFilter),
     responses(
-        (status = 200, description = "Success", body = Vec<Invoice>),
+        (status = 200, description = "Success", body = Vec<AdminInvoiceSummary>),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
         (status = 401, description = "Unauthorized", body = ErrorResponse, example = json!(UNAUTHORIZED_EXAMPLE)),
         (status = 403, description = "Forbidden", body = ErrorResponse, example = json!(FORBIDDEN_EXAMPLE)),
@@ -133,12 +133,24 @@ async fn list_invoices(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(filter): Query<InvoiceFilter>,
-) -> Result<Json<Vec<Invoice>>, ApplicationError> {
+) -> Result<Json<Vec<AdminInvoiceSummary>>, ApplicationError> {
     user.check_permission(Permission::ReadTransaction)?;
 
     let invoices = services.invoice.list(filter).await?;
 
-    Ok(Json(invoices))
+    Ok(Json(
+        crate::domains::wallet::administrative_summaries(
+            services.wallet.as_ref(),
+            &user,
+            invoices,
+            |row| row.wallet_id,
+            |invoice, wallet_display| AdminInvoiceSummary {
+                invoice,
+                wallet_display,
+            },
+        )
+        .await?,
+    ))
 }
 
 /// Delete an invoice

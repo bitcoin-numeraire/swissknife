@@ -363,6 +363,76 @@ where
         }))
     }
 
+    async fn transaction_displays(
+        &self,
+        ids: &[Uuid],
+        include_account: bool,
+    ) -> Result<Vec<swissknife_types::TransactionWalletDisplay>, DatabaseError> {
+        use crate::infra::database::sea_orm::models::{account, asset, ln_address};
+        use swissknife_types::TransactionWalletDisplay;
+
+        let mut result = Vec::with_capacity(ids.len());
+        for chunk in ids.chunks(500) {
+            let base = WalletEntity::find()
+                .select_only()
+                .columns([Column::Id, Column::Label])
+                .inner_join(AssetEntity)
+                .column(asset::Column::DisplayTicker)
+                .column(asset::Column::Network)
+                .left_join(LnAddress)
+                .column(ln_address::Column::Username)
+                .filter(Column::Id.is_in(chunk.iter().copied()));
+            let query = if include_account {
+                base.inner_join(account::Entity)
+                    .column(Column::AccountId)
+                    .column(account::Column::DisplayName)
+                    .column_as(Expr::cust("(SELECT subject FROM auth_identity WHERE auth_identity.account_id = wallet.account_id ORDER BY created_at, id LIMIT 1)"), "account_subject")
+            } else {
+                base.column_as(Expr::val(None::<Uuid>), "account_id")
+                    .column_as(Expr::val(None::<String>), "display_name")
+                    .column_as(Expr::val(None::<String>), "account_subject")
+            };
+            let rows = query
+                .into_tuple::<(
+                    Uuid,
+                    Option<String>,
+                    String,
+                    String,
+                    Option<String>,
+                    Option<Uuid>,
+                    Option<String>,
+                    Option<String>,
+                )>()
+                .all(self.db.connection())
+                .await
+                .map_err(|e| DatabaseError::FindRelated(e.to_string()))?;
+            result.extend(rows.into_iter().map(
+                |(
+                    wallet_id,
+                    wallet_label,
+                    display_ticker,
+                    network,
+                    username,
+                    account_id,
+                    account_label,
+                    account_subject,
+                )| {
+                    TransactionWalletDisplay {
+                        wallet_id,
+                        wallet_label,
+                        display_ticker,
+                        network,
+                        account_id,
+                        account_label,
+                        username,
+                        account_subject,
+                    }
+                },
+            ));
+        }
+        Ok(result)
+    }
+
     async fn get_balance(&self, id: Uuid) -> Result<Balance, DatabaseError> {
         let wallet_amounts = WalletEntity::find_by_id(id)
             .select_only()

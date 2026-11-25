@@ -53,7 +53,7 @@ pub use payment::{
 pub use permission::Permission;
 pub use query::OrderDirection;
 pub use system::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
-pub use transaction::{Currency, Ledger};
+pub use transaction::{AdminInvoiceSummary, AdminPaymentSummary, Currency, Ledger, TransactionWalletDisplay};
 pub use wallet::{
     Asset, Balance, Contact, CreateWalletRequest, Protocol, Wallet, WalletFilter, WalletOverview,
     WalletStatementPeriod, NATIVE_ASSET_REF,

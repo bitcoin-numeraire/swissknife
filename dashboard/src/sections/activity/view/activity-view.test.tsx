@@ -1,4 +1,4 @@
-import type { Account, Invoice, Payment } from 'src/lib/swissknife';
+import type { Invoice, Payment } from 'src/lib/swissknife';
 
 import { vi, it, expect, describe, beforeEach } from 'vitest';
 import { render, screen, within, waitFor, fireEvent } from '@testing-library/react';
@@ -15,11 +15,8 @@ import { ActivityView, AdminTransactionsView } from './activity-view';
 
 const mocks = vi.hoisted(() => ({
   permissions: [] as string[],
-  accounts: [] as Account[],
   invoices: [] as Invoice[],
   payments: [] as Payment[],
-  accountError: undefined as Error | undefined,
-  listAccounts: vi.fn(),
   mutate: vi.fn(),
   success: vi.fn(),
   handleActionError: vi.fn(),
@@ -51,12 +48,6 @@ vi.mock('src/sections/wallet/money-drawers', () => ({
 vi.mock('src/sections/transaction/transaction-quick-drawer', () => ({
   TransactionQuickDrawer: ({ open }: { open: boolean }) =>
     open ? <div>Transaction drawer</div> : null,
-}));
-vi.mock('src/actions/account', () => ({
-  useListAccounts: (enabled: boolean) => {
-    mocks.listAccounts(enabled);
-    return { accounts: enabled ? mocks.accounts : undefined, accountsError: mocks.accountError };
-  },
 }));
 vi.mock('src/actions/invoices', () => ({
   useListInvoices: () => ({ invoices: mocks.invoices, invoicesLoading: false }),
@@ -97,6 +88,15 @@ const invoice = {
   ...common,
   id: 'shared-id',
   wallet_id: 'wallet-treasury',
+  timestamp: new Date('2026-10-28T12:00:00Z'),
+  wallet_display: {
+    wallet_id: 'wallet-treasury',
+    wallet_label: 'Cold reserve',
+    account_id: 'account-treasury',
+    account_label: 'Treasury',
+    display_ticker: 'BTC',
+    network: 'mainnet',
+  },
   description: 'Selected invoice',
   status: 'Expired',
 } as Invoice;
@@ -104,6 +104,14 @@ const payment = {
   ...common,
   id: 'shared-id',
   wallet_id: 'wallet-shop',
+  wallet_display: {
+    wallet_id: 'wallet-shop',
+    wallet_label: 'Checkout',
+    account_id: 'account-shop',
+    account_subject: 'auth0|shop-owner',
+    display_ticker: 'BTC',
+    network: 'mainnet',
+  },
   description: 'Selected payment',
   status: 'Failed',
 } as Payment;
@@ -160,6 +168,7 @@ beforeEach(() => {
     Permission.READ_TRANSACTION,
     Permission.WRITE_TRANSACTION,
     Permission.READ_ACCOUNT,
+    Permission.READ_WALLET,
   ];
   mocks.invoices = [
     invoice,
@@ -169,25 +178,6 @@ beforeEach(() => {
     payment,
     { ...payment, id: 'other-payment', description: 'Unselected payment' },
   ];
-  mocks.accounts = [
-    {
-      id: 'account-treasury',
-      display_name: 'Treasury',
-      wallets: [
-        {
-          id: 'wallet-treasury',
-          label: 'Cold reserve',
-          asset: { name: 'Bitcoin', display_ticker: 'BTC', network: 'mainnet' },
-        },
-      ],
-    },
-    {
-      id: 'account-shop',
-      identity: { subject: 'auth0|shop-owner' },
-      wallets: [{ id: 'wallet-shop', label: 'Checkout' }],
-    },
-  ] as Account[];
-  mocks.accountError = undefined;
   mocks.params = new URLSearchParams();
 });
 
@@ -308,23 +298,23 @@ describe('administrative transactions', () => {
     expect(screen.getByText('1 selected')).toBeVisible();
   });
 
-  it('does not offer deletion or request accounts without the corresponding permissions', () => {
+  it('limits transaction-only readers to the activity and wallet code', () => {
     mocks.permissions = [Permission.READ_TRANSACTION];
+    mocks.invoices = mocks.invoices.map((row) => ({ ...row, wallet_display: undefined }));
+    mocks.payments = mocks.payments.map((row) => ({ ...row, wallet_display: undefined }));
     renderView();
     selectRow('Selected invoice');
     expect(
       screen.queryByRole('button', { name: 'activity_view.delete_selected' })
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'clean' })).toBeDisabled();
-    expect(mocks.listAccounts).toHaveBeenCalledWith(false);
-    expect(screen.getAllByRole('link', { name: 'wallet-treasury' })).toHaveLength(2);
+    expect(screen.getAllByText('wallet-treasury')).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: 'wallet-treasury' })).not.toBeInTheDocument();
   });
 
-  it('keeps transactions accessible if ownership metadata cannot be loaded', () => {
-    mocks.accounts = [];
-    mocks.accountError = new Error('Unavailable');
+  it('keeps transactions accessible with older API responses', () => {
+    mocks.invoices = mocks.invoices.map((row) => ({ ...row, wallet_display: undefined }));
     renderView();
-    expect(screen.getByRole('alert')).toHaveTextContent('activity_view.ownership_unavailable');
     expect(screen.getByRole('row', { name: /Selected invoice/ })).toBeVisible();
     expect(screen.getAllByRole('link', { name: 'wallet-treasury' })).toHaveLength(2);
   });
@@ -336,6 +326,5 @@ describe('administrative transactions', () => {
       screen.queryByRole('button', { name: 'activity_view.delete_selected' })
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Treasury' })).not.toBeInTheDocument();
-    expect(mocks.listAccounts).not.toHaveBeenCalled();
   });
 });

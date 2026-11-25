@@ -291,8 +291,13 @@ export const getBtcAddressResponseTransformer = async (
   return data;
 };
 
+const adminInvoiceSummarySchemaResponseTransformer = (data: any) => {
+  data = invoiceSchemaResponseTransformer(data);
+  return data;
+};
+
 export const listInvoicesResponseTransformer = async (data: any): Promise<ListInvoicesResponse> => {
-  data = data.map((item: any) => invoiceSchemaResponseTransformer(item));
+  data = data.map((item: any) => adminInvoiceSummarySchemaResponseTransformer(item));
   return data;
 };
 
@@ -496,8 +501,13 @@ export const getWalletPaymentResponseTransformer = async (
   return data;
 };
 
+const adminPaymentSummarySchemaResponseTransformer = (data: any) => {
+  data = paymentSchemaResponseTransformer(data);
+  return data;
+};
+
 export const listPaymentsResponseTransformer = async (data: any): Promise<ListPaymentsResponse> => {
-  data = data.map((item: any) => paymentSchemaResponseTransformer(item));
+  data = data.map((item: any) => adminPaymentSummarySchemaResponseTransformer(item));
   return data;
 };
 

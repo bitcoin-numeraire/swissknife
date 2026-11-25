@@ -96,6 +96,8 @@ export {
 export {
   type Account,
   type AccountPreferences,
+  type AdminInvoiceSummary,
+  type AdminPaymentSummary,
   type ApiKey,
   type Asset,
   type AuthIdentity,
@@ -534,6 +536,7 @@ export {
   type StreamAccountEventsErrors,
   type StreamAccountEventsResponse,
   type StreamAccountEventsResponses,
+  type TransactionWalletDisplay,
   type UpdateAccountAddressData,
   type UpdateAccountAddressError,
   type UpdateAccountAddressErrors,
