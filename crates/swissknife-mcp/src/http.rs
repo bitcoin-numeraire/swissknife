@@ -97,8 +97,9 @@ pub(super) async fn serve(wallet: WalletClient, listen: SocketAddr, public_origi
         .with_allowed_origins(origins)
         .with_legacy_session_mode(false)
         .with_max_request_body_bytes(65536);
+    let feeds = crate::resources::ResourceFeeds::default();
     let service = StreamableHttpService::new(
-        move || Ok(WalletServer::new(wallet.clone())),
+        move || Ok(WalletServer::new(wallet.clone(), feeds.clone())),
         Arc::new(LocalSessionManager::default()),
         config,
     );

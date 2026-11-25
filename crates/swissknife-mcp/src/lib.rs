@@ -1,4 +1,5 @@
 mod http;
+mod resources;
 mod tools;
 mod wallet;
 
@@ -20,7 +21,9 @@ pub async fn run(
     if let Some(listen) = listen {
         return http::serve(client, listen, public_origin).await;
     }
-    let service = tools::WalletServer::new(client).serve(stdio()).await?;
+    let service = tools::WalletServer::new(client, resources::ResourceFeeds::default())
+        .serve(stdio())
+        .await?;
     service.waiting().await?;
     Ok(())
 }
