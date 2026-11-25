@@ -15,6 +15,7 @@ use uuid::Uuid;
 #[async_trait]
 pub trait OfferUseCases: Send + Sync {
     async fn create(&self, wallet: Uuid, request: CreateOfferRequest) -> Result<WalletOffer, ApplicationError>;
+    async fn get(&self, id: Uuid, wallet: Option<Uuid>) -> Result<WalletOffer, ApplicationError>;
     async fn list(&self, filter: OfferFilter) -> Result<Vec<WalletOffer>, ApplicationError>;
     async fn disable(&self, id: Uuid, wallet: Option<Uuid>) -> Result<WalletOffer, ApplicationError>;
     async fn sync(&self) -> Result<bool, ApplicationError>;
@@ -108,6 +109,9 @@ impl OfferUseCases for OfferService {
         }
         self.require_original(&stored.backend)?;
         self.finish_registration(offer, fresh).await
+    }
+    async fn get(&self, id: Uuid, wallet: Option<Uuid>) -> Result<WalletOffer, ApplicationError> {
+        Ok(self.store.offer.get(id, wallet).await?.offer)
     }
     async fn list(&self, filter: OfferFilter) -> Result<Vec<WalletOffer>, ApplicationError> {
         self.store.offer.list(filter).await

@@ -25,9 +25,11 @@ import type {
   GetBtcAddressResponse,
   GetInvoiceResponse,
   GetLocalLoginResponse,
+  GetOfferResponse,
   GetPaymentResponse,
   GetPaymentSubmissionResponse,
   GetWalletInvoiceResponse,
+  GetWalletOfferResponse,
   GetWalletPaymentResponse,
   GetWalletPaymentSubmissionResponse,
   GetWalletResponse,
@@ -535,6 +537,13 @@ export const disableWalletOfferResponseTransformer = async (
   return data;
 };
 
+export const getWalletOfferResponseTransformer = async (
+  data: any
+): Promise<GetWalletOfferResponse> => {
+  data = walletOfferSchemaResponseTransformer(data);
+  return data;
+};
+
 export const listWalletPaymentsResponseTransformer = async (
   data: any
 ): Promise<ListWalletPaymentsResponse> => {
@@ -599,6 +608,11 @@ export const createOfferResponseTransformer = async (data: any): Promise<CreateO
 };
 
 export const disableOfferResponseTransformer = async (data: any): Promise<DisableOfferResponse> => {
+  data = walletOfferSchemaResponseTransformer(data);
+  return data;
+};
+
+export const getOfferResponseTransformer = async (data: any): Promise<GetOfferResponse> => {
   data = walletOfferSchemaResponseTransformer(data);
   return data;
 };

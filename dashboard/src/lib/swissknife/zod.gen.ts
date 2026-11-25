@@ -1851,6 +1851,16 @@ export const zDisableWalletOfferPath = z.object({
  */
 export const zDisableWalletOfferResponse = zWalletOffer;
 
+export const zGetWalletOfferPath = z.object({
+  wallet_id: z.uuid(),
+  id: z.uuid(),
+});
+
+/**
+ * Offer and current lifecycle state
+ */
+export const zGetWalletOfferResponse = zWalletOffer;
+
 export const zDeleteFailedPaymentsPath = z.object({
   wallet_id: z.uuid(),
 });
@@ -1990,6 +2000,15 @@ export const zDisableOfferPath = z.object({
  * Success
  */
 export const zDisableOfferResponse = zWalletOffer;
+
+export const zGetOfferPath = z.object({
+  id: z.uuid(),
+});
+
+/**
+ * Offer and current lifecycle state
+ */
+export const zGetOfferResponse = zWalletOffer;
 
 export const zDeletePaymentsQuery = z.object({
   limit: z.coerce

@@ -14,7 +14,7 @@ use utoipa::OpenApi;
 use uuid::Uuid;
 #[derive(OpenApi)]
 #[openapi(
-    paths(create_offer, list_offers, disable_offer, create_wallet_offer, list_wallet_offers, disable_wallet_offer),
+    paths(create_offer, get_offer, list_offers, disable_offer, create_wallet_offer, get_wallet_offer, list_wallet_offers, disable_wallet_offer),
     components(schemas(WalletOffer, CreateOfferRequest, swissknife_types::OfferState, swissknife_types::OfferInvoice)),
     tags((name = "Offers", description = "Wallet-owned BOLT12 receive offers."))
 )]
@@ -22,14 +22,14 @@ pub struct OfferHandler;
 pub fn router() -> Router<Arc<AppServices>> {
     Router::new()
         .route("/v1/offers", get(list_offers).post(create_offer))
-        .route("/v1/offers/{id}", axum::routing::delete(disable_offer))
+        .route("/v1/offers/{id}", get(get_offer).delete(disable_offer))
         .route(
             "/v1/me/wallets/{wallet_id}/offers",
             get(list_wallet_offers).post(create_wallet_offer),
         )
         .route(
             "/v1/me/wallets/{wallet_id}/offers/{id}",
-            axum::routing::delete(disable_wallet_offer),
+            get(get_wallet_offer).delete(disable_wallet_offer),
         )
 }
 
@@ -82,6 +82,25 @@ async fn list_offers(
 ) -> Result<Json<Vec<WalletOffer>>, ApplicationError> {
     user.check_permission(Permission::ReadTransaction)?;
     Ok(Json(services.offer.list(filter).await?))
+}
+
+/// Read a BOLT12 offer by its stable SwissKnife ID.
+#[utoipa::path(
+    get, path = "/v1/offers/{id}", tag = "Offers",
+    responses(
+        (status = 200, description = "Offer and current lifecycle state", body = WalletOffer),
+        (status = 401, description = "Authentication required", body = ErrorResponse),
+        (status = 403, description = "Insufficient permission", body = ErrorResponse),
+        (status = 404, description = "Offer not found", body = ErrorResponse)
+    )
+)]
+async fn get_offer(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path(id): Path<Uuid>,
+) -> Result<Json<WalletOffer>, ApplicationError> {
+    user.check_permission(Permission::ReadTransaction)?;
+    Ok(Json(services.offer.get(id, None).await?))
 }
 
 /// Disable BOLT12 offer.
@@ -156,6 +175,25 @@ async fn list_wallet_offers(
     services.wallet.verify_ownership(user.account_id, wallet_id).await?;
     filter.wallet_id = Some(wallet_id);
     Ok(Json(services.offer.list(filter).await?))
+}
+
+/// Read a BOLT12 offer by its stable SwissKnife ID.
+#[utoipa::path(
+    get, path = "/v1/me/wallets/{wallet_id}/offers/{id}", tag = "Offers",
+    responses(
+        (status = 200, description = "Offer and current lifecycle state", body = WalletOffer),
+        (status = 401, description = "Authentication required", body = ErrorResponse),
+        (status = 403, description = "Insufficient permission", body = ErrorResponse),
+        (status = 404, description = "Offer not found", body = ErrorResponse)
+    )
+)]
+async fn get_wallet_offer(
+    State(services): State<Arc<AppServices>>,
+    user: User,
+    Path((wallet_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<WalletOffer>, ApplicationError> {
+    services.wallet.verify_ownership(user.account_id, wallet_id).await?;
+    Ok(Json(services.offer.get(id, Some(wallet_id)).await?))
 }
 
 /// Disable wallet-owned BOLT12 offer.

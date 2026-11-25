@@ -119,6 +119,36 @@ async fn receives_reusable_offers_once_per_paid_invoice_after_restart() {
     assert_status(&result, StatusCode::OK);
     let first: WalletOffer = result.parse();
     assert_eq!(first.state, OfferState::Active);
+    let scoped = format!("{path}/{}", first.id);
+    let op = format!("/v1/offers/{}", first.id);
+    assert_eq!(api.get(&scoped, auth).await.parse::<WalletOffer>().id, first.id);
+    assert_eq!(
+        api.get(&op, Auth::Bearer(&admin))
+            .await
+            .parse::<WalletOffer>()
+            .wallet_id,
+        a.wallet.id
+    );
+    assert_error(&api.get(&op, Auth::None).await, StatusCode::UNAUTHORIZED);
+    use swissknife_types::Permission;
+    let service = app.create_account(&admin, "publisher").await;
+    let reader = app
+        .account_api_key(&admin, service.id, vec![Permission::ReadTransaction])
+        .await;
+    let limited = app
+        .account_api_key(&admin, service.id, vec![Permission::ReadWallet])
+        .await;
+    assert_eq!(
+        api.get(&op, Auth::ApiKey(&reader)).await.parse::<WalletOffer>().id,
+        first.id
+    );
+    assert_error(&api.delete(&op, Auth::ApiKey(&reader)).await, StatusCode::FORBIDDEN);
+    assert_error(&api.get(&op, Auth::ApiKey(&limited)).await, StatusCode::FORBIDDEN);
+    assert_error(&api.get(&scoped, Auth::ApiKey(&b.key)).await, StatusCode::NOT_FOUND);
+    assert_error(
+        &api.get(&format!("{other}/{}", first.id), Auth::ApiKey(&b.key)).await,
+        StatusCode::NOT_FOUND,
+    );
     let replay: WalletOffer = api.post(&path, auth, &body).await.parse();
     assert_eq!(replay.bolt12, first.bolt12);
     let mut conflict = body.clone();
