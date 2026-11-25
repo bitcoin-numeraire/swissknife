@@ -1,0 +1,323 @@
+use super::wallet::WalletClient;
+use anyhow::{ensure, Context};
+use lightning_invoice::Bolt11Invoice;
+use rmcp::{
+    handler::server::{router::tool::ToolRouter, wrapper::Parameters},
+    model::{
+        CallToolResult, ListResourcesResult, PaginatedRequestParams, ReadResourceRequestParams, ReadResourceResponse,
+        ReadResourceResult, Resource, ResourceContents, ServerCapabilities, ServerConfig,
+    },
+    schemars,
+    service::RequestContext,
+    tool, tool_handler, tool_router, ErrorData, RoleServer, ServerHandler,
+};
+use serde::Deserialize;
+use serde_json::{json, Value};
+use uuid::Uuid;
+
+#[derive(Clone)]
+pub struct WalletServer {
+    wallet: WalletClient,
+    tool_router: ToolRouter<Self>,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct InvoiceDetails {
+    /// Signed BOLT11 invoice to inspect.
+    invoice: String,
+}
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct NewInvoice {
+    /// Positive whole millisatoshis as a decimal string.
+    amount_msat: String,
+    description: Option<String>,
+    expiry_seconds: Option<u32>,
+}
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct PaymentDetails {
+    /// SwissKnife payment UUID.
+    id: String,
+}
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ListPayments {
+    /// Between 1 and 100. Defaults to 20.
+    limit: Option<u8>,
+    offset: Option<u32>,
+}
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ApprovedPayment {
+    /// Destination required by this tool.
+    destination: String,
+    /// Exact authorized principal in millisatoshis, as a decimal string.
+    amount_msat: String,
+    /// Maximum authorized routing fee in millisatoshis, as a decimal string.
+    maximum_fee_msat: String,
+    /// Unique UUID for this approval. Reuse the same UUID and terms after a lost response.
+    idempotency_key: String,
+}
+
+enum Target {
+    Invoice,
+    Address,
+    Lnurl,
+}
+
+fn amount(value: &str) -> anyhow::Result<u64> {
+    ensure!(
+        !value.is_empty() && value.bytes().all(|b| b.is_ascii_digit()),
+        "Amounts must be whole millisatoshis written as decimal strings"
+    );
+    value.parse().context("Amount exceeds the supported integer range")
+}
+
+fn result(value: anyhow::Result<Value>) -> CallToolResult {
+    match value {
+        Ok(value) => CallToolResult::structured(value),
+        Err(error) => CallToolResult::structured_error(json!({"error":error.to_string()})),
+    }
+}
+
+fn invoice(value: &str) -> anyhow::Result<Bolt11Invoice> {
+    value
+        .trim()
+        .parse::<Bolt11Invoice>()
+        .context("Invalid signed BOLT11 invoice")
+}
+
+impl WalletServer {
+    pub fn new(wallet: WalletClient) -> Self {
+        Self {
+            wallet,
+            tool_router: Self::tool_router(),
+        }
+    }
+    async fn submit(&self, args: ApprovedPayment, kind: Target) -> anyhow::Result<Value> {
+        let principal = amount(&args.amount_msat)?;
+        let maximum = amount(&args.maximum_fee_msat)?;
+        ensure!(
+            principal > 0 && principal.checked_add(maximum).is_some(),
+            "Invalid principal or fee limit"
+        );
+        let key = Uuid::parse_str(&args.idempotency_key).context("Invalid idempotency UUID")?;
+        let destination = args.destination.trim();
+        match kind {
+            Target::Invoice => {
+                let invoice = invoice(destination)?;
+                ensure!(!invoice.is_expired(), "Invoice has expired");
+                ensure!(
+                    invoice.amount_milli_satoshis().is_none_or(|n| n == principal),
+                    "Approved amount differs from the signed invoice"
+                );
+            }
+            Target::Address => {
+                let (user, domain) = destination.split_once('@').context("Enter a Lightning Address")?;
+                ensure!(
+                    !user.is_empty()
+                        && !domain.is_empty()
+                        && !user.starts_with('₿')
+                        && !domain.contains('@')
+                        && !destination.contains(['/', ':', '?', '#'])
+                        && !destination.chars().any(char::is_whitespace),
+                    "Invalid Lightning Address"
+                );
+            }
+            Target::Lnurl => ensure!(
+                destination
+                    .get(..6)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("lnurl1")),
+                "Enter a bech32 LNURL-pay request"
+            ),
+        }
+        self.wallet
+            .post(
+                "payments/submissions",
+                json!({"input":destination,"amount_msat":principal,"maximum_fee_msat":maximum,"idempotency_key":key}),
+            )
+            .await
+    }
+}
+
+#[tool_router]
+impl WalletServer {
+    #[tool(
+        description = "Read the selected wallet balance. Amounts are exact decimal millisatoshi strings.",
+        annotations(read_only_hint = true)
+    )]
+    async fn get_balance(&self) -> CallToolResult {
+        result(self.wallet.get("balance").await)
+    }
+
+    #[tool(
+        description = "Read this wallet’s public identity, asset and receiving address.",
+        annotations(read_only_hint = true)
+    )]
+    async fn get_wallet_info(&self) -> CallToolResult {
+        result(
+            self.wallet.get("").await.map(
+                |w| json!({"id":w["id"],"asset":w["asset"],"label":w["label"],"lightning_address":w["ln_address"]}),
+            ),
+        )
+    }
+
+    #[tool(
+        description = "Read this wallet’s registered receiving address and whether it is active.",
+        annotations(read_only_hint = true)
+    )]
+    async fn get_lightning_address(&self) -> CallToolResult {
+        result(
+            self.wallet
+                .get("")
+                .await
+                .map(|w| json!({"lightning_address":w["ln_address"]})),
+        )
+    }
+
+    #[tool(
+        description = "List payment contacts recorded for this wallet.",
+        annotations(read_only_hint = true)
+    )]
+    async fn list_contacts(&self) -> CallToolResult {
+        result(self.wallet.get("contacts").await.map(|v| json!({"contacts":v})))
+    }
+
+    #[tool(
+        description = "Decode a signed BOLT11 invoice locally, including amount, expiry, network and payee. No payment is made.",
+        annotations(read_only_hint = true)
+    )]
+    fn decode_invoice(&self, Parameters(args): Parameters<InvoiceDetails>) -> CallToolResult {
+        result(invoice(&args.invoice).map(|invoice| {
+            json!({
+                "payment_hash": invoice.payment_hash().to_string(),
+                "amount_msat": invoice.amount_milli_satoshis().map(|amount| amount.to_string()),
+                "network": invoice.currency().to_string(),
+                "description": invoice.description().to_string(),
+                "payee": invoice.recover_payee_pub_key().to_string(),
+                "expires_at_unix": invoice.expires_at().map(|time| time.as_secs()),
+                "expired": invoice.is_expired()
+            })
+        }))
+    }
+
+    #[tool(
+        description = "Issue a new incoming Lightning invoice. A retry creates another invoice.",
+        annotations(destructive_hint = false, idempotent_hint = false)
+    )]
+    async fn create_invoice(&self, Parameters(args): Parameters<NewInvoice>) -> CallToolResult {
+        result(
+            async {
+                let principal = amount(&args.amount_msat)?;
+                ensure!(principal > 0, "Invoice amount must be positive");
+                self.wallet
+                    .post(
+                        "invoices",
+                        json!({"amount_msat":principal,"description":args.description,"expiry":args.expiry_seconds}),
+                    )
+                    .await
+            }
+            .await,
+        )
+    }
+
+    #[tool(
+        description = "Spend the approved principal to pay a signed BOLT11 invoice. Supply the approved maximum fee and reuse the same idempotency UUID and terms on retry. A submission can still be pending.",
+        annotations(destructive_hint = true, idempotent_hint = true)
+    )]
+    async fn send_payment(&self, Parameters(args): Parameters<ApprovedPayment>) -> CallToolResult {
+        result(self.submit(args, Target::Invoice).await)
+    }
+
+    #[tool(
+        description = "Pay an external Lightning Address with an approved amount, fee cap and stable submission UUID.",
+        annotations(destructive_hint = true, idempotent_hint = true)
+    )]
+    async fn send_to_address(&self, Parameters(args): Parameters<ApprovedPayment>) -> CallToolResult {
+        result(self.submit(args, Target::Address).await)
+    }
+
+    #[tool(
+        description = "Pay a bech32 LNURL-pay request with an approved amount, fee cap and stable submission UUID.",
+        annotations(destructive_hint = true, idempotent_hint = true)
+    )]
+    async fn lnurl_pay(&self, Parameters(args): Parameters<ApprovedPayment>) -> CallToolResult {
+        result(self.submit(args, Target::Lnurl).await)
+    }
+
+    #[tool(
+        description = "List recent outgoing wallet payments with optional pagination.",
+        annotations(read_only_hint = true)
+    )]
+    async fn list_payments(&self, Parameters(args): Parameters<ListPayments>) -> CallToolResult {
+        result(
+            self.wallet
+                .recent(args.limit.unwrap_or(20), args.offset.unwrap_or(0))
+                .await,
+        )
+    }
+
+    #[tool(
+        description = "Read one payment and its final or pending status.",
+        annotations(read_only_hint = true)
+    )]
+    async fn get_payment(&self, Parameters(args): Parameters<PaymentDetails>) -> CallToolResult {
+        result(
+            async {
+                let id = Uuid::parse_str(&args.id).context("Invalid payment UUID")?;
+                self.wallet.get(&format!("payments/{id}")).await
+            }
+            .await,
+        )
+    }
+
+    #[tool(
+        description = "Read the execution state of a durable payment submission, including reconciliation and settlement.",
+        annotations(read_only_hint = true)
+    )]
+    async fn get_payment_submission(&self, Parameters(args): Parameters<PaymentDetails>) -> CallToolResult {
+        result(
+            async {
+                let id = Uuid::parse_str(&args.id).context("Invalid submission UUID")?;
+                self.wallet.get(&format!("payments/submissions/{id}")).await
+            }
+            .await,
+        )
+    }
+}
+
+#[tool_handler(router=self.tool_router)]
+impl ServerHandler for WalletServer {
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().build())
+            .with_instructions("This connection selects one wallet. Amounts are exact decimal millisatoshi strings. Obtain approval for the principal and maximum fee before spending. Keep the same payment UUID and terms if a response is lost.")
+    }
+    async fn list_resources(
+        &self,
+        _: Option<PaginatedRequestParams>,
+        _: RequestContext<RoleServer>,
+    ) -> Result<ListResourcesResult, ErrorData> {
+        Ok(ListResourcesResult::with_all_items(vec![
+            Resource::new("wallet://balance", "Wallet balance").with_mime_type("application/json"),
+            Resource::new("wallet://payments/recent", "Recent outgoing payments").with_mime_type("application/json"),
+        ]))
+    }
+    async fn read_resource(
+        &self,
+        request: ReadResourceRequestParams,
+        _: RequestContext<RoleServer>,
+    ) -> Result<ReadResourceResponse, ErrorData> {
+        let value = match request.uri.as_str() {
+            "wallet://balance" => self.wallet.get("balance").await,
+            "wallet://payments/recent" => self.wallet.recent(20, 0).await,
+            _ => return Err(ErrorData::resource_not_found("Unknown wallet resource", None)),
+        }
+        .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        Ok(ReadResourceResult::new(vec![
+            ResourceContents::text(value.to_string(), request.uri).with_mime_type("application/json")
+        ])
+        .into())
+    }
+}

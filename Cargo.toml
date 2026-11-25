@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/migration", "crates/swissknife-types"]
+members = ["crates/migration", "crates/swissknife-types", "crates/swissknife-mcp"]
 resolver = "2"
 
 [workspace.package]
@@ -66,6 +66,7 @@ humantime = "2.4.0"
 rust_socketio = { version = "0.6.0", features = ["async"] }
 migration = { path = "crates/migration" }
 swissknife-types = { path = "crates/swissknife-types" }
+swissknife-mcp = { path = "crates/swissknife-mcp" }
 utoipa = { version = "6.0.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-scalar = { version = "0.4.0", features = ["axum"] }
 native-tls = "0.2.18"
@@ -95,6 +96,7 @@ strip = true
 itest = []
 
 [dev-dependencies]
+tokio = { version = "1.54.1", features = ["process"] }
 tempfile = "3"
 mockall = "0.15.0"
 dtor = "1.0"
