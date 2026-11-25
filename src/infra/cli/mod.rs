@@ -27,6 +27,9 @@ pub enum Command {
         /// HTTPS origin of an optional TLS proxy that preserves the public Host header.
         #[arg(long, requires = "http_listen")]
         public_origin: Option<String>,
+        /// Trusted LNURL-withdraw service origin. Repeat for additional discovery or callback origins.
+        #[arg(long = "withdraw-origin", value_name = "ORIGIN")]
+        withdraw_origins: Vec<String>,
     },
     /// Enable an existing local login and issue a one-time password reset code.
     /// Uses the configured database without connecting to a Lightning provider.

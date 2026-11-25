@@ -5087,6 +5087,7 @@ dependencies = [
  "hex",
  "l402-proto",
  "lightning-invoice",
+ "lnurl-rs",
  "reqwest 0.13.5",
  "rmcp",
  "serde",

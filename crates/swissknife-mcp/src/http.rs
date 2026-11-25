@@ -79,7 +79,12 @@ fn allowed_origins(local: SocketAddr, public_origin: Option<&str>) -> anyhow::Re
     Ok((hosts, origins))
 }
 
-pub(super) async fn serve(wallet: WalletClient, listen: SocketAddr, public_origin: Option<&str>) -> anyhow::Result<()> {
+pub(super) async fn serve(
+    wallet: WalletClient,
+    withdrawals: super::withdraw::WithdrawalClient,
+    listen: SocketAddr,
+    public_origin: Option<&str>,
+) -> anyhow::Result<()> {
     ensure!(
         listen.ip().is_loopback(),
         "MCP HTTP must bind to loopback; expose it through a TLS proxy or private tunnel"
@@ -99,7 +104,7 @@ pub(super) async fn serve(wallet: WalletClient, listen: SocketAddr, public_origi
         .with_max_request_body_bytes(65536);
     let feeds = crate::resources::ResourceFeeds::default();
     let service = StreamableHttpService::new(
-        move || Ok(WalletServer::new(wallet.clone(), feeds.clone())),
+        move || Ok(WalletServer::new(wallet.clone(), feeds.clone(), withdrawals.clone())),
         Arc::new(LocalSessionManager::default()),
         config,
     );

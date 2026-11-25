@@ -1,5 +1,6 @@
 use super::resources::{LegacySubscriptions, ResourceFeeds, WalletResource};
 use super::wallet::WalletClient;
+use super::withdraw::WithdrawalClient;
 use anyhow::{ensure, Context};
 use lightning_invoice::Bolt11Invoice;
 use rmcp::{
@@ -21,9 +22,28 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct WalletServer {
     wallet: WalletClient,
+    withdrawals: WithdrawalClient,
     tool_router: ToolRouter<Self>,
     feeds: ResourceFeeds,
     legacy: Arc<LegacySubscriptions>,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct WithdrawalLink {
+    /// Encoded LNURL-withdraw voucher from a configured service. Treat it as a secret.
+    lnurl: String,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct RedeemWithdrawal {
+    /// Encoded LNURL-withdraw voucher reviewed with inspect_lnurl_withdraw.
+    lnurl: String,
+    /// UUID of the selected wallet invoice issued for this withdrawal. Keep this ID for reconciliation.
+    invoice_id: String,
+    /// Exact amount approved for receipt, as a decimal millisatoshi string.
+    amount_msat: String,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -145,10 +165,16 @@ fn merchant_invoice(header: &str) -> anyhow::Result<(l402_proto::L402Challenge, 
 }
 
 impl WalletServer {
-    pub(super) fn new(wallet: WalletClient, feeds: ResourceFeeds) -> Self {
+    pub(super) fn new(wallet: WalletClient, feeds: ResourceFeeds, withdrawals: WithdrawalClient) -> Self {
+        let mut tool_router = Self::tool_router();
+        if !withdrawals.enabled() {
+            tool_router.remove_route("inspect_lnurl_withdraw");
+            tool_router.remove_route("lnurl_withdraw");
+        }
         Self {
             wallet,
-            tool_router: Self::tool_router(),
+            withdrawals,
+            tool_router,
             feeds,
             legacy: Arc::default(),
         }
@@ -334,6 +360,47 @@ impl WalletServer {
                         json!({"amount_msat":principal,"description":args.description,"expiry":args.expiry_seconds}),
                     )
                     .await
+            }
+            .await,
+        )
+    }
+
+    #[tool(
+        description = "Read the issuer, description and amount range of a trusted LNURL-withdraw voucher. This does not create an invoice or redeem the voucher.",
+        annotations(read_only_hint = true)
+    )]
+    async fn inspect_lnurl_withdraw(&self, Parameters(args): Parameters<WithdrawalLink>) -> CallToolResult {
+        result(self.withdrawals.discover(&args.lnurl).await.map(|offer| offer.terms()))
+    }
+
+    #[tool(
+        description = "Submit a reviewed voucher with an existing pending wallet invoice for the approved amount. Requires read permission. Keep the invoice UUID from create_invoice and check get_invoice for settlement after an accepted or uncertain callback.",
+        annotations(idempotent_hint = false)
+    )]
+    async fn lnurl_withdraw(&self, Parameters(args): Parameters<RedeemWithdrawal>) -> CallToolResult {
+        result(
+            async {
+                let id = Uuid::parse_str(&args.invoice_id).context("Invalid invoice UUID")?;
+                let principal = amount(&args.amount_msat)?;
+                ensure!(principal > 0, "Choose a positive withdrawal amount");
+                let receipt = self.wallet.get(&format!("invoices/{id}")).await?;
+                ensure!(
+                    receipt["status"] == "Pending",
+                    "Use get_invoice to check this invoice's current status"
+                );
+                let bolt11 = receipt["ln_invoice"]["bolt11"]
+                    .as_str()
+                    .context("This invoice cannot receive a Lightning payment")?;
+                let signed = invoice(bolt11)?;
+                ensure!(
+                    signed.amount_milli_satoshis() == Some(principal),
+                    "Invoice does not match the approved amount"
+                );
+                let offer = self.withdrawals.discover(&args.lnurl).await?;
+                offer.check_amount(principal)?;
+                ensure!(!signed.is_expired(), "Withdrawal invoice has expired");
+                let callback_status = self.withdrawals.submit(offer, bolt11).await;
+                Ok(json!({"invoice_id": id, "amount_msat": principal.to_string(), "callback_status": callback_status}))
             }
             .await,
         )

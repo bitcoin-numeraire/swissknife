@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Inspect LNURL-withdraw vouchers and redeem them into a selected wallet invoice through an operator-configured MCP bridge.
+
 - Look up an incoming invoice and its settled amount from a wallet-scoped MCP connection.
 
 - MCP clients can inspect L402 merchant challenges and build a private access credential from a matching settled wallet payment.
