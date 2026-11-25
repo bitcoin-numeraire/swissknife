@@ -1,4 +1,28 @@
 {
+  "merchant_tools": {
+    "title": "Outils marchands",
+    "routes": "Routes payantes",
+    "load_error": "Impossible de charger vos routes payantes.",
+    "no_origins": "Demandez à l’opérateur de votre instance d’attribuer une ressource à ce portefeuille pour publier une route.",
+    "choose": "Choisir une route",
+    "new": "Nouvelle route",
+    "public_url": "URL publique",
+    "withdrawn": "L’opérateur a retiré cette ressource. Les ventes et l’accès sont indisponibles.",
+    "name": "Nom de la route",
+    "duplicate": "Ce nom est déjà utilisé. Sélectionnez la route pour la modifier.",
+    "name_help": "Utilisez de 1 à 57 lettres minuscules, chiffres ou tirets.",
+    "origin": "Ressource",
+    "quote_limit": "Plafond par facture (msat)",
+    "price": "Prix (msat)",
+    "maximum": "Maximum de {{value}} msat",
+    "duration": "L’accès dure {{value}} secondes.",
+    "requests": "Chaque paiement couvre {{value}} requêtes.",
+    "sales": "Accepter de nouvelles ventes",
+    "save_error": "Impossible d’enregistrer cette route. Vérifiez la ressource et le prix puis réessayez.",
+    "save": "Enregistrer les modifications",
+    "publish": "Publier la route",
+    "saved": "Route enregistrée."
+  },
   "merchant_revenue": {
     "title": "Revenus marchands",
     "from": "Du (UTC)",
