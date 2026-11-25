@@ -30,7 +30,7 @@ import { shouldFail } from 'src/utils/errors';
 import { fFromNow } from 'src/utils/format-time';
 import { displayLnAddress } from 'src/utils/lnurl';
 import { fCurrency } from 'src/utils/format-number';
-import { mergeAndSortTransactions } from 'src/utils/transactions';
+import { getLedgerLabel, mergeAndSortTransactions } from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
@@ -45,11 +45,13 @@ import { Iconify } from 'src/components/iconify';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { ErrorView } from 'src/components/error/error-view';
 import { useSettingsContext } from 'src/components/settings';
+import { AssetUnits } from 'src/components/bitcoin/asset-units';
 
 import { TransactionQuickDrawer } from 'src/sections/transaction/transaction-quick-drawer';
 
 import { TransactionType } from 'src/types/transaction';
 
+import { OpeningCredit } from '../opening-credit';
 import { SendMoneyDrawer, ReceiveMoneyDrawer } from '../money-drawers';
 
 // ----------------------------------------------------------------------
@@ -78,6 +80,7 @@ function statusColor(status: string) {
 }
 
 function railIcon(tx: ITransaction) {
+  if (tx.ledger === 'Adjustment') return 'solar:wallet-bold-duotone';
   if (tx.ledger === 'Onchain') return 'solar:link-bold-duotone';
   if (tx.ledger === 'Internal') return 'solar:home-angle-bold-duotone';
   return 'solar:bolt-bold-duotone';
@@ -87,12 +90,6 @@ function txHref(tx: ITransaction) {
   return tx.transaction_type === TransactionType.PAYMENT
     ? paths.wallet.payment(tx.id)
     : paths.wallet.invoice(tx.id);
-}
-
-function txNetworkLabel(tx: ITransaction) {
-  if (tx.ledger === 'Onchain') return 'On-chain';
-  if (tx.ledger === 'Internal') return 'Internal';
-  return 'Lightning';
 }
 
 function txDisplayTitle(tx: ITransaction, t: (key: string) => string) {
@@ -221,6 +218,7 @@ export function WalletView() {
 
   return (
     <DashboardContent maxWidth="xl">
+      <OpeningCredit />
       {failed ? (
         <ErrorView errors={errors} isLoading={isLoading} data={data} />
       ) : (
@@ -296,11 +294,20 @@ export function WalletView() {
                           </IconButton>
                         </Tooltip>
                       </Stack>
-                      <SatsWithIcon
-                        variant="h2"
-                        amountMSats={wallet?.balance.available_msat ?? 0}
-                        sx={{ letterSpacing: 0, fontWeight: 400 }}
-                      />
+                      {wallet?.asset && wallet.balance.available_units != null ? (
+                        <AssetUnits
+                          units={wallet.balance.available_units}
+                          asset={wallet.asset}
+                          variant="h2"
+                          sx={{ letterSpacing: 0, fontWeight: 400 }}
+                        />
+                      ) : (
+                        <SatsWithIcon
+                          variant="h2"
+                          amountMSats={wallet?.balance.available_msat ?? 0}
+                          sx={{ letterSpacing: 0, fontWeight: 400 }}
+                        />
+                      )}
                       {fiatValueAvailable ? (
                         <Typography variant="subtitle1" color="text.secondary">
                           {balancesHidden
@@ -776,6 +783,7 @@ export function WalletView() {
                       const isIncoming = direction === 'in';
                       const title = txDisplayTitle(tx, t);
                       const isOpenAmount = isOpenAmountRequest(tx);
+                      const creditUnits = 'credit_amount_units' in tx && tx.credit_amount_units;
 
                       return (
                         <Box
@@ -839,7 +847,12 @@ export function WalletView() {
                               </Typography>
                             </Stack>
                             <Typography variant="caption" color="text.secondary">
-                              {fFromNow(tx.created_at)} · {txNetworkLabel(tx)}
+                              {fFromNow(tx.created_at)} ·{' '}
+                              {getLedgerLabel(
+                                tx.ledger,
+                                t,
+                                'credit_purpose' in tx ? tx.credit_purpose : undefined
+                              )}
                             </Typography>
                           </Stack>
 
@@ -867,12 +880,20 @@ export function WalletView() {
                                 >
                                   {isIncoming ? '+' : '-'}
                                 </Typography>
-                                <SatsWithIcon
-                                  component="span"
-                                  amountMSats={txAmount(tx)}
-                                  noWrap
-                                  sx={{ color: isIncoming ? 'success.main' : 'warning.main' }}
-                                />
+                                {creditUnits ? (
+                                  <AssetUnits
+                                    units={creditUnits}
+                                    asset={wallet?.asset}
+                                    color={isIncoming ? 'success.main' : 'warning.main'}
+                                  />
+                                ) : (
+                                  <SatsWithIcon
+                                    component="span"
+                                    amountMSats={txAmount(tx)}
+                                    noWrap
+                                    sx={{ color: isIncoming ? 'success.main' : 'warning.main' }}
+                                  />
+                                )}
                               </Stack>
                             )}
 
@@ -909,11 +930,19 @@ export function WalletView() {
                               >
                                 {isIncoming ? '+' : '-'}
                               </Typography>
-                              <SatsWithIcon
-                                component="span"
-                                amountMSats={txAmount(tx)}
-                                sx={{ color: isIncoming ? 'success.main' : 'warning.main' }}
-                              />
+                              {creditUnits ? (
+                                <AssetUnits
+                                  units={creditUnits}
+                                  asset={wallet?.asset}
+                                  color={isIncoming ? 'success.main' : 'warning.main'}
+                                />
+                              ) : (
+                                <SatsWithIcon
+                                  component="span"
+                                  amountMSats={txAmount(tx)}
+                                  sx={{ color: isIncoming ? 'success.main' : 'warning.main' }}
+                                />
+                              )}
                             </Stack>
                           )}
 

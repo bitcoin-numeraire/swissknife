@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { LabelColor } from 'src/components/label';
+import type { CreditPurpose } from 'src/lib/swissknife';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -251,7 +252,15 @@ export function TransactionTimeline({
   );
 }
 
-export function StatusBadges({ status, ledger }: { status: string; ledger: string }) {
+export function StatusBadges({
+  status,
+  ledger,
+  creditPurpose,
+}: {
+  status: string;
+  ledger: string;
+  creditPurpose?: CreditPurpose | null;
+}) {
   const { t } = useTranslate();
 
   return (
@@ -260,7 +269,7 @@ export function StatusBadges({ status, ledger }: { status: string; ledger: strin
         {status}
       </Label>
       <Label variant="soft" color={ledgerColor(ledger)}>
-        {getLedgerLabel(ledger, t)}
+        {getLedgerLabel(ledger, t, creditPurpose)}
       </Label>
     </Stack>
   );

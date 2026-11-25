@@ -5,9 +5,15 @@ import { sumBy } from 'es-toolkit';
 
 import { TransactionType } from 'src/types/transaction';
 
-export const LEDGERS = ['Lightning', 'Internal', 'Onchain'];
+export const LEDGERS = ['Lightning', 'Internal', 'Onchain', 'Adjustment'];
 
-export function getLedgerLabel(ledger: string | null | undefined, t: (key: string) => string) {
+export function getLedgerLabel(
+  ledger: string | null | undefined,
+  t: (key: string) => string,
+  creditPurpose?: Invoice['credit_purpose']
+) {
+  if (ledger === 'Adjustment')
+    return t(creditPurpose === 'opening' ? 'wallet_credit.opening' : 'wallet_credit.admin');
   if (ledger === 'Lightning') return t('transaction_details.lightning');
   if (ledger === 'Internal') return t('transaction_details.internal');
   if (ledger === 'Onchain') return t('transaction_details.onchain');
@@ -42,14 +48,19 @@ export function getPercentageChange(transactions: ITransaction[]): number {
   const previousMonthEnd = lastMonth;
 
   const currentMonthTransactions = transactions.filter(
-    (tx) => tx.created_at >= lastMonth && tx.created_at < nextMonth && tx.status === 'Settled'
+    (tx) =>
+      tx.created_at >= lastMonth &&
+      tx.created_at < nextMonth &&
+      tx.status === 'Settled' &&
+      tx.ledger !== 'Adjustment'
   );
 
   const previousMonthTransactions = transactions.filter(
     (tx) =>
       tx.created_at >= previousMonthStart &&
       tx.created_at < previousMonthEnd &&
-      tx.status === 'Settled'
+      tx.status === 'Settled' &&
+      tx.ledger !== 'Adjustment'
   );
 
   const currentMonthTotal = currentMonthTransactions.reduce(
@@ -71,7 +82,7 @@ export function getPercentageChange(transactions: ITransaction[]): number {
 
 export function getTotal(transactions: ITransaction[]): number {
   return sumBy(
-    transactions.filter((tx) => tx.status === 'Settled'),
+    transactions.filter((tx) => tx.status === 'Settled' && tx.ledger !== 'Adjustment'),
     (tx) => (tx.amount_msat || 0) + (tx.fee_msat || 0)
   );
 }
@@ -79,7 +90,7 @@ export function getTotal(transactions: ITransaction[]): number {
 export function getCumulativeSeries(transactions: ITransaction[]) {
   let cumulativeSum = 0;
   const seriesData = transactions
-    .filter((tx) => tx.status === 'Settled')
+    .filter((tx) => tx.status === 'Settled' && tx.ledger !== 'Adjustment')
     .sort((a, b) => a.payment_time!.getTime() - b.payment_time!.getTime())
     .map((tx) => {
       const amount = ((tx.amount_msat || 0) + (tx.fee_msat || 0)) / 1000; // Convert from msat to sat
