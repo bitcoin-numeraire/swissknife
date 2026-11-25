@@ -13,7 +13,7 @@ use tracing::{debug, trace};
 
 use crate::{
     application::{composition::AppStore, errors::DatabaseError},
-    domains::system::HealthProbe,
+    domains::system::{HealthProbe, HealthStatus, DATABASE_PROBE},
 };
 
 use super::{
@@ -149,7 +149,17 @@ impl SeaOrmHealthProbe {
 
 #[async_trait]
 impl HealthProbe for SeaOrmHealthProbe {
-    async fn ping(&self) -> Result<(), DatabaseError> {
-        self.db.ping().await.map_err(|e| DatabaseError::Ping(e.to_string()))
+    fn name(&self) -> &'static str {
+        DATABASE_PROBE
+    }
+
+    async fn health(&self) -> HealthStatus {
+        match self.db.ping().await {
+            Ok(()) => HealthStatus::Operational,
+            Err(err) => {
+                tracing::error!(%err, "Database health check failed");
+                HealthStatus::Unavailable
+            }
+        }
     }
 }

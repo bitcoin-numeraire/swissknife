@@ -1,30 +1,30 @@
 use async_trait::async_trait;
+use futures_util::future::join_all;
 use serde_json::{self, from_value, to_value};
-use std::sync::Arc;
-use tracing::{debug, error, info, trace};
+use std::{collections::HashMap, sync::Arc};
+use tracing::{debug, info, trace};
 
 use crate::{
-    application::{
-        composition::AppStore,
-        errors::{ApplicationError, DataError},
-    },
+    application::errors::{ApplicationError, DataError},
     domains::{account::LOCAL_AUTH_INITIALIZED_KEY, bitcoin::OnchainSyncCursor},
-    infra::lightning::LnClient,
 };
 
-use super::{HealthCheck, HealthStatus, SetupInfo, SystemUseCases, VersionInfo};
+use super::{
+    ConfigRepository, HealthCheck, HealthProbe, HealthStatus, SetupInfo, SystemUseCases, VersionInfo, DATABASE_PROBE,
+    LIGHTNING_PROBE,
+};
 
 const WELCOME_COMPLETE_KEY: &str = "welcome_complete";
 const ONCHAIN_CURSOR_KEY: &str = "onchain_sync_cursor";
 
 pub struct SystemService {
-    store: AppStore,
-    ln_client: Arc<dyn LnClient>,
+    config: Arc<dyn ConfigRepository>,
+    probes: Vec<Arc<dyn HealthProbe>>,
 }
 
 impl SystemService {
-    pub fn new(store: AppStore, ln_client: Arc<dyn LnClient>) -> Self {
-        SystemService { store, ln_client }
+    pub fn new(config: Arc<dyn ConfigRepository>, probes: Vec<Arc<dyn HealthProbe>>) -> Self {
+        Self { config, probes }
     }
 }
 
@@ -33,23 +33,21 @@ impl SystemUseCases for SystemService {
     async fn health_check(&self) -> HealthCheck {
         trace!("Checking system health");
 
-        let database = self
-            .store
-            .health
-            .ping()
-            .await
-            .map(|_| HealthStatus::Operational)
-            .unwrap_or_else(|err| {
-                error!(%err, "Database health check failed");
-                HealthStatus::Unavailable
-            });
+        let mut statuses: HashMap<_, _> = join_all(
+            self.probes
+                .iter()
+                .map(|probe| async { (probe.name(), probe.health().await) }),
+        )
+        .await
+        .into_iter()
+        .collect();
 
-        let ln_provider = self.ln_client.health().await.unwrap_or_else(|err| {
-            error!(%err, "Lightning provider health check failed");
-            HealthStatus::Unavailable
-        });
-
-        HealthCheck::new(database, ln_provider)
+        let mut check = HealthCheck::new(
+            statuses.remove(DATABASE_PROBE).unwrap_or(HealthStatus::Unavailable),
+            statuses.remove(LIGHTNING_PROBE).unwrap_or(HealthStatus::Unavailable),
+        );
+        check.is_healthy &= statuses.values().all(|status| *status == HealthStatus::Operational);
+        check
     }
 
     fn version(&self) -> VersionInfo {
@@ -64,8 +62,8 @@ impl SystemUseCases for SystemService {
     async fn setup_check(&self) -> Result<SetupInfo, ApplicationError> {
         trace!("Checking system setup");
 
-        let welcome_complete = self.store.config.find(WELCOME_COMPLETE_KEY).await?.is_some();
-        let sign_up_complete: bool = self.store.config.find(LOCAL_AUTH_INITIALIZED_KEY).await?.is_some();
+        let welcome_complete = self.config.find(WELCOME_COMPLETE_KEY).await?.is_some();
+        let sign_up_complete: bool = self.config.find(LOCAL_AUTH_INITIALIZED_KEY).await?.is_some();
 
         debug!(%welcome_complete, %sign_up_complete, "Checking system setup");
         Ok(SetupInfo {
@@ -77,11 +75,11 @@ impl SystemUseCases for SystemService {
     async fn mark_welcome_complete(&self) -> Result<(), ApplicationError> {
         debug!("Marking welcome flow as completed");
 
-        if self.store.config.find(WELCOME_COMPLETE_KEY).await?.is_some() {
+        if self.config.find(WELCOME_COMPLETE_KEY).await?.is_some() {
             return Ok(());
         }
 
-        self.store.config.insert(WELCOME_COMPLETE_KEY, true.into()).await?;
+        self.config.insert(WELCOME_COMPLETE_KEY, true.into()).await?;
 
         info!("Welcome flow marked as complete successfully");
         Ok(())
@@ -90,7 +88,7 @@ impl SystemUseCases for SystemService {
     async fn get_onchain_cursor(&self) -> Result<Option<OnchainSyncCursor>, ApplicationError> {
         trace!("Retrieving onchain sync cursor");
 
-        let Some(value) = self.store.config.find(ONCHAIN_CURSOR_KEY).await? else {
+        let Some(value) = self.config.find(ONCHAIN_CURSOR_KEY).await? else {
             return Ok(None);
         };
 
@@ -104,7 +102,7 @@ impl SystemUseCases for SystemService {
         trace!("Setting onchain sync cursor");
 
         let value = to_value(cursor.clone()).map_err(|e| DataError::Malformed(e.to_string()))?;
-        self.store.config.upsert(ONCHAIN_CURSOR_KEY, value).await?;
+        self.config.upsert(ONCHAIN_CURSOR_KEY, value).await?;
 
         debug!(?cursor, "Onchain sync cursor updated successfully");
         Ok(())
@@ -115,91 +113,83 @@ impl SystemUseCases for SystemService {
 mod tests {
     use std::sync::Arc;
 
-    use crate::{
-        application::{
-            composition::MockAppStoreBuilder,
-            errors::{DatabaseError, LightningError},
-        },
-        infra::lightning::MockLnClient,
-    };
-
     use super::*;
+    use crate::application::composition::MockAppStoreBuilder;
+    use crate::domains::system::MockHealthProbe;
 
-    fn service(store: MockAppStoreBuilder, ln_client: MockLnClient) -> SystemService {
-        SystemService::new(store.build(), Arc::new(ln_client))
+    fn service(store: MockAppStoreBuilder) -> SystemService {
+        SystemService::new(Arc::new(store.config), vec![])
     }
 
     mod health_check {
         use super::*;
+        use tokio::sync::Barrier;
 
-        mod when_dependencies_are_operational {
-            use super::*;
-
-            #[tokio::test]
-            async fn reports_system_healthy() {
-                let mut store = MockAppStoreBuilder::new();
-                store.health.expect_ping().times(1).returning(|| Ok(()));
-
-                let mut ln_client = MockLnClient::new();
-                ln_client
-                    .expect_health()
-                    .times(1)
-                    .returning(|| Ok(HealthStatus::Operational));
-
-                let health = service(store, ln_client).health_check().await;
-
-                assert_eq!(health.database, HealthStatus::Operational);
-                assert_eq!(health.ln_provider, HealthStatus::Operational);
-                assert!(health.is_healthy);
+        struct Probe(&'static str, HealthStatus, Arc<Barrier>);
+        #[async_trait]
+        impl HealthProbe for Probe {
+            fn name(&self) -> &'static str {
+                self.0
+            }
+            async fn health(&self) -> HealthStatus {
+                self.2.wait().await;
+                self.1.clone()
             }
         }
 
-        mod when_database_is_down {
-            use super::*;
-
-            #[tokio::test]
-            async fn reports_database_unavailable_and_unhealthy() {
-                let mut store = MockAppStoreBuilder::new();
-                store
-                    .health
-                    .expect_ping()
-                    .times(1)
-                    .returning(|| Err(DatabaseError::Ping("down".to_string())));
-
-                let mut ln_client = MockLnClient::new();
-                ln_client
-                    .expect_health()
-                    .times(1)
-                    .returning(|| Ok(HealthStatus::Operational));
-
-                let health = service(store, ln_client).health_check().await;
-
-                assert_eq!(health.database, HealthStatus::Unavailable);
-                assert_eq!(health.ln_provider, HealthStatus::Operational);
-                assert!(!health.is_healthy);
+        #[tokio::test]
+        async fn probes_run_concurrently_and_keep_the_public_health_fields() {
+            for (database, lightning, additional, healthy) in [
+                (
+                    HealthStatus::Operational,
+                    HealthStatus::Operational,
+                    HealthStatus::Operational,
+                    true,
+                ),
+                (
+                    HealthStatus::Unavailable,
+                    HealthStatus::Operational,
+                    HealthStatus::Operational,
+                    false,
+                ),
+                (
+                    HealthStatus::Operational,
+                    HealthStatus::Maintenance,
+                    HealthStatus::Operational,
+                    false,
+                ),
+                (
+                    HealthStatus::Operational,
+                    HealthStatus::Operational,
+                    HealthStatus::Unavailable,
+                    false,
+                ),
+            ] {
+                let barrier = Arc::new(Barrier::new(3));
+                let probes: Vec<Arc<dyn HealthProbe>> = vec![
+                    Arc::new(Probe("other", additional, barrier.clone())),
+                    Arc::new(Probe(LIGHTNING_PROBE, lightning.clone(), barrier.clone())),
+                    Arc::new(Probe(DATABASE_PROBE, database.clone(), barrier)),
+                ];
+                let service = SystemService::new(Arc::new(MockAppStoreBuilder::new().config), probes);
+                let health = tokio::time::timeout(std::time::Duration::from_secs(2), service.health_check())
+                    .await
+                    .unwrap();
+                assert_eq!(health.database, database);
+                assert_eq!(health.ln_provider, lightning);
+                assert_eq!(health.is_healthy, healthy);
             }
         }
 
-        mod when_lightning_provider_is_down {
-            use super::*;
-
-            #[tokio::test]
-            async fn reports_provider_unavailable_and_unhealthy() {
-                let mut store = MockAppStoreBuilder::new();
-                store.health.expect_ping().times(1).returning(|| Ok(()));
-
-                let mut ln_client = MockLnClient::new();
-                ln_client
-                    .expect_health()
-                    .times(1)
-                    .returning(|| Err(LightningError::HealthCheck("down".to_string())));
-
-                let health = service(store, ln_client).health_check().await;
-
-                assert_eq!(health.database, HealthStatus::Operational);
-                assert_eq!(health.ln_provider, HealthStatus::Unavailable);
-                assert!(!health.is_healthy);
-            }
+        #[tokio::test]
+        async fn a_missing_required_probe_is_unavailable() {
+            let mut probe = MockHealthProbe::new();
+            probe.expect_name().return_const(DATABASE_PROBE);
+            probe.expect_health().returning(|| HealthStatus::Operational);
+            let service = SystemService::new(Arc::new(MockAppStoreBuilder::new().config), vec![Arc::new(probe)]);
+            let health = service.health_check().await;
+            assert_eq!(health.ln_provider, HealthStatus::Unavailable);
+            assert!(!health.is_healthy);
         }
     }
 
@@ -218,7 +208,7 @@ mod tests {
                 }
             });
 
-            let service = service(store, MockLnClient::new());
+            let service = service(store);
 
             let info = service.setup_check().await.unwrap();
 
@@ -244,7 +234,7 @@ mod tests {
                     .times(1)
                     .returning(|_, _| Ok(()));
 
-                let service = service(store, MockLnClient::new());
+                let service = service(store);
 
                 assert!(service.mark_welcome_complete().await.is_ok());
             }
@@ -259,7 +249,7 @@ mod tests {
                 store.config.expect_find().times(1).returning(|_| Ok(Some(true.into())));
                 // insert is intentionally not expected.
 
-                let service = service(store, MockLnClient::new());
+                let service = service(store);
 
                 assert!(service.mark_welcome_complete().await.is_ok());
             }
@@ -281,7 +271,7 @@ mod tests {
                     .times(1)
                     .returning(|_| Ok(Some(serde_json::to_value(OnchainSyncCursor::BlockHeight(42)).unwrap())));
 
-                let service = service(store, MockLnClient::new());
+                let service = service(store);
 
                 let cursor = service.get_onchain_cursor().await.unwrap();
 
@@ -297,7 +287,7 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store.config.expect_find().times(1).returning(|_| Ok(None));
 
-                let service = service(store, MockLnClient::new());
+                let service = service(store);
 
                 assert_eq!(service.get_onchain_cursor().await.unwrap(), None);
             }
@@ -315,7 +305,7 @@ mod tests {
                     .times(1)
                     .returning(|_| Ok(Some(serde_json::Value::String("not a cursor".to_string()))));
 
-                let service = service(store, MockLnClient::new());
+                let service = service(store);
 
                 let err = service.get_onchain_cursor().await.unwrap_err();
 
@@ -340,7 +330,7 @@ mod tests {
                 .times(1)
                 .returning(|_, _| Ok(()));
 
-            let service = service(store, MockLnClient::new());
+            let service = service(store);
 
             assert!(service
                 .set_onchain_cursor(OnchainSyncCursor::BlockHeight(7))
@@ -354,7 +344,7 @@ mod tests {
 
         #[tokio::test]
         async fn returns_cargo_package_version() {
-            let service = service(MockAppStoreBuilder::new(), MockLnClient::new());
+            let service = service(MockAppStoreBuilder::new());
 
             let version = service.version();
 
