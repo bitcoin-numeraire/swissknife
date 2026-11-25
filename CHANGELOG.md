@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Operators can export daily or weekly account budget consumption as JSON or CSV and filter by the wallet or original delegated credential.
+
 - Connect an MCP client to a single SwissKnife wallet over stdio to inspect balances, issue invoices, and submit and track approved Lightning payments.
 
 - Wallet owners can issue expiring, revocable credentials with independent access to wallet data, invoice creation and payment submission.

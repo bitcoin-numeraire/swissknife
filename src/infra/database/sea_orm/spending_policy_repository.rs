@@ -59,6 +59,53 @@ async fn usage(db: &impl ConnectionTrait, account: Uuid, today: NaiveDate) -> Re
 
 #[async_trait]
 impl SpendingPolicyRepository for SeaOrmSpendingPolicyRepository {
+    async fn report(
+        &self,
+        account: Uuid,
+        range: crate::domains::agent::SpendingReportRange,
+    ) -> Result<Vec<swissknife_types::SpendingReportRow>, DatabaseError> {
+        use futures_util::TryStreamExt;
+        use std::collections::BTreeMap;
+        use swissknife_types::{SpendingInterval, SpendingReportRow};
+        let mut query = SpendingEntry::find()
+            .select_only()
+            .column(entry::Column::AdmittedAt)
+            .column(entry::Column::ChargedMsat)
+            .filter(entry::Column::AccountId.eq(account))
+            .filter(entry::Column::AdmittedAt.gte(range.start))
+            .filter(entry::Column::AdmittedAt.lt(range.end));
+        if let Some(id) = range.wallet_id {
+            query = query.filter(entry::Column::WalletId.eq(id));
+        }
+        if let Some(id) = range.agent_key_id {
+            query = query.filter(entry::Column::AgentKeyId.eq(id));
+        }
+        let selector = query.into_tuple::<(chrono::NaiveDateTime, i64)>();
+        let mut entries = selector.stream(&self.0).await.map_err(db_error)?;
+        // A long report can exceed both a database BIGINT and JavaScript's exact number range.
+        // Keep at most 366 groups in memory and sum original integer amounts.
+        let mut groups = BTreeMap::<NaiveDate, (u64, u128)>::new();
+        while let Some((admission, charge)) = entries.try_next().await.map_err(db_error)? {
+            let day = admission.date();
+            let start = match range.interval {
+                SpendingInterval::Day => day,
+                SpendingInterval::Week => period_starts(day)[1],
+            };
+            let group = groups.entry(start).or_default();
+            group.0 += 1;
+            group.1 += u128::try_from(charge)
+                .map_err(|_| DatabaseError::FindMany("Negative account spending charge".into()))?;
+        }
+        Ok(groups
+            .into_iter()
+            .map(|(period_start, (payments, total))| SpendingReportRow {
+                period_start,
+                payments,
+                charged_msat: total.to_string(),
+            })
+            .collect())
+    }
+
     async fn get(&self, account: Uuid) -> Result<Option<SpendingPolicy>, DatabaseError> {
         use sea_orm::TransactionTrait;
         let tx = self.0.begin().await.map_err(db_error)?;
@@ -122,7 +169,12 @@ async fn locked_policy(tx: &DatabaseTransaction, account: Uuid) -> Result<Option
         .map_err(db_error)
 }
 
-pub(super) async fn admit(tx: &DatabaseTransaction, payment: &Payment, amount: u64) -> Result<(), ApplicationError> {
+pub(super) async fn admit(
+    tx: &DatabaseTransaction,
+    payment: &Payment,
+    amount: u64,
+    agent_key_id: Option<Uuid>,
+) -> Result<(), ApplicationError> {
     let account = wallet::Entity::find_by_id(payment.wallet_id)
         .select_only()
         .column(wallet::Column::AccountId)
@@ -140,6 +192,8 @@ pub(super) async fn admit(tx: &DatabaseTransaction, payment: &Payment, amount: u
     authorize_spending(&limits, &used, amount)?;
     entry::ActiveModel {
         payment_id: Set(payment.id),
+        wallet_id: Set(Some(payment.wallet_id)),
+        agent_key_id: Set(agent_key_id),
         account_id: Set(account),
         admitted_at: Set(now.naive_utc()),
         charged_msat: Set(i64::try_from(amount)

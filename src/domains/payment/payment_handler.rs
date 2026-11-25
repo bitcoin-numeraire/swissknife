@@ -87,7 +87,7 @@ async fn submit_payment(
         .ok_or_else(|| DataError::Malformed("wallet_id is required".into()))?;
     let submission = services
         .payment
-        .submit_payment(wallet, request)
+        .submit_payment(wallet, None, request)
         .await?
         .response("/v1/payments/submissions");
     services.payment_command_available.notify_one();

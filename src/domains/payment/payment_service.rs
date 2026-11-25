@@ -749,9 +749,10 @@ impl PaymentsUseCases for PaymentService {
     async fn submit_payment(
         &self,
         wallet_id: Uuid,
+        agent_key_id: Option<Uuid>,
         request: swissknife_types::SubmitPaymentRequest,
     ) -> Result<super::SubmittedPayment, ApplicationError> {
-        let key = super::SubmissionKey::new(wallet_id, &request);
+        let key = super::SubmissionKey::new(wallet_id, &request, agent_key_id);
         if request.wallet_id.is_some_and(|id| id != wallet_id) {
             return Err(DataError::Validation("Submission wallet differs from the path".into()).into());
         }

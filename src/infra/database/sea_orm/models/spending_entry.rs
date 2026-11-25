@@ -10,6 +10,8 @@ pub struct Model {
     pub account_id: Uuid,
     pub admitted_at: DateTime,
     pub charged_msat: i64,
+    pub wallet_id: Option<Uuid>,
+    pub agent_key_id: Option<Uuid>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

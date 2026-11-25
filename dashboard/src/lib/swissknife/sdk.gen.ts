@@ -174,6 +174,9 @@ import type {
   EstimateWalletPaymentFeeData,
   EstimateWalletPaymentFeeErrors,
   EstimateWalletPaymentFeeResponses,
+  ExportAccountSpendingReportData,
+  ExportAccountSpendingReportErrors,
+  ExportAccountSpendingReportResponses,
   GenerateBtcAddressData,
   GenerateBtcAddressErrors,
   GenerateBtcAddressResponses,
@@ -198,6 +201,9 @@ import type {
   GetAccountSpendingPolicyData,
   GetAccountSpendingPolicyErrors,
   GetAccountSpendingPolicyResponses,
+  GetAccountSpendingReportData,
+  GetAccountSpendingReportErrors,
+  GetAccountSpendingReportResponses,
   GetAccountWalletData,
   GetAccountWalletErrors,
   GetAccountWalletResponses,
@@ -603,6 +609,48 @@ export const replaceAccountSpendingPolicy = <ThrowOnError extends boolean = fals
       'Content-Type': 'application/json',
       ...options.headers,
     },
+  });
+
+/**
+ * Read current budget consumption grouped by the day or week of original admission.
+ */
+export const getAccountSpendingReport = <ThrowOnError extends boolean = false>(
+  options: Options<GetAccountSpendingReportData, ThrowOnError>
+): RequestResult<GetAccountSpendingReportResponses, GetAccountSpendingReportErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetAccountSpendingReportResponses,
+    GetAccountSpendingReportErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/spending-report',
+    ...options,
+  });
+
+/**
+ * Download the same spending report as a CSV with exact integer millisatoshis.
+ */
+export const exportAccountSpendingReport = <ThrowOnError extends boolean = false>(
+  options: Options<ExportAccountSpendingReportData, ThrowOnError>
+): RequestResult<
+  ExportAccountSpendingReportResponses,
+  ExportAccountSpendingReportErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ExportAccountSpendingReportResponses,
+    ExportAccountSpendingReportErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: 'bearer', type: 'http' },
+      { name: 'Api-Key', type: 'apiKey' },
+    ],
+    url: '/v1/accounts/{account_id}/spending-report.csv',
+    ...options,
   });
 
 /**

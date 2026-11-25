@@ -2,12 +2,15 @@ use crate::application::errors::{ApplicationError, DataError, DatabaseError};
 use async_trait::async_trait;
 use chrono::{Datelike, Days, NaiveDate};
 use std::sync::Arc;
-use swissknife_types::{SpendingLimits, SpendingPolicy, SpendingUsage};
+use swissknife_types::{
+    SpendingInterval, SpendingLimits, SpendingPolicy, SpendingReportQuery, SpendingReportRow, SpendingUsage,
+};
 use uuid::Uuid;
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait SpendingPolicyRepository: Send + Sync {
+    async fn report(&self, account: Uuid, range: SpendingReportRange) -> Result<Vec<SpendingReportRow>, DatabaseError>;
     async fn get(&self, account: Uuid) -> Result<Option<SpendingPolicy>, DatabaseError>;
     async fn replace(&self, account: Uuid, limits: SpendingLimits) -> Result<(), DatabaseError>;
     async fn disable(&self, account: Uuid) -> Result<(), DatabaseError>;
@@ -16,15 +19,54 @@ pub trait SpendingPolicyRepository: Send + Sync {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait SpendingPolicyUseCases: Send + Sync {
+    async fn report(
+        &self,
+        account: Uuid,
+        query: SpendingReportQuery,
+    ) -> Result<Vec<SpendingReportRow>, ApplicationError>;
     async fn get(&self, account: Uuid) -> Result<SpendingPolicy, ApplicationError>;
     async fn replace(&self, account: Uuid, limits: SpendingLimits) -> Result<(), ApplicationError>;
     async fn disable(&self, account: Uuid) -> Result<(), ApplicationError>;
+}
+
+pub struct SpendingReportRange {
+    pub start: chrono::NaiveDateTime,
+    pub end: chrono::NaiveDateTime,
+    pub wallet_id: Option<Uuid>,
+    pub agent_key_id: Option<Uuid>,
+    pub interval: SpendingInterval,
 }
 
 pub struct SpendingPolicyService(pub Arc<dyn SpendingPolicyRepository>);
 
 #[async_trait]
 impl SpendingPolicyUseCases for SpendingPolicyService {
+    async fn report(
+        &self,
+        account: Uuid,
+        query: SpendingReportQuery,
+    ) -> Result<Vec<SpendingReportRow>, ApplicationError> {
+        let last = query.through.unwrap_or_else(|| chrono::Utc::now().date_naive());
+        let first = query
+            .from
+            .or_else(|| last.checked_sub_days(Days::new(29)))
+            .ok_or_else(|| DataError::Validation("Invalid spending report start date".into()))?;
+        let end = last
+            .succ_opt()
+            .ok_or_else(|| DataError::Validation("Invalid spending report end date".into()))?;
+        if first > last || (end - first).num_days() > 366 {
+            return Err(DataError::Validation("Choose a spending report range of 1–366 days".into()).into());
+        }
+        let range = SpendingReportRange {
+            start: first.and_time(chrono::NaiveTime::MIN),
+            end: end.and_time(chrono::NaiveTime::MIN),
+            wallet_id: query.wallet_id,
+            agent_key_id: query.agent_key_id,
+            interval: query.interval,
+        };
+        Ok(self.0.report(account, range).await?)
+    }
+
     async fn get(&self, account: Uuid) -> Result<SpendingPolicy, ApplicationError> {
         self.0
             .get(account)

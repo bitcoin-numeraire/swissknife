@@ -35,6 +35,7 @@ pub(super) async fn reserve_in_transaction(
     txn: &DatabaseTransaction,
     mut payment: Payment,
     reserve_amount_msat: u64,
+    agent_key_id: Option<uuid::Uuid>,
 ) -> Result<Payment, ApplicationError> {
     let wallet_repo = SeaOrmWalletRepository::new(txn);
     if !wallet_repo.reserve(payment.wallet_id, reserve_amount_msat).await? {
@@ -43,7 +44,7 @@ pub(super) async fn reserve_in_transaction(
     payment.reserved_amount = reserve_amount_msat;
 
     let payment = SeaOrmPaymentRepository::new(txn).insert(payment).await?;
-    super::spending_policy_repository::admit(txn, &payment, reserve_amount_msat).await?;
+    super::spending_policy_repository::admit(txn, &payment, reserve_amount_msat, agent_key_id).await?;
     Ok(payment)
 }
 
@@ -51,6 +52,7 @@ pub(super) async fn settle_internal_in_transaction(
     txn: &DatabaseTransaction,
     mut payment: Payment,
     invoice: Invoice,
+    agent_key_id: Option<uuid::Uuid>,
 ) -> Result<Payment, ApplicationError> {
     let wallet_repo = SeaOrmWalletRepository::new(txn);
     let invoice_repo = SeaOrmInvoiceRepository::new(txn);
@@ -79,7 +81,7 @@ pub(super) async fn settle_internal_in_transaction(
         invoice
     };
 
-    super::spending_policy_repository::admit(txn, &payment, debit_msat).await?;
+    super::spending_policy_repository::admit(txn, &payment, debit_msat, agent_key_id).await?;
     let event_repo = SeaOrmClientEventRepository::new(txn);
     event_repo.append_event(NewClientEvent::payment(&payment)).await?;
     event_repo.append_event(NewClientEvent::invoice_paid(&invoice)).await?;
@@ -199,7 +201,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let payment = reserve_in_transaction(&txn, payment, reserve_amount_msat).await?;
+        let payment = reserve_in_transaction(&txn, payment, reserve_amount_msat, None).await?;
 
         txn.commit()
             .await
@@ -309,7 +311,7 @@ impl PaymentUnitOfWork for SeaOrmPaymentUnitOfWork {
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;
 
-        let payment = settle_internal_in_transaction(&txn, payment, invoice).await?;
+        let payment = settle_internal_in_transaction(&txn, payment, invoice, None).await?;
         txn.commit()
             .await
             .map_err(|e| DatabaseError::Transaction(e.to_string()))?;

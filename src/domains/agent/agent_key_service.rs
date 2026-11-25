@@ -30,7 +30,7 @@ pub trait AgentKeyUseCases: Send + Sync {
         wallet: Uuid,
         secret: &str,
         capability: WalletCapability,
-    ) -> Result<Uuid, ApplicationError>;
+    ) -> Result<super::WalletAccess, ApplicationError>;
 }
 
 pub struct AgentKeyService(pub Arc<dyn AgentKeyRepository>);
@@ -90,26 +90,29 @@ impl AgentKeyUseCases for AgentKeyService {
         wallet: Uuid,
         secret: &str,
         capability: WalletCapability,
-    ) -> Result<Uuid, ApplicationError> {
+    ) -> Result<super::WalletAccess, ApplicationError> {
         let mut bytes = [0; 32];
         let encoded = secret
             .strip_prefix("swka_")
             .ok_or(AuthenticationError::InvalidCredentials)?;
         hex::decode_to_slice(encoded, &mut bytes).map_err(|_| AuthenticationError::InvalidCredentials)?;
         let digest = sha256::Hash::hash(&bytes).to_byte_array().to_vec();
-        let (account, caps) = self
+        let (account, key) = self
             .0
             .active_grant(wallet, digest)
             .await?
             .ok_or(AuthenticationError::InvalidCredentials)?;
         let allowed = match capability {
-            WalletCapability::Read => caps.read,
-            WalletCapability::Receive => caps.receive,
-            WalletCapability::Spend => caps.spend,
+            WalletCapability::Read => key.capabilities.read,
+            WalletCapability::Receive => key.capabilities.receive,
+            WalletCapability::Spend => key.capabilities.spend,
         };
         if !allowed {
             return Err(AuthorizationError::WalletCapability.into());
         }
-        Ok(account)
+        Ok(super::WalletAccess {
+            account_id: account,
+            agent_key_id: Some(key.id),
+        })
     }
 }

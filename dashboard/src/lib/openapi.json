@@ -707,6 +707,211 @@
         ]
       }
     },
+    "/v1/accounts/{account_id}/spending-report": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Read current budget consumption grouped by the day or week of original admission.",
+        "operationId": "get_account_spending_report",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First UTC admission date, inclusive. Defaults to 29 days before the last date.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "example": "2026-11-01"
+          },
+          {
+            "name": "through",
+            "in": "query",
+            "description": "Last UTC admission date, inclusive. Defaults to today.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "example": "2026-11-30"
+          },
+          {
+            "name": "wallet_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "agent_key_id",
+            "in": "query",
+            "description": "Filter by the credential that originally admitted a payment, including revoked keys.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SpendingInterval"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SpendingReportRow"
+                  }
+                }
+              }
+            }
+          },
+          "403": {},
+          "404": {},
+          "422": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/accounts/{account_id}/spending-report.csv": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Download the same spending report as a CSV with exact integer millisatoshis.",
+        "operationId": "export_account_spending_report",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First UTC admission date, inclusive. Defaults to 29 days before the last date.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "example": "2026-11-01"
+          },
+          {
+            "name": "through",
+            "in": "query",
+            "description": "Last UTC admission date, inclusive. Defaults to today.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "example": "2026-11-30"
+          },
+          {
+            "name": "wallet_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "agent_key_id",
+            "in": "query",
+            "description": "Filter by the credential that originally admitted a payment, including revoked keys.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SpendingInterval"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {},
+          "404": {},
+          "422": {}
+        },
+        "security": [
+          {
+            "jwt": []
+          },
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
     "/v1/accounts/{id}": {
       "get": {
         "tags": [
@@ -12158,6 +12363,13 @@
           }
         }
       },
+      "SpendingInterval": {
+        "type": "string",
+        "enum": [
+          "day",
+          "week"
+        ]
+      },
       "SpendingLimits": {
         "type": "object",
         "description": "Account-wide limits, including fees. Amounts are decimal millisatoshi strings.\nOmitted limits are unrestricted. Zero blocks positive payments.",
@@ -12202,6 +12414,31 @@
           },
           "usage": {
             "$ref": "#/components/schemas/SpendingUsage"
+          }
+        }
+      },
+      "SpendingReportRow": {
+        "type": "object",
+        "required": [
+          "period_start",
+          "payments",
+          "charged_msat"
+        ],
+        "properties": {
+          "charged_msat": {
+            "type": "string",
+            "description": "Current amount charged, in exact decimal millisatoshis, including outstanding reservations."
+          },
+          "payments": {
+            "type": "integer",
+            "format": "int64",
+            "description": "All admitted payments in the selected period, including subsequently released reservations.",
+            "minimum": 0
+          },
+          "period_start": {
+            "type": "string",
+            "description": "UTC day or Monday of the ISO week.",
+            "example": "2026-11-01"
           }
         }
       },

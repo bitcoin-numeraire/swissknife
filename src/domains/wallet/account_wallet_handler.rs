@@ -586,12 +586,12 @@ async fn submit_wallet_payment(
     ),
     ApplicationError,
 > {
-    let account_id = actor.account_for(&services, wallet_id, WalletCapability::Spend).await?;
-    services.wallet.verify_ownership(account_id, wallet_id).await?;
+    let access = actor.authorize(&services, wallet_id, WalletCapability::Spend).await?;
+    services.wallet.verify_ownership(access.account_id, wallet_id).await?;
     let base = format!("/v1/me/wallets/{wallet_id}/payments/submissions");
     let submission = services
         .payment
-        .submit_payment(wallet_id, request)
+        .submit_payment(wallet_id, access.agent_key_id, request)
         .await?
         .response(&base);
     services.payment_command_available.notify_one();

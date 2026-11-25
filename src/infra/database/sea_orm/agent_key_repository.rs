@@ -68,11 +68,7 @@ impl AgentKeyRepository for SeaOrmAgentKeyRepository {
             .map(|result| result.rows_affected == 1)
             .map_err(|err| DatabaseError::Delete(err.to_string()))
     }
-    async fn active_grant(
-        &self,
-        wallet: Uuid,
-        digest: Vec<u8>,
-    ) -> Result<Option<(Uuid, WalletCapabilities)>, DatabaseError> {
+    async fn active_grant(&self, wallet: Uuid, digest: Vec<u8>) -> Result<Option<(Uuid, AgentKey)>, DatabaseError> {
         let row = WalletAgentKey::find()
             .filter(Column::KeyHash.eq(digest))
             .filter(Column::WalletId.eq(wallet))
@@ -80,15 +76,6 @@ impl AgentKeyRepository for SeaOrmAgentKeyRepository {
             .one(&self.0)
             .await
             .map_err(|err| DatabaseError::FindOne(err.to_string()))?;
-        Ok(row.map(|row| {
-            (
-                row.account_id,
-                WalletCapabilities {
-                    read: row.can_read,
-                    receive: row.can_receive,
-                    spend: row.can_spend,
-                },
-            )
-        }))
+        Ok(row.map(|row| (row.account_id, row.into())))
     }
 }

@@ -1377,6 +1377,10 @@ export type SignUpRequest = {
   username: string;
 };
 
+export const SpendingInterval = { DAY: 'day', WEEK: 'week' } as const;
+
+export type SpendingInterval = (typeof SpendingInterval)[keyof typeof SpendingInterval];
+
 /**
  * Account-wide limits, including fees. Amounts are decimal millisatoshi strings.
  * Omitted limits are unrestricted. Zero blocks positive payments.
@@ -1391,6 +1395,21 @@ export type SpendingLimits = {
 export type SpendingPolicy = {
   limits: SpendingLimits;
   usage: SpendingUsage;
+};
+
+export type SpendingReportRow = {
+  /**
+   * Current amount charged, in exact decimal millisatoshis, including outstanding reservations.
+   */
+  charged_msat: string;
+  /**
+   * All admitted payments in the selected period, including subsequently released reservations.
+   */
+  payments: number;
+  /**
+   * UTC day or Monday of the ISO week.
+   */
+  period_start: string;
 };
 
 /**
@@ -1997,6 +2016,80 @@ export type ReplaceAccountSpendingPolicyResponses = {
 
 export type ReplaceAccountSpendingPolicyResponse =
   ReplaceAccountSpendingPolicyResponses[keyof ReplaceAccountSpendingPolicyResponses];
+
+export type GetAccountSpendingReportData = {
+  body?: never;
+  path: {
+    account_id: string;
+  };
+  query?: {
+    /**
+     * First UTC admission date, inclusive. Defaults to 29 days before the last date.
+     */
+    from?: string | null;
+    /**
+     * Last UTC admission date, inclusive. Defaults to today.
+     */
+    through?: string | null;
+    wallet_id?: string | null;
+    /**
+     * Filter by the credential that originally admitted a payment, including revoked keys.
+     */
+    agent_key_id?: string | null;
+    interval?: SpendingInterval;
+  };
+  url: '/v1/accounts/{account_id}/spending-report';
+};
+
+export type GetAccountSpendingReportErrors = {
+  403: unknown;
+  404: unknown;
+  422: unknown;
+};
+
+export type GetAccountSpendingReportResponses = {
+  200: Array<SpendingReportRow>;
+};
+
+export type GetAccountSpendingReportResponse =
+  GetAccountSpendingReportResponses[keyof GetAccountSpendingReportResponses];
+
+export type ExportAccountSpendingReportData = {
+  body?: never;
+  path: {
+    account_id: string;
+  };
+  query?: {
+    /**
+     * First UTC admission date, inclusive. Defaults to 29 days before the last date.
+     */
+    from?: string | null;
+    /**
+     * Last UTC admission date, inclusive. Defaults to today.
+     */
+    through?: string | null;
+    wallet_id?: string | null;
+    /**
+     * Filter by the credential that originally admitted a payment, including revoked keys.
+     */
+    agent_key_id?: string | null;
+    interval?: SpendingInterval;
+  };
+  url: '/v1/accounts/{account_id}/spending-report.csv';
+};
+
+export type ExportAccountSpendingReportErrors = {
+  403: unknown;
+  404: unknown;
+  422: unknown;
+};
+
+export type ExportAccountSpendingReportResponses = {
+  200: string;
+};
+
+export type ExportAccountSpendingReportResponse =
+  ExportAccountSpendingReportResponses[keyof ExportAccountSpendingReportResponses];
 
 export type DeleteAccountByIdData = {
   body?: never;
