@@ -30,7 +30,11 @@ import { shouldFail } from 'src/utils/errors';
 import { fFromNow } from 'src/utils/format-time';
 import { displayLnAddress } from 'src/utils/lnurl';
 import { fCurrency } from 'src/utils/format-number';
-import { getLedgerLabel, mergeAndSortTransactions } from 'src/utils/transactions';
+import {
+  getLedgerLabel,
+  mergeAndSortTransactions,
+  getTransactionStatusLabel,
+} from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
@@ -897,7 +901,9 @@ export function WalletView() {
                               </Stack>
                             )}
 
-                            <Label color={statusColor(tx.status)}>{tx.status}</Label>
+                            <Label color={statusColor(tx.status)}>
+                              {getTransactionStatusLabel(tx.status, t)}
+                            </Label>
                           </Stack>
 
                           {isOpenAmount ? (

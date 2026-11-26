@@ -17,9 +17,9 @@ import { Avatar, Divider, MenuList } from '@mui/material';
 import { useRouter } from 'src/routes/hooks';
 
 import { truncateText } from 'src/utils/format-string';
-import { getLedgerLabel } from 'src/utils/transactions';
 import { composeBip21 } from 'src/utils/bitcoin-request';
 import { fDate, fTime, fDateTime } from 'src/utils/format-time';
+import { getLedgerLabel, getTransactionStatusLabel } from 'src/utils/transactions';
 
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
@@ -238,7 +238,7 @@ export function TransactionTableRow({
               'default'
             }
           >
-            {status}
+            {getTransactionStatusLabel(status, t)}
           </Label>
         </TableCell>
 

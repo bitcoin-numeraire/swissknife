@@ -230,6 +230,7 @@
     "receive_money": "Ricevi",
     "receive_money_detail": "Crea una richiesta unificata, un bollettino Lightning, un indirizzo Bitcoin o un paycode.",
     "active_requests_summary": "{{count}} richieste di pagamento attive",
+    "active_requests_summary_one": "{{count}} richiesta di pagamento attiva",
     "no_active_requests": "Nessuna richiesta di pagamento attiva",
     "reusable_receive": "Identità ricevente riutilizzabile",
     "manage_receive_identity": "Gestisci identità",

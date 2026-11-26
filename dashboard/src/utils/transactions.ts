@@ -7,6 +7,18 @@ import { TransactionType } from 'src/types/transaction';
 
 export const LEDGERS = ['Lightning', 'Internal', 'Onchain', 'Adjustment'];
 
+export function getTransactionStatusLabel(status: string, t: (key: string) => string) {
+  switch (status) {
+    case 'Pending':
+    case 'Settled':
+    case 'Expired':
+    case 'Failed':
+      return t(`transaction_details.${status.toLowerCase()}`);
+    default:
+      return status;
+  }
+}
+
 export function getLedgerLabel(
   ledger: string | null | undefined,
   t: (key: string) => string,

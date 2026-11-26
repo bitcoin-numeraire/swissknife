@@ -6,8 +6,8 @@ import { useCallback } from 'react';
 
 import Chip from '@mui/material/Chip';
 
-import { getLedgerLabel } from 'src/utils/transactions';
 import { fDateRangeShortLabel } from 'src/utils/format-time';
+import { getLedgerLabel, getTransactionStatusLabel } from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
 
@@ -66,7 +66,7 @@ export function TransactionTableFiltersResult({ filters, totalResults, onResetPa
       <FiltersBlock label={t('transaction_filters.status')} isShow={filters.state.status !== 'all'}>
         <Chip
           {...chipProps}
-          label={filters.state.status}
+          label={getTransactionStatusLabel(filters.state.status, t)}
           onDelete={handleRemoveStatus}
           sx={{ textTransform: 'capitalize' }}
         />

@@ -26,6 +26,7 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { fFromNow } from 'src/utils/format-time';
+import { getTransactionStatusLabel } from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
@@ -244,7 +245,7 @@ function RecentTransactionsRow({ row, isAdmin }: RecentTransactionsRowProps) {
               (status === 'Settled' && 'success') || (status === 'Pending' && 'warning') || 'error'
             }
           >
-            {status}
+            {getTransactionStatusLabel(status, t)}
           </Label>
         </TableCell>
 
