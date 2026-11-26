@@ -4,7 +4,7 @@ import { vi, afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
 // Decorative icons must not fetch remotely or update React after jsdom teardown.
-vi.mock('@iconify/react', () => ({ Icon: () => null }));
+vi.mock('@iconify/react', () => ({ Icon: () => null, addAPIProvider: vi.fn() }));
 
 afterEach(() => {
   cleanup();

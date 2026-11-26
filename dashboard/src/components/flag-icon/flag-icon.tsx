@@ -22,7 +22,7 @@ export function FlagIcon({ code, className, sx, ...other }: FlagIconProps) {
       <FlagImg
         loading="lazy"
         alt={code}
-        src={`https://purecatamphetamine.github.io/country-flag-icons/3x2/${code?.toUpperCase()}.svg`}
+        src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/assets/dashboard-icons/flags/${code.toUpperCase()}.svg`}
         className={flagIconClasses.img}
       />
     </FlagRoot>

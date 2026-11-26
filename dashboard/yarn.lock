@@ -12,6 +12,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@antfu/install-pkg@npm:^2.0.1":
+  version: 2.1.0
+  resolution: "@antfu/install-pkg@npm:2.1.0"
+  dependencies:
+    package-manager-detector: "npm:^1.8.0"
+    tinyexec: "npm:^1.3.1"
+  checksum: 10c0/b4f448a7ffb6d4b5a2fabbdecc3d619e2dfb01cb4ab030d04cfda3b8d98c62c6bea795ae181716c2d5cd97f10d78bfbee892fa7319a8bb3b469df8648bdf1755
+  languageName: node
+  linkType: hard
+
 "@auth0/auth0-auth-js@npm:^1.17.0":
   version: 1.18.0
   resolution: "@auth0/auth0-auth-js@npm:1.18.0"
@@ -1852,6 +1862,60 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@iconify-json/carbon@npm:1.2.30":
+  version: 1.2.30
+  resolution: "@iconify-json/carbon@npm:1.2.30"
+  dependencies:
+    "@iconify/types": "npm:*"
+  checksum: 10c0/1b6b5137d0f4d74c84c209ff2c04eb1b9f8d4b29f5954f0fa71843cad62ff209d86078bd616d1222400440f4bfb930b4808f7484995757b0d4540dfdfc71292a
+  languageName: node
+  linkType: hard
+
+"@iconify-json/eva@npm:1.2.3":
+  version: 1.2.3
+  resolution: "@iconify-json/eva@npm:1.2.3"
+  dependencies:
+    "@iconify/types": "npm:*"
+  checksum: 10c0/bbec5e2cd38182a322ba53cd19613de154dfeea8ca68e3f4a924ecb654f908fa56e38fd22cfaaea8f4b3c2485355cab522c03d93a8d1ebac0522bad7dfcb3ded
+  languageName: node
+  linkType: hard
+
+"@iconify-json/iconamoon@npm:1.2.2":
+  version: 1.2.2
+  resolution: "@iconify-json/iconamoon@npm:1.2.2"
+  dependencies:
+    "@iconify/types": "npm:*"
+  checksum: 10c0/54cc19e49feee1625fab877dacc4f7212ffdc3b664e11e8b9d894a7b686d26c461c4c0270395ca579956b5a5d708743aeb064c49e51ceb3c79feb165f091983b
+  languageName: node
+  linkType: hard
+
+"@iconify-json/mdi@npm:1.2.3":
+  version: 1.2.3
+  resolution: "@iconify-json/mdi@npm:1.2.3"
+  dependencies:
+    "@iconify/types": "npm:*"
+  checksum: 10c0/4d11426abba03464e5ebe4675c87cc39c720e54b7c28265ff9ccd93f229a51f7616bb0a8f1c01412eac3cc9a1ebdc0a122bbaa3395c14d30834d96f8a141e96d
+  languageName: node
+  linkType: hard
+
+"@iconify-json/mingcute@npm:1.2.10":
+  version: 1.2.10
+  resolution: "@iconify-json/mingcute@npm:1.2.10"
+  dependencies:
+    "@iconify/types": "npm:*"
+  checksum: 10c0/5224d17a197d2548be3302aaf4d60192c1a3b5789bc583329faa1c2ea3ab6fd98208053ed853097ecd88ca2fd9ff67c1d76099c459556c69e7782aef7bb77063
+  languageName: node
+  linkType: hard
+
+"@iconify-json/solar@npm:1.2.17":
+  version: 1.2.17
+  resolution: "@iconify-json/solar@npm:1.2.17"
+  dependencies:
+    "@iconify/types": "npm:*"
+  checksum: 10c0/a5261a8ac1e6f1aeccdef45271c64245bddfacf8a348cf84f6c6af8e5979d0fe5e03079aa201765867ba79c99320af4bca7ef0aadb640c8e600d7716fc9a2a2a
+  languageName: node
+  linkType: hard
+
 "@iconify/react@npm:^6.0.4":
   version: 6.0.4
   resolution: "@iconify/react@npm:6.0.4"
@@ -1863,10 +1927,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@iconify/types@npm:^2.0.0":
+"@iconify/types@npm:*, @iconify/types@npm:^2.0.0":
   version: 2.0.0
   resolution: "@iconify/types@npm:2.0.0"
   checksum: 10c0/65a3be43500c7ccacf360e136d00e1717f050b7b91da644e94370256ac66f582d59212bdb30d00788aab4fc078262e91c95b805d1808d654b72f6d2072a7e4b2
+  languageName: node
+  linkType: hard
+
+"@iconify/utils@npm:^3.1.7":
+  version: 3.1.7
+  resolution: "@iconify/utils@npm:3.1.7"
+  dependencies:
+    "@antfu/install-pkg": "npm:^2.0.1"
+    "@iconify/types": "npm:^2.0.0"
+    import-meta-resolve: "npm:^4.2.0"
+  checksum: 10c0/26c99ceff910d84e66e46c643ad37946b34468b352a315534c023e8e59bd6504c26734d306b877660f92aa59d8ce742bf4fe882b24149ad6e862abe919db6564
   languageName: node
   linkType: hard
 
@@ -4392,6 +4467,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"country-flag-icons@npm:1.6.20":
+  version: 1.6.20
+  resolution: "country-flag-icons@npm:1.6.20"
+  checksum: 10c0/e270cbf3f31d8f57a7f6da56c15733897f4dcc9c7fd50f88c7d295d16cb9fd97dcae96c054b2d840916bec3f27472335201938dc569961d935da4c4d341f9d32
+  languageName: node
+  linkType: hard
+
 "cross-spawn@npm:7.0.6, cross-spawn@npm:^7.0.6":
   version: 7.0.6
   resolution: "cross-spawn@npm:7.0.6"
@@ -5778,6 +5860,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"import-meta-resolve@npm:^4.2.0":
+  version: 4.2.0
+  resolution: "import-meta-resolve@npm:4.2.0"
+  checksum: 10c0/3ee8aeecb61d19b49d2703987f977e9d1c7d4ba47db615a570eaa02fe414f40dfa63f7b953e842cbe8470d26df6371332bfcf21b2fd92b0112f9fea80dde2c4c
+  languageName: node
+  linkType: hard
+
 "imurmurhash@npm:^0.1.4":
   version: 0.1.4
   resolution: "imurmurhash@npm:0.1.4"
@@ -6991,6 +7080,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"package-manager-detector@npm:^1.8.0":
+  version: 1.9.0
+  resolution: "package-manager-detector@npm:1.9.0"
+  checksum: 10c0/c901b08e9d284e9b517d27be1783fc279f3e814fac9de4c30441129a3a4b1475b16314ff95b98268daf49e20d5076478c50bc7b1b3ff8a591eb39f03f02dbb16
+  languageName: node
+  linkType: hard
+
 "parent-module@npm:^1.0.0":
   version: 1.0.1
   resolution: "parent-module@npm:1.0.1"
@@ -8111,7 +8207,14 @@ __metadata:
     "@fontsource-variable/public-sans": "npm:^5.3.0"
     "@hey-api/openapi-ts": "npm:^0.99.0"
     "@hookform/resolvers": "npm:^7.0.7"
+    "@iconify-json/carbon": "npm:1.2.30"
+    "@iconify-json/eva": "npm:1.2.3"
+    "@iconify-json/iconamoon": "npm:1.2.2"
+    "@iconify-json/mdi": "npm:1.2.3"
+    "@iconify-json/mingcute": "npm:1.2.10"
+    "@iconify-json/solar": "npm:1.2.17"
     "@iconify/react": "npm:^6.0.4"
+    "@iconify/utils": "npm:^3.1.7"
     "@mui/lab": "npm:^9.0.0-beta.10"
     "@mui/material": "npm:^9.5.0"
     "@mui/material-nextjs": "npm:^9.5.0"
@@ -8136,6 +8239,7 @@ __metadata:
     apexcharts: "npm:^8.9.1"
     autosuggest-highlight: "npm:^3.3.4"
     bech32: "npm:^2.0.0"
+    country-flag-icons: "npm:1.6.20"
     dayjs: "npm:^1.11.23"
     embla-carousel: "npm:^8.6.0"
     embla-carousel-auto-scroll: "npm:^8.6.0"

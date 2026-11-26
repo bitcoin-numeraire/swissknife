@@ -35,3 +35,4 @@ build
 .eslintcache
 .unimportedrc.json
 tsconfig.tsbuildinfo
+/public/assets/dashboard-icons/
