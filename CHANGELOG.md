@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Merchant checkout shows the confirmed amount received above the order total.
+
 - Last completed sale keeps links to every settled checkout receipt after starting the next sale or reloading the register.
 
 - Merchant checkout recognizes payments to its Bitcoin address from another SwissKnife wallet on the same instance.

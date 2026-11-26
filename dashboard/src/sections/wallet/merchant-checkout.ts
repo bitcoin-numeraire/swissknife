@@ -6,6 +6,8 @@ import { composeBip21 } from 'src/utils/bitcoin-request';
 
 import { Ledger, InvoiceStatus } from 'src/lib/swissknife';
 
+const msatPerSat = BigInt(1000);
+
 const saleSchema = z
   .object({
     walletId: z.string().min(1),
@@ -68,15 +70,17 @@ export function checkoutSettlement(sale: MerchantSale, invoices: Invoice[], now:
     if (invoice.status === InvoiceStatus.SETTLED) confirmed.set(invoice.id, amount);
     if (matchesAddress && invoice.status === InvoiceStatus.PENDING) pending.set(invoice.id, amount);
   }
-  let receivedMsat = 0;
-  let pendingMsat = 0;
+  let receivedMsat = BigInt(0);
+  let pendingMsat = BigInt(0);
   for (const [id, amount] of confirmed) {
     pending.delete(id);
-    receivedMsat += amount;
+    receivedMsat += BigInt(amount);
   }
-  for (const amount of pending.values()) pendingMsat += amount;
+  for (const amount of pending.values()) pendingMsat += BigInt(amount);
+  const orderMsat = BigInt(sale.amountSats) * msatPerSat;
+  const excessMsat = receivedMsat > orderMsat ? receivedMsat - orderMsat : BigInt(0);
   const status =
-    receivedMsat >= sale.amountSats * 1000
+    receivedMsat >= orderMsat
       ? 'paid'
       : pendingMsat > 0
         ? 'incoming'
@@ -85,7 +89,20 @@ export function checkoutSettlement(sale: MerchantSale, invoices: Invoice[], now:
           : now >= sale.expiresAt
             ? 'expired'
             : 'waiting';
-  return { status, receivedMsat, pendingMsat, invoiceIds: Array.from(confirmed.keys()) };
+  return {
+    status,
+    receivedMsat,
+    pendingMsat,
+    excessMsat,
+    invoiceIds: Array.from(confirmed.keys()),
+  };
+}
+
+export function formatCheckoutSats(msat: bigint, locale: string) {
+  const fraction = (msat % msatPerSat).toString().padStart(3, '0');
+  const sats = `${msat / msatPerSat}.${fraction}` as `${number}`;
+  // Intl accepts decimal strings without rounding through a JavaScript number.
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(sats);
 }
 
 export function checkoutPaymentRequest(
@@ -107,8 +124,9 @@ export function checkoutPaymentRequest(
     };
   }
   if (settlement.status !== 'partial' || !sale.address) return undefined;
-  const remainingSats = (sale.amountSats * 1000 - settlement.receivedMsat) / 1000;
-  if (!Number.isSafeInteger(remainingSats) || remainingSats <= 0) return undefined;
+  const remainingMsat = BigInt(sale.amountSats) * msatPerSat - settlement.receivedMsat;
+  if (remainingMsat <= 0 || remainingMsat % msatPerSat !== BigInt(0)) return undefined;
+  const remainingSats = Number(remainingMsat / msatPerSat);
   return {
     uri: composeBip21(sale.address, undefined, remainingSats),
     method: 'pos.onchain',
