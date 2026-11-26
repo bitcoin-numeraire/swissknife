@@ -9,6 +9,7 @@ import {
   checkoutSettlement,
   restoreMerchantSale,
   checkoutPaymentRequest,
+  restoreCheckoutReceipts,
 } from './merchant-checkout';
 
 const sale = {
@@ -140,4 +141,14 @@ it('retains the original rail for an unpaid single-method sale', () => {
     method: 'pos.lightning',
     amountSats: 27,
   });
+});
+
+it('restores split receipts and previous single-receipt sessions', () => {
+  const a = '00000000-0000-4000-8000-000000000001';
+  const b = '00000000-0000-4000-8000-000000000002';
+  expect(restoreCheckoutReceipts(a)).toEqual([a]);
+  expect(restoreCheckoutReceipts(JSON.stringify([a, b, a]))).toEqual([a, b]);
+  for (const invalid of [null, '', '{', '[]', '["invalid"]', '42']) {
+    expect(restoreCheckoutReceipts(invalid)).toEqual([]);
+  }
 });

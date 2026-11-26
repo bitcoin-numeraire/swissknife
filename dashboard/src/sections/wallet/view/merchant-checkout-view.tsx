@@ -4,7 +4,7 @@ import type { Wallet } from 'src/lib/swissknife';
 import type { MerchantSale } from '../merchant-checkout';
 
 import { QRCode } from 'react-qrcode-logo';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -39,6 +39,7 @@ import {
   checkoutSettlement,
   restoreMerchantSale,
   checkoutPaymentRequest,
+  restoreCheckoutReceipts,
 } from '../merchant-checkout';
 
 const saleDuration = 15 * 60;
@@ -54,7 +55,7 @@ function Checkout({ wallet }: { wallet: Wallet }) {
   const [now, setNow] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
-  const [previous, setPrevious] = useState<string>();
+  const [previous, setPrevious] = useState<string[]>([]);
   const [sound, setSound] = useState(false);
   const [haptics, setHaptics] = useState(false);
   const audio = useRef<AudioContext | undefined>(undefined);
@@ -64,7 +65,7 @@ function Checkout({ wallet }: { wallet: Wallet }) {
   useEffect(() => {
     try {
       setSale(restoreMerchantSale(sessionStorage.getItem(sessionKey), wallet.id));
-      setPrevious(sessionStorage.getItem(sessionKey + '.last') || undefined);
+      setPrevious(restoreCheckoutReceipts(sessionStorage.getItem(sessionKey + '.last')));
       lastFeedback.current = sessionStorage.getItem(sessionKey + '.feedback') || undefined;
       const prefs = JSON.parse(localStorage.getItem(feedbackKey) ?? '{}');
       setSound(prefs?.sound === true);
@@ -100,22 +101,35 @@ function Checkout({ wallet }: { wallet: Wallet }) {
     wallet.id,
     Boolean(sale?.address)
   );
-  const settlement = sale
-    ? checkoutSettlement(sale, [...(deposits.invoices ?? []), ...(invoice ? [invoice] : [])], now)
-    : undefined;
-  const receipt = settlement?.status === 'paid' ? settlement.invoiceIds[0] : undefined;
+  const settlement = useMemo(
+    () =>
+      sale
+        ? checkoutSettlement(
+            sale,
+            [...(deposits.invoices ?? []), ...(invoice ? [invoice] : [])],
+            now
+          )
+        : undefined,
+    [sale, deposits.invoices, invoice, now]
+  );
+  const receipts = settlement?.status === 'paid' ? settlement.invoiceIds : undefined;
 
   const saleId = sale?.invoiceId || sale?.address;
   useEffect(() => {
-    if (!receipt || !saleId || lastFeedback.current === saleId) return;
+    if (!receipts || !saleId) return;
+    const sameSale = lastFeedback.current === saleId;
+    if (sameSale && receipts.every((id) => previous.includes(id))) return;
+    // One rail can finish revalidating before the other when the tab reopens.
+    const ids = sameSale ? [...new Set([...previous, ...receipts])] : receipts;
+    setPrevious(ids);
     lastFeedback.current = saleId;
-    setPrevious(receipt);
     try {
-      sessionStorage.setItem(sessionKey + '.last', receipt);
+      sessionStorage.setItem(sessionKey + '.last', JSON.stringify(ids));
       sessionStorage.setItem(sessionKey + '.feedback', saleId);
     } catch {
-      /* The current tab still retains its receipt. */
+      /* The current tab still retains its receipts. */
     }
+    if (sameSale) return;
     if (haptics) navigator.vibrate?.(120);
     const context = audio.current;
     if (sound && context?.state === 'running') {
@@ -129,7 +143,7 @@ function Checkout({ wallet }: { wallet: Wallet }) {
       tone.start(start);
       tone.stop(start + 0.16);
     }
-  }, [receipt, saleId, sessionKey, haptics, sound]);
+  }, [receipts, previous, saleId, sessionKey, haptics, sound]);
 
   const unlockSound = () => {
     if (typeof window.AudioContext !== 'function') return;
@@ -289,7 +303,12 @@ function Checkout({ wallet }: { wallet: Wallet }) {
           >
             {t('pos.start')}
           </Button>
-          {previous && <Button href={paths.wallet.invoice(previous)}>{t('pos.previous')}</Button>}
+          {previous.map((id, index) => (
+            <Button key={id} href={paths.wallet.invoice(id)}>
+              {t('pos.previous')}
+              {previous.length > 1 && ` · ${index + 1}/${previous.length}`}
+            </Button>
+          ))}
         </Stack>
       ) : (
         <Stack spacing={2.5}>
@@ -297,11 +316,11 @@ function Checkout({ wallet }: { wallet: Wallet }) {
             sx={{
               p: { xs: 2.5, sm: 4 },
               textAlign: 'center',
-              ...(receipt && { bgcolor: 'success.darker', color: 'common.white' }),
+              ...(receipts && { bgcolor: 'success.darker', color: 'common.white' }),
             }}
           >
             <Stack spacing={2} sx={{ alignItems: 'center' }} aria-live="polite" aria-atomic="true">
-              {receipt && (
+              {receipts && (
                 <Box
                   component="img"
                   alt={CONFIG.appName}
@@ -368,12 +387,12 @@ function Checkout({ wallet }: { wallet: Wallet }) {
           <Button
             size="large"
             color="inherit"
-            variant={receipt ? 'contained' : 'outlined'}
+            variant={receipts ? 'contained' : 'outlined'}
             onClick={reset}
           >
-            {t(receipt || settlement?.status === 'expired' ? 'pos.next' : 'pos.cancel')}
+            {t(receipts || settlement?.status === 'expired' ? 'pos.next' : 'pos.cancel')}
           </Button>
-          {!receipt && (
+          {!receipts && (
             <Typography variant="caption" color="text.secondary">
               {t('pos.stop_note')}
             </Typography>

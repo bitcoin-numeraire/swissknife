@@ -34,6 +34,18 @@ export function restoreMerchantSale(value: string | null, walletId: string) {
   return undefined;
 }
 
+export function restoreCheckoutReceipts(value: string | null): string[] {
+  if (!value) return [];
+  // Earlier checkouts stored the first receipt UUID as plain text.
+  if (z.uuid().safeParse(value).success) return [value];
+  try {
+    const result = z.array(z.uuid()).safeParse(JSON.parse(value));
+    return result.success ? [...new Set(result.data)] : [];
+  } catch {
+    return [];
+  }
+}
+
 export function checkoutAmount(input: string) {
   if (!/^\d+$/.test(input)) return undefined;
   const sats = Number(input);
