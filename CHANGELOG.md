@@ -10,6 +10,7 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Wallet event streams close when the server shuts down, allowing active dashboards to reconnect after a restart.
 - The all-in-one image opens its local wallet and API by default.
 - Local authentication requires a deployment-specific signing secret.
 

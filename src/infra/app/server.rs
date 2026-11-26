@@ -8,9 +8,10 @@ use crate::{
     },
     domains::{account, bitcoin, invoice, ln_address, lnurl, nostr, payment, system, wallet},
 };
-use axum::{routing::get, Router};
+use axum::{routing::get, Extension, Router};
 use std::future::Future;
 use tokio::net::TcpListener;
+use tokio_util::sync::CancellationToken;
 use tower_http::{
     cors::CorsLayer,
     services::{ServeDir, ServeFile},
@@ -66,8 +67,13 @@ impl Server {
 
         info!(addr, "Listening on");
 
-        axum::serve(listener, self.router.clone())
-            .with_graceful_shutdown(shutdown_signal)
+        let draining = CancellationToken::new();
+        let router = self.router.clone().layer(Extension(draining.clone()));
+        axum::serve(listener, router)
+            .with_graceful_shutdown(async move {
+                shutdown_signal.await;
+                draining.cancel();
+            })
             .await
             .map_err(|e| WebServerError::Serve(e.to_string()))?;
 

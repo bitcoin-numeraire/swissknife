@@ -8,10 +8,11 @@ use axum::{
         IntoResponse, Sse,
     },
     routing::{delete, get, post, put},
-    Router,
+    Extension, Router,
 };
-use futures_util::stream::{self, Stream};
+use futures_util::stream::{self, Stream, StreamExt};
 use tokio::time::{sleep, Instant};
+use tokio_util::sync::CancellationToken;
 use tracing::warn;
 use utoipa::OpenApi;
 use uuid::Uuid;
@@ -172,6 +173,7 @@ async fn stream_account_events(
     State(services): State<Arc<AppServices>>,
     user: User,
     Query(query): Query<ClientEventStreamQuery>,
+    draining: Option<Extension<CancellationToken>>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, ApplicationError> {
     let cursor = match replay_cursor(&headers, query.after)? {
@@ -182,7 +184,9 @@ async fn stream_account_events(
         None => services.client_event.latest_id(user.account_id).await?,
     };
 
-    let stream = account_event_stream(services, user.account_id, cursor, headers);
+    let draining = draining.map(|Extension(token)| token).unwrap_or_default();
+    let stream =
+        account_event_stream(services, user.account_id, cursor, headers).take_until(draining.cancelled_owned());
     let sse = Sse::new(stream).keep_alive(KeepAlive::new().interval(KEEP_ALIVE_INTERVAL).text("keep-alive"));
 
     Ok((
