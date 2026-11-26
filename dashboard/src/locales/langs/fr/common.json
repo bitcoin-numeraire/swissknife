@@ -224,6 +224,7 @@
     "receive_money": "Recevoir",
     "receive_money_detail": "Crée une demande unifiée, une facture Lightning, une adresse Bitcoin ou un paycode.",
     "active_requests_summary": "{{count}} demandes de paiement actives",
+    "active_requests_summary_one": "{{count}} demande de paiement active",
     "no_active_requests": "Aucune demande active",
     "reusable_receive": "Identité de réception réutilisable",
     "manage_receive_identity": "Gérer l'identité",

@@ -74,3 +74,26 @@ it('ships both namespaces and all interpolation tokens in every supported langua
     }
   }
 });
+
+it('localizes transaction badges and distinguishes a single active request in every language', async () => {
+  const { languages, i18nOptions } = await import('./locales-config');
+  const { getTransactionStatusLabel } = await import('../utils/transactions');
+
+  for (const lng of languages) {
+    const { default: common } = await import(`./langs/${lng}/common.json`);
+    const i18n = createInstance();
+    await i18n.init({ ...i18nOptions(), lng, resources: { [lng]: { common } } });
+    for (const status of ['Settled', 'Pending', 'Failed', 'Expired']) {
+      expect(getTransactionStatusLabel(status, i18n.t)).toBe(
+        common.transaction_details[status.toLowerCase()]
+      );
+    }
+    expect(getTransactionStatusLabel('Reversed', i18n.t)).toBe('Reversed');
+    expect(i18n.t('wallet_view.active_requests_summary', { count: 1 })).toBe(
+      common.wallet_view.active_requests_summary_one.replace('{{count}}', '1')
+    );
+    expect(i18n.t('wallet_view.active_requests_summary', { count: 2 })).toBe(
+      common.wallet_view.active_requests_summary.replace('{{count}}', '2')
+    );
+  }
+});

@@ -22,10 +22,10 @@ import { useRouter } from 'src/routes/hooks';
 
 import { fDate } from 'src/utils/format-time';
 import { displayLnAddress } from 'src/utils/lnurl';
-import { getLedgerLabel } from 'src/utils/transactions';
 import { shouldFail, handleActionError } from 'src/utils/errors';
 import { compactBitcoinAddress } from 'src/utils/bitcoin-request';
 import { bitcoinAddressExplorerUrl } from 'src/utils/bitcoin-explorer';
+import { getLedgerLabel, getTransactionStatusLabel } from 'src/utils/transactions';
 
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
@@ -265,7 +265,7 @@ function RecentTransactionRow({ transaction }: { transaction: WalletTransaction 
             sx={{ color: amountColor }}
           />
           <Label variant="soft" color={statusColor(transaction.status)}>
-            {transaction.status}
+            {getTransactionStatusLabel(transaction.status, t)}
           </Label>
         </Stack>
       </Stack>

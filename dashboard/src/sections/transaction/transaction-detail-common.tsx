@@ -19,7 +19,7 @@ import TimelineSeparator from '@mui/lab/TimelineSeparator';
 import { RouterLink } from 'src/routes/components';
 
 import { fDate, fTime } from 'src/utils/format-time';
-import { getLedgerLabel } from 'src/utils/transactions';
+import { getLedgerLabel, getTransactionStatusLabel } from 'src/utils/transactions';
 
 import { useTranslate } from 'src/locales';
 
@@ -266,7 +266,7 @@ export function StatusBadges({
   return (
     <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
       <Label variant="soft" color={statusColor(status)}>
-        {status}
+        {getTransactionStatusLabel(status, t)}
       </Label>
       <Label variant="soft" color={ledgerColor(ledger)}>
         {getLedgerLabel(ledger, t, creditPurpose)}

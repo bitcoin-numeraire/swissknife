@@ -45,6 +45,7 @@ import {
   getLedgerLabel,
   getCumulativeSeries,
   mergeAndSortTransactions,
+  getTransactionStatusLabel,
 } from 'src/utils/transactions';
 
 import { CONFIG } from 'src/global-config';
@@ -254,8 +255,10 @@ function applyFilter({
   comparator,
   filters,
   dateError,
+  t,
 }: {
   dateError: boolean;
+  t: (key: string) => string;
   inputData: ActivityRow[];
   filters: ITransactionTableFilters;
   comparator: (a: any, b: any) => number;
@@ -280,6 +283,7 @@ function applyFilter({
         tx.description_label.toLowerCase().includes(value) ||
         tx.ledger.toLowerCase().includes(value) ||
         tx.status.toLowerCase().includes(value) ||
+        getTransactionStatusLabel(tx.status, t).toLowerCase().includes(value) ||
         tx.id.toLowerCase().includes(value) ||
         tx.wallet_id.toLowerCase().includes(value) ||
         tx.account_label.toLowerCase().includes(value) ||
@@ -600,8 +604,9 @@ function ActivityLedger({
         comparator: getComparator(table.order, table.orderBy),
         filters: filters.state,
         dateError,
+        t,
       }),
-    [rows, table.order, table.orderBy, filters.state, dateError]
+    [rows, table.order, table.orderBy, filters.state, dateError, t]
   );
 
   const selectedRows = dataFiltered.filter((row) => table.selected.includes(row.row_key));
@@ -1172,7 +1177,7 @@ function ActivityTableRow({
 
         <TableCell>
           <Label variant="soft" color={statusColor(row.status)}>
-            {row.status}
+            {getTransactionStatusLabel(row.status, t)}
           </Label>
         </TableCell>
 

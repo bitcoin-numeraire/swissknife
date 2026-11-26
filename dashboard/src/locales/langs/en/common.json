@@ -224,6 +224,7 @@
     "receive_money": "Receive",
     "receive_money_detail": "Create a unified request, Lightning invoice, Bitcoin address or paycode.",
     "active_requests_summary": "{{count}} active payment requests",
+    "active_requests_summary_one": "{{count}} active payment request",
     "no_active_requests": "No active payment requests",
     "reusable_receive": "Reusable receive identity",
     "manage_receive_identity": "Manage identity",

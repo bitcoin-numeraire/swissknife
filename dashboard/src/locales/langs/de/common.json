@@ -230,6 +230,7 @@
     "receive_money": "Empfangen",
     "receive_money_detail": "Erstelle eine einheitliche Anfrage, Lightning-Rechnung, Bitcoin-Adresse oder Paycode.",
     "active_requests_summary": "{{count}} aktive Zahlungsanfragen",
+    "active_requests_summary_one": "{{count}} aktive Zahlungsanfrage",
     "no_active_requests": "Keine aktiven Zahlungsanfragen",
     "reusable_receive": "Wiederverwendbare Empfangsidentität",
     "manage_receive_identity": "Identität verwalten",

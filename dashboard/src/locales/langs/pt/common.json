@@ -230,6 +230,7 @@
     "receive_money": "Receber",
     "receive_money_detail": "Crie uma solicitação unificada, fatura Lightning, endereço Bitcoin ou paycode.",
     "active_requests_summary": "{{count}} solicitações de pagamento ativas",
+    "active_requests_summary_one": "{{count}} solicitação de pagamento ativa",
     "no_active_requests": "Nenhuma solicitação de pagamento ativa",
     "reusable_receive": "Identidade de recebimento reutilizável",
     "manage_receive_identity": "Gerir identidade",
