@@ -66,6 +66,7 @@ import { RoleBasedGuard } from 'src/auth/guard';
 import { LocalLoginCard } from './local-login-card';
 import { AccountDirectory } from './account-directory';
 import { SpendingPolicyCard } from './spending-policy-card';
+import { SpendingReportCard } from './spending-report-card';
 import { PaymentApprovalCard } from './payment-approval-card';
 import { AgentSpendingActivityCard } from './agent-spending-activity-card';
 
@@ -489,6 +490,11 @@ function AccountDetailsView({ id }: { id: string }) {
               <SpendingPolicyCard key={account!.id} accountId={account!.id} />
               <AgentSpendingActivityCard key={'activity-' + account!.id} accountId={account!.id} />
               <PaymentApprovalCard key={'reviews-' + account!.id} accountId={account!.id} />
+              <SpendingReportCard
+                key={`report-${account!.id}`}
+                accountId={account!.id}
+                wallets={accountWallets}
+              />
 
               {CONFIG.auth.method === 'jwt' &&
                 account!.identity?.provider !== AuthProvider.OAUTH2 && (
