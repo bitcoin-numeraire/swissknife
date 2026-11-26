@@ -1,5 +1,5 @@
 use reqwest::StatusCode;
-use swissknife_types::{NodeOverview, Permission};
+use swissknife_types::{NodeAlert, NodeOverview, Permission};
 
 use crate::common::{app, assert_status, Auth};
 
@@ -24,8 +24,12 @@ async fn scoped_read_reports_live_regtest_peers_channels_and_balances() {
     let response = api.get(path, Auth::ApiKey(&node_reader)).await;
     assert_status(&response, StatusCode::OK);
     let node = response.parse::<NodeOverview>();
-    assert!(node.alerts.is_empty(), "{node:?}");
     let info = node.info.unwrap();
+    if info.synced_to_chain {
+        assert!(node.alerts.is_empty(), "{:?}", node.alerts);
+    } else {
+        assert_eq!(node.alerts, [NodeAlert::ChainNotSynced]);
+    }
     assert_eq!(info.network, "regtest");
     assert!(info.block_height > 0);
     let peers = node.peers.unwrap();
