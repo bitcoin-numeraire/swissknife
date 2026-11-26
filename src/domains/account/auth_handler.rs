@@ -44,6 +44,7 @@ pub fn auth_router() -> Router<Arc<AppServices>> {
     tag = "Authentication",
     context_path = CONTEXT_PATH,
     request_body = SignUpRequest,
+    security(),
     responses(
         (status = 200, description = "Admin account created", body = SignInResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
@@ -73,6 +74,7 @@ async fn sign_up(
     tag = "Authentication",
     context_path = CONTEXT_PATH,
     request_body = SignInRequest,
+    security(),
     responses(
         (status = 200, description = "Token Created", body = SignInResponse),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),
@@ -106,8 +108,7 @@ async fn sign_in(
         (status = 409, description = "Credentials changed concurrently", body = ErrorResponse),
         (status = 422, description = "Validation failed", body = ErrorResponse, example = json!(UNPROCESSABLE_EXAMPLE)),
         (status = 429, description = "Authentication throttled; retry later", body = ErrorResponse)
-    ),
-    security(("jwt" = []))
+    )
 )]
 async fn change_password(
     State(services): State<Arc<AppServices>>,
@@ -128,6 +129,7 @@ async fn change_password(
     tag = "Authentication",
     context_path = CONTEXT_PATH,
     request_body = swissknife_types::ResetLocalPasswordRequest,
+    security(),
     responses(
         (status = 204, description = "Password set; sign in to continue"),
         (status = 401, description = "Invalid or expired code", body = ErrorResponse),

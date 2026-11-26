@@ -30,7 +30,7 @@ use utoipa::{
     ),
     components(schemas(OrderDirection, Ledger, ErrorResponse), responses(ErrorResponse)),
     modifiers(&SecurityAddon),
-    security(("jwt" = []))
+    security(("jwt" = []), ("api_key" = []))
 )]
 struct ApiDoc;
 

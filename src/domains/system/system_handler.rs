@@ -46,6 +46,7 @@ pub fn router() -> Router<Arc<AppServices>> {
     path = "/ready",
     tag = "System",
     context_path = CONTEXT_PATH,
+    security(),
     responses(
         (status = 204, description = "No Content on success"),
     )
@@ -62,6 +63,7 @@ async fn readiness_check() -> impl IntoResponse {
     path = "/health",
     tag = "System",
     context_path = CONTEXT_PATH,
+    security(),
     responses(
         (status = 200, description = "OK", body = HealthCheck),
         (status = 503, description = "Service Unavailable", body = HealthCheck)
@@ -87,6 +89,7 @@ async fn health_check(State(services): State<Arc<AppServices>>) -> impl IntoResp
     path = "/version",
     tag = "System",
     context_path = CONTEXT_PATH,
+    security(),
     responses(
         (status = 200, description = "OK", body = VersionInfo)
 
@@ -104,6 +107,7 @@ async fn version_check(State(services): State<Arc<AppServices>>) -> Json<Version
     path = "/setup",
     tag = "System",
     context_path = CONTEXT_PATH,
+    security(),
     responses(
         (status = 200, description = "OK", body = SetupInfo),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
@@ -122,6 +126,7 @@ async fn setup_check(State(services): State<Arc<AppServices>>) -> Result<Json<Se
     path = "/mark-welcome-complete",
     tag = "System",
     context_path = CONTEXT_PATH,
+    security(),
     responses(
         (status = 204, description = "No Content on success"),
         (status = 500, description = "Internal Server Error", body = ErrorResponse, example = json!(INTERNAL_EXAMPLE))
