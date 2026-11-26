@@ -388,6 +388,7 @@ function Checkout({ wallet }: { wallet: Wallet }) {
             size="large"
             color="inherit"
             variant={receipts ? 'contained' : 'outlined'}
+            disabled={!receiptsReady || receipts?.some((id) => !previous.includes(id))}
             onClick={reset}
           >
             {t(receipts || settlement?.status === 'expired' ? 'pos.next' : 'pos.cancel')}

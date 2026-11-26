@@ -1,6 +1,7 @@
 import type { Page, APIRequestContext } from '@playwright/test';
 
 import { test, expect } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 
 const api = process.env.SWISSKNIFE_POS_REGTEST_API;
 const dashboard = process.env.SWISSKNIFE_POS_REGTEST_DASHBOARD;
@@ -235,4 +236,101 @@ test('a cashier can collect a sale partly from another SwissKnife wallet', async
   await page.reload();
   await expect(page.getByRole('link', { name: 'Last completed sale' })).toHaveCount(3);
   expect(await vibrations()).toBe('1');
+});
+
+test('a reopened Lightning sale retains the Bitcoin receipt that loads last', async ({
+  page,
+  request,
+}) => {
+  const headers = await openMerchant(page, request);
+  await page.getByLabel('Amount in sats').fill('20000');
+  const [bill, destination] = await Promise.all([
+    page
+      .waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname.endsWith('/invoices')
+      )
+      .then((response) => response.json()),
+    page
+      .waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname.endsWith('/bitcoin/addresses')
+      )
+      .then((response) => response.json()),
+    page.getByRole('button', { name: 'Create payment request' }).click(),
+  ]);
+  await expect(page.getByText('Bitcoin or Lightning', { exact: true })).toBeVisible();
+  await page.goto('about:blank');
+
+  // Both customers pay while the register is away. Use the connected peer for Lightning.
+  const bolt11 = bill.ln_invoice.bolt11;
+  expect(bolt11).toMatch(/^lnbcrt/i);
+  const peer = process.env.SWISSKNIFE_ITEST_PROVIDER?.startsWith('cln')
+    ? ['lnd', 'lncli', '--network=regtest', 'payinvoice', '--force']
+    : ['cln', 'lightning-cli', '--network=regtest', 'pay'];
+  execFileSync(
+    'docker',
+    [
+      'compose',
+      '-p',
+      process.env.SWISSKNIFE_ITEST_COMPOSE_PROJECT || 'swissknife-itest',
+      '-f',
+      process.env.SWISSKNIFE_ITEST_COMPOSE_FILE || '../tests/itest/docker-compose.yml',
+      'exec',
+      '-T',
+      ...peer,
+      bolt11,
+    ],
+    { stdio: 'ignore', timeout: 30_000 }
+  );
+  await bitcoin(request, 'sendtoaddress', [destination.address, 0.00001]);
+  const miner = await bitcoin(request, 'getnewaddress', ['pos', 'bech32']);
+  await bitcoin(request, 'generatetoaddress', [6, miner]);
+
+  const invoices = api + '/v1/me/wallets/' + destination.wallet_id + '/invoices';
+  const depositUrl = invoices + '?bitcoin_address=' + destination.address;
+  await expect
+    .poll(
+      async () => {
+        const response = await request.get(depositUrl, { headers });
+        return (await response.json())[0]?.status;
+      },
+      { timeout: 30_000 }
+    )
+    .toBe('Settled');
+  const [deposit] = await (await request.get(depositUrl, { headers })).json();
+
+  const addressHistory = (url: URL) =>
+    url.pathname.endsWith('/invoices') &&
+    url.searchParams.get('bitcoin_address') === destination.address;
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(addressHistory, async (route) => {
+    await pending;
+    await route.continue();
+  });
+  const nextSale = page.getByRole('button', { name: 'Next sale' });
+  try {
+    const requested = page.waitForRequest((req) => addressHistory(new URL(req.url())));
+    await page.goto(dashboard + '/wallet/pos', { waitUntil: 'domcontentloaded' });
+    await requested;
+    await expect(page.getByRole('heading', { name: 'Payment received' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open payment details' })).toHaveCount(1);
+    await expect(nextSale).toBeDisabled();
+  } finally {
+    release();
+    await page.unrouteAll({ behavior: 'wait' });
+  }
+  await expect(page.getByRole('link', { name: 'Open payment details' })).toHaveCount(2);
+  await nextSale.click();
+  await page.reload();
+  const previous = page.getByRole('link', { name: 'Last completed sale' });
+  await expect(previous).toHaveCount(2);
+  for (const id of [bill.id, deposit.id]) {
+    await expect(previous.and(page.locator(`a[href*="${id}"]`))).toHaveCount(1);
+  }
 });

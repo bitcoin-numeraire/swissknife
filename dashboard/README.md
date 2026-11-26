@@ -83,5 +83,8 @@ Start the repository regtest services and a disposable SwissKnife instance using
 `SWISSKNIFE_POS_REGTEST_API` and `SWISSKNIFE_POS_REGTEST_DASHBOARD` to their
 respective `http://127.0.0.1` origins. Run `yarn playwright test merchant-regtest`
 from the dashboard directory. Set `SWISSKNIFE_ITEST_PROVIDER` to the instance's
-provider to exercise LND's unconfirmed deposit notification. The test creates a
-local owner on a fresh instance and pays a sale using the regtest miner wallet.
+provider so the Lightning checkout uses the connected peer as its payer. If
+you started the fixture with a custom Compose project or file, pass the same
+`SWISSKNIFE_ITEST_COMPOSE_PROJECT` or `SWISSKNIFE_ITEST_COMPOSE_FILE` to
+Playwright. The suite creates a local owner on a fresh instance and also pays
+Bitcoin addresses from the regtest miner wallet.
