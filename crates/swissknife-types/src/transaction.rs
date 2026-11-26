@@ -4,6 +4,7 @@ use utoipa::ToSchema;
 
 /// The ledger a transaction settles on.
 #[derive(Clone, Debug, EnumString, Deserialize, Serialize, Display, PartialEq, Eq, Default, ToSchema)]
+#[cfg_attr(feature = "mcp-schema", derive(schemars::JsonSchema))]
 pub enum Ledger {
     #[default]
     Lightning,

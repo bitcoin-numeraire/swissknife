@@ -250,6 +250,7 @@ async fn stdio_discovers_tools_and_resources_and_settles_an_approved_payment_onc
     let history: Value = serde_json::from_str(history["contents"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(history["payments"].as_array().unwrap().len(), 1);
     assert_eq!(history["payments"][0]["amount_msat"], "45001");
+    check_payment_history(&app, &mut mcp, admin, owner.wallet.id, &history["payments"]).await;
     assert_status(
         &api.delete(&format!("{keys}/{}", issued.metadata.id), Auth::ApiKey(&owner.key))
             .await,
@@ -261,6 +262,74 @@ async fn stdio_discovers_tools_and_resources_and_settles_an_approved_payment_onc
         .await;
     assert!(denied["error"].is_object());
     mcp.close().await;
+}
+
+async fn check_payment_history(
+    app: &TestApp,
+    mcp: &mut StdioWallet,
+    admin: &str,
+    wallet_id: Uuid,
+    lightning_history: &Value,
+) {
+    use sea_orm::{ConnectionTrait, Database};
+
+    let api = app.api();
+    // Record an internal payment so filtering happens against a mixed wallet history.
+    let payee = app.create_wallet(admin, "mcp-history-payee").await;
+    let invoice = api
+        .post(
+            "/v1/invoices",
+            Auth::Bearer(admin),
+            json!({"wallet_id":payee.id,"amount_msat":46002}),
+        )
+        .await;
+    assert_status(&invoice, StatusCode::OK);
+    let internal = api
+        .post(
+            "/v1/payments",
+            Auth::Bearer(admin),
+            json!({"wallet_id":wallet_id,"input":invoice.body["ln_invoice"]["bolt11"]}),
+        )
+        .await;
+    assert_status(&internal, StatusCode::OK);
+    let filtered = mcp
+        .tool(
+            "list_payments",
+            json!({"status":"Settled","ledger":"Lightning","limit":1}),
+        )
+        .await;
+    assert_eq!(filtered["structuredContent"]["payments"], *lightning_history);
+    for (query, count) in [
+        (json!({"ledger":"Internal"}), 1),
+        (json!({"status":"Failed"}), 0),
+        (json!({"status":"Settled","ledger":"Lightning","offset":1}), 0),
+        (json!({}), 2),
+    ] {
+        let listed = mcp.tool("list_payments", query).await;
+        assert_eq!(listed["structuredContent"]["payments"].as_array().unwrap().len(), count);
+    }
+    assert_eq!(
+        mcp.tool("list_payments", json!({"ledger":"Card"})).await["isError"],
+        true
+    );
+
+    // Simulate batched historical records in this test's isolated database.
+    let db = Database::connect(&app.database_url).await.unwrap();
+    db.execute_unprepared("UPDATE payment SET created_at = (SELECT MIN(created_at) FROM payment)")
+        .await
+        .unwrap();
+    db.close().await.unwrap();
+    let mut ids = [
+        lightning_history[0]["id"].as_str().unwrap(),
+        internal.body["id"].as_str().unwrap(),
+    ];
+    ids.sort_unstable_by(|a, b| b.cmp(a));
+    for (offset, expected) in ids.into_iter().enumerate() {
+        let page = mcp
+            .tool("list_payments", json!({"status":"Settled","offset":offset,"limit":1}))
+            .await;
+        assert_eq!(page["structuredContent"]["payments"][0]["id"], expected);
+    }
 }
 
 #[tokio::test]

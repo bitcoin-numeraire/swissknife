@@ -3,9 +3,26 @@ use reqwest::{
     header::{HeaderMap, HeaderValue, ACCEPT},
     Client, Method, Url,
 };
+use rmcp::schemars;
+use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{net::IpAddr, time::Duration};
+use swissknife_types::{Ledger, PaymentFilter, PaymentStatus};
 use uuid::Uuid;
+
+#[derive(Default, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ListPayments {
+    /// Maximum matching payments to return, from 1 to 100. Defaults to 20.
+    #[schemars(range(min = 1, max = 100))]
+    limit: Option<u8>,
+    /// Skip this many matching payments.
+    offset: Option<u32>,
+    /// Only payments with this lifecycle status.
+    status: Option<PaymentStatus>,
+    /// Only payments on this ledger.
+    ledger: Option<Ledger>,
+}
 
 #[derive(Clone)]
 pub struct WalletClient {
@@ -99,9 +116,17 @@ impl WalletClient {
         Ok(value)
     }
 
-    pub async fn recent(&self, limit: u8, offset: u32) -> anyhow::Result<Value> {
+    pub(super) async fn recent(&self, args: ListPayments) -> anyhow::Result<Value> {
+        let limit = args.limit.unwrap_or(20);
         ensure!((1..=100).contains(&limit), "Choose a limit from 1 to 100");
-        let payments = self.get(&format!("payments?limit={limit}&offset={offset}")).await?;
+        let query = serde_urlencoded::to_string(PaymentFilter {
+            limit: Some(u64::from(limit)),
+            offset: Some(u64::from(args.offset.unwrap_or(0))),
+            status: args.status,
+            ledger: args.ledger,
+            ..Default::default()
+        })?;
+        let payments = self.get(&format!("payments?{query}")).await?;
         Ok(json!({"payments":payments}))
     }
 }

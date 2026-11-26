@@ -1,6 +1,6 @@
 use super::pass_status::PassClient;
 use super::resources::{LegacySubscriptions, ResourceFeeds, WalletResource};
-use super::wallet::WalletClient;
+use super::wallet::{ListPayments, WalletClient};
 use super::withdraw::WithdrawalClient;
 use anyhow::{ensure, Context};
 use lightning_invoice::Bolt11Invoice;
@@ -106,13 +106,6 @@ struct InvoiceId {
 struct PaymentDetails {
     /// SwissKnife payment UUID.
     id: String,
-}
-#[derive(Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct ListPayments {
-    /// Between 1 and 100. Defaults to 20.
-    limit: Option<u8>,
-    offset: Option<u32>,
 }
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -478,15 +471,11 @@ impl WalletServer {
     }
 
     #[tool(
-        description = "List recent outgoing wallet payments with optional pagination.",
+        description = "List outgoing wallet payments newest first. Filter by status, ledger, or both before pagination.",
         annotations(read_only_hint = true)
     )]
     async fn list_payments(&self, Parameters(args): Parameters<ListPayments>) -> CallToolResult {
-        result(
-            self.wallet
-                .recent(args.limit.unwrap_or(20), args.offset.unwrap_or(0))
-                .await,
-        )
+        result(self.wallet.recent(args).await)
     }
 
     #[tool(
