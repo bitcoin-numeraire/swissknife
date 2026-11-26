@@ -33,6 +33,7 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 
 import { RoleBasedGuard } from 'src/auth/guard';
 
+import { AgentHours } from './agent-hours';
 import {
   periods,
   editLimits,
@@ -144,6 +145,7 @@ export function SpendingPolicyCard({ accountId }: { accountId: string }) {
               </Stack>
             </RoleBasedGuard>
           )}
+          <AgentHours accountId={accountId} />
         </Stack>
       </CardContent>
       <Dialog open={!!form} onClose={() => !pending && setForm(null)} fullWidth maxWidth="xs">

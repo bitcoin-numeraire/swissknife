@@ -1179,5 +1179,21 @@
     "empty": "Aucun paiement soumis au budget sur cette période.",
     "csv": "Télécharger le CSV",
     "json": "Télécharger le JSON"
+  },
+  "agent_hours": {
+    "title": "Horaires de paiement des agents",
+    "none": "Les identifiants de portefeuille peuvent initier un paiement à toute heure.",
+    "help": "Choisissez les jours de début de la plage horaire. Les heures sont en UTC. Une heure de fin antérieure prolonge la plage après minuit.",
+    "days": "Jours de début",
+    "start": "De (UTC)",
+    "end": "À (UTC)",
+    "next_day": "lendemain",
+    "set": "Définir les horaires",
+    "edit": "Modifier les horaires",
+    "remove": "Supprimer les horaires",
+    "confirm": "Les identifiants de portefeuille pourront initier un paiement à toute heure. Les plafonds du compte continueront de s’appliquer.",
+    "save": "Enregistrer les horaires",
+    "invalid": "Choisissez au moins un jour et deux heures valides. De minuit à minuit correspond à une journée entière.",
+    "error": "Impossible de charger les horaires de paiement des agents."
   }
 }

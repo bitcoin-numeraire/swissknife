@@ -1180,5 +1180,21 @@
     "empty": "No budgeted payments in this period.",
     "csv": "Download CSV",
     "json": "Download JSON"
+  },
+  "agent_hours": {
+    "title": "Agent spending hours",
+    "none": "Wallet credentials can start payments at any time.",
+    "help": "Choose the days on which a shift starts. Times use UTC. An earlier end carries the shift past midnight.",
+    "days": "Start days",
+    "start": "From (UTC)",
+    "end": "Until (UTC)",
+    "next_day": "next day",
+    "set": "Set hours",
+    "edit": "Edit hours",
+    "remove": "Remove hours",
+    "confirm": "Wallet credentials will be able to start payments at any time. Account amount limits still apply.",
+    "save": "Save hours",
+    "invalid": "Choose at least one day and two valid times. Use midnight to midnight for a full day.",
+    "error": "Could not load agent spending hours."
   }
 }
