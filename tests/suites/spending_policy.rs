@@ -309,7 +309,7 @@ async fn rolling_velocity_is_atomic_per_credential_and_does_not_limit_owner_paym
         credentials.push(result.parse::<IssuedAgentKey>());
     }
     let operator = Auth::Bearer(admin);
-    let cap = json!({"agent_hourly_msat":"10000"});
+    let cap = json!({"agent_hourly_msat":"10000", "agent_hourly_warning_msat":"10000"});
     assert_status(&api.put(&policy, operator, &cap).await, StatusCode::NO_CONTENT);
     assert_eq!(
         api.get(&policy, operator).await.body["limits"]["agent_hourly_msat"],
@@ -397,6 +397,7 @@ async fn rolling_velocity_is_atomic_per_credential_and_does_not_limit_owner_paym
         assert_eq!(row.name.as_deref(), Some(credential.metadata.name.as_str()));
         assert_eq!(row.wallet_id, Some(owner.wallet.id));
         assert_eq!(row.current_hour.charged_msat, 10000);
+        assert!(!row.above_hourly_warning, "equality must not warn");
         assert_eq!(
             row.current_hour.payments,
             if row.agent_key_id == credentials[0].metadata.id {
@@ -407,6 +408,31 @@ async fn rolling_velocity_is_atomic_per_credential_and_does_not_limit_owner_paym
         );
         assert_eq!((row.previous_hour.payments, row.previous_hour.charged_msat), (0, 0));
     }
+    // A warning can be the only policy rule. Crossing it admits the payment
+    // and flags only the credential that spent the extra amount.
+    let warning = |amount: &str| json!({"agent_hourly_warning_msat": amount});
+    assert_error(
+        &api.put(&policy, Auth::ApiKey(&restricted), &warning("0")).await,
+        StatusCode::FORBIDDEN,
+    );
+    assert_error(
+        &api.put(&policy, operator, &warning("9223372036854775808")).await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+    );
+    assert_status(
+        &api.put(&policy, operator, &warning("10000")).await,
+        StatusCode::NO_CONTENT,
+    );
+    assert_status(&api.post(&path, second, request(1000)).await, StatusCode::ACCEPTED);
+    let warnings = api
+        .get(&activity, operator)
+        .await
+        .parse::<swissknife_types::AgentActivityPage>();
+    assert_eq!(warnings.items.len(), 2);
+    for row in warnings.items {
+        assert_eq!(row.above_hourly_warning, row.agent_key_id == credentials[1].metadata.id);
+    }
+    assert_status(&api.put(&policy, operator, &warning("0")).await, StatusCode::NO_CONTENT);
     let revoke = format!("{wallet}/agent-keys/{}", credentials[0].metadata.id);
     assert_status(&api.delete(&revoke, owner_auth).await, StatusCode::NO_CONTENT);
     let all = api
@@ -420,6 +446,28 @@ async fn rolling_velocity_is_atomic_per_credential_and_does_not_limit_owner_paym
         .unwrap();
     assert_eq!(revoked.name, None);
     assert_eq!(revoked.current_hour.charged_msat, 10000);
+    assert!(revoked.above_hourly_warning);
+    assert_status(&api.delete(&policy, operator).await, StatusCode::NO_CONTENT);
+    let disabled = api
+        .get(&activity, operator)
+        .await
+        .parse::<swissknife_types::AgentActivityPage>();
+    assert_eq!(disabled.items.len(), 2);
+    assert!(disabled.items.iter().all(|row| !row.above_hourly_warning));
+    assert_status(
+        &api.put(&policy, operator, &json!({"daily_msat":"55000"})).await,
+        StatusCode::NO_CONTENT,
+    );
+    assert!(api.get(&policy, operator).await.body["limits"]
+        .get("agent_hourly_warning_msat")
+        .is_none());
+    assert!(api
+        .get(&activity, operator)
+        .await
+        .parse::<swissknife_types::AgentActivityPage>()
+        .items
+        .iter()
+        .all(|row| !row.above_hourly_warning));
     let other = format!("/v1/accounts/{}/agent-spending-activity", recipient.account.id);
     assert!(api
         .get(&other, operator)

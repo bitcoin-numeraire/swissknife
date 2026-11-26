@@ -1,5 +1,6 @@
 {
   "agent_activity": {
+    "above_warning": "Seuil d’alerte horaire dépassé",
     "title": "Activité des dépenses des agents",
     "updated": "Mise à jour à {{time}}",
     "load_error": "Impossible de charger les dépenses des agents.",
@@ -1136,6 +1137,8 @@
     "reset_display_name_help": "Laissez vide pour conserver votre nom actuel. Votre identifiant de connexion reste inchangé."
   },
   "spending_policy": {
+    "agent_hourly_warning_msat": "Seuil d’alerte horaire par agent",
+    "warning_help": "Afficher une alerte quand les dépenses d’un identifiant dépassent ce montant en 60 minutes. Les paiements peuvent continuer.",
     "approval_above_msat": "Approbation requise au-delà de",
     "title": "Budget de dépenses",
     "load_error": "Impossible de charger le budget.",
@@ -1154,7 +1157,7 @@
     "edit": "Modifier les limites",
     "create": "Définir des limites",
     "disable": "Désactiver le budget",
-    "input_help": "Saisissez les limites en sats avec au plus trois décimales. Laissez le champ vide pour autoriser les dépenses sans limite sur cette période. Zéro bloque les dépenses.",
+    "input_help": "Saisissez les montants en sats avec au plus trois décimales. Laissez un champ vide pour désactiver la règle correspondante.",
     "cancel": "Annuler",
     "save": "Enregistrer les limites",
     "disable_help": "Les paiements sortants seront autorisés sans ces limites. Les dépenses déjà comptabilisées seront conservées."

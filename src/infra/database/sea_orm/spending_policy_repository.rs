@@ -31,6 +31,7 @@ impl From<policy::Model> for SpendingLimits {
             weekly_msat: row.weekly_msat.map(|n| n as u64),
             monthly_msat: row.monthly_msat.map(|n| n as u64),
             agent_hourly_msat: row.agent_hourly_msat.map(|n| n as u64),
+            agent_hourly_warning_msat: row.agent_hourly_warning_msat.map(|n| n as u64),
             approval_above_msat: row.approval_above_msat.map(|n| n as u64),
         }
     }
@@ -255,6 +256,7 @@ impl SpendingPolicyRepository for SeaOrmSpendingPolicyRepository {
             weekly_msat: Set(limits.weekly_msat.map(|n| n as i64)),
             monthly_msat: Set(limits.monthly_msat.map(|n| n as i64)),
             agent_hourly_msat: Set(limits.agent_hourly_msat.map(|n| n as i64)),
+            agent_hourly_warning_msat: Set(limits.agent_hourly_warning_msat.map(|n| n as i64)),
             approval_above_msat: Set(limits.approval_above_msat.map(|n| n as i64)),
         })
         .on_conflict(
@@ -267,6 +269,7 @@ impl SpendingPolicyRepository for SeaOrmSpendingPolicyRepository {
                     MonthlyMsat,
                     AgentHourlyMsat,
                     ApprovalAboveMsat,
+                    AgentHourlyWarningMsat,
                 ])
                 .to_owned(),
         )

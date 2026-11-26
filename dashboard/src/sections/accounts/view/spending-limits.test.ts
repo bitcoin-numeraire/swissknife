@@ -9,6 +9,7 @@ it('round trips exact millisatoshis, zero and unrestricted periods', () => {
     approval_above_msat: '1001',
     per_payment_msat: '17',
     agent_hourly_msat: '9007199254740993',
+    agent_hourly_warning_msat: '9007199254740992',
   };
   const form = editLimits(limits);
   expect(form.daily_msat).toBe('9007199254740.993');

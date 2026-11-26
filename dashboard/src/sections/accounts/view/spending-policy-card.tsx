@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSWRConfig } from 'swr';
 
 import {
   Box,
@@ -22,6 +23,7 @@ import {
 import { handleActionError } from 'src/utils/errors';
 
 import { useTranslate } from 'src/locales';
+import { endpointKeys } from 'src/actions/keys';
 import { useSpendingPolicy } from 'src/actions/spending-policy';
 import {
   Permission,
@@ -48,6 +50,7 @@ import {
 export function SpendingPolicyCard({ accountId }: { accountId: string }) {
   const { t, currentLang } = useTranslate();
   const { data, error, isLoading, mutate } = useSpendingPolicy(accountId);
+  const { mutate: refresh } = useSWRConfig();
   const [form, setForm] = useState<LimitsForm | null>(null);
   const [confirmDisable, setConfirmDisable] = useState(false);
   const [pending, setPending] = useState(false);
@@ -60,9 +63,13 @@ export function SpendingPolicyCard({ accountId }: { accountId: string }) {
     if (!disable && !parsed) return;
     setPending(true);
     try {
-      if (disable) await disableAccountSpendingPolicy<true>({ path });
-      else await replaceAccountSpendingPolicy<true>({ path, body: parsed! });
-      await mutate();
+      if (disable) await disableAccountSpendingPolicy<true>({ path, throwOnError: true });
+      else await replaceAccountSpendingPolicy<true>({ path, body: parsed!, throwOnError: true });
+      const [activity, id] = endpointKeys.accounts.agentActivity(accountId);
+      await Promise.all([
+        mutate(),
+        refresh((key) => Array.isArray(key) && key[0] === activity && key[1] === id),
+      ]);
       setForm(null);
       setConfirmDisable(false);
     } catch (cause) {
@@ -102,6 +109,14 @@ export function SpendingPolicyCard({ accountId }: { accountId: string }) {
                       : t('spending_policy.sats', { value: sats(data.limits[field]) })}
                   </Typography>
                 )
+              )}
+              {data.limits.agent_hourly_warning_msat != null && (
+                <Typography variant="body2">
+                  {t('spending_policy.agent_hourly_warning_msat')} ·{' '}
+                  {t('spending_policy.sats', {
+                    value: sats(data.limits.agent_hourly_warning_msat),
+                  })}
+                </Typography>
               )}
               {periods.map((field) => {
                 const cap = data.limits[field];
@@ -178,6 +193,9 @@ export function SpendingPolicyCard({ accountId }: { accountId: string }) {
                 <TextField
                   key={field}
                   label={t(`spending_policy.${field}`)}
+                  helperText={
+                    field === 'agent_hourly_warning_msat' && t('spending_policy.warning_help')
+                  }
                   value={form[field]}
                   disabled={pending}
                   slotProps={{ htmlInput: { inputMode: 'decimal', maxLength: 20 } }}

@@ -22,6 +22,7 @@ export const zAgentActivityHour = z.object({
 });
 
 export const zAgentSpendingActivity = z.object({
+  above_hourly_warning: z.boolean().optional(),
   agent_key_id: z.uuid(),
   current_hour: zAgentActivityHour,
   name: z.string().nullish(),
@@ -824,10 +825,11 @@ export const zSpendingInterval = z.enum(['day', 'week']);
 
 /**
  * Account-wide limits, including fees. Amounts are decimal millisatoshi strings.
- * Omitted limits are unrestricted. Zero blocks positive payments.
+ * Omitted rules are inactive. A zero cap blocks positive payments.
  */
 export const zSpendingLimits = z.object({
   agent_hourly_msat: z.string().nullish(),
+  agent_hourly_warning_msat: z.string().nullish(),
   approval_above_msat: z.string().nullish(),
   daily_msat: z.string().nullish(),
   monthly_msat: z.string().nullish(),

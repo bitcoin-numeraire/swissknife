@@ -1,5 +1,6 @@
 {
   "agent_activity": {
+    "above_warning": "Above hourly warning threshold",
     "title": "Agent spending activity",
     "updated": "Updated at {{time}}",
     "load_error": "Couldn’t load agent spending activity.",
@@ -1137,6 +1138,8 @@
     "reset_display_name_help": "Leave blank to keep your current display name. Your assigned username stays the same."
   },
   "spending_policy": {
+    "agent_hourly_warning_msat": "Hourly warning per agent",
+    "warning_help": "Show a warning when a credential spends more than this amount in 60 minutes. Payments can continue.",
     "approval_above_msat": "Require approval above",
     "title": "Spending budget",
     "load_error": "Unable to load this budget.",
@@ -1155,7 +1158,7 @@
     "edit": "Edit limits",
     "create": "Set spending limits",
     "disable": "Disable budget",
-    "input_help": "Enter limits in sats, with up to three decimal places. Leave a field empty for unlimited spending in that period. Zero blocks spending.",
+    "input_help": "Enter amounts in sats with up to three decimal places. Leave a field empty to turn off that rule.",
     "cancel": "Cancel",
     "save": "Save limits",
     "disable_help": "Outgoing payments will be allowed without these limits. Previously charged usage is retained."

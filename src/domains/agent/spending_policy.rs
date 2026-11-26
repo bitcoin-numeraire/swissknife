@@ -162,6 +162,7 @@ impl SpendingPolicyUseCases for SpendingPolicyService {
             limits.weekly_msat,
             limits.monthly_msat,
             limits.agent_hourly_msat,
+            limits.agent_hourly_warning_msat,
             limits.approval_above_msat,
         ];
         if amounts.iter().all(Option::is_none) {

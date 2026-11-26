@@ -10740,6 +10740,10 @@
           "previous_hour"
         ],
         "properties": {
+          "above_hourly_warning": {
+            "type": "boolean",
+            "description": "The credential's current-hour charges exceed the active policy's warning threshold."
+          },
           "agent_key_id": {
             "type": "string",
             "format": "uuid"
@@ -12925,7 +12929,7 @@
       },
       "SpendingLimits": {
         "type": "object",
-        "description": "Account-wide limits, including fees. Amounts are decimal millisatoshi strings.\nOmitted limits are unrestricted. Zero blocks positive payments.",
+        "description": "Account-wide limits, including fees. Amounts are decimal millisatoshi strings.\nOmitted rules are inactive. A zero cap blocks positive payments.",
         "properties": {
           "agent_hourly_msat": {
             "type": [
@@ -12933,6 +12937,14 @@
               "null"
             ],
             "description": "Maximum charged to each delegated credential over a rolling hour, including fees.",
+            "example": "500000"
+          },
+          "agent_hourly_warning_msat": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Flag credentials whose charges exceed this amount in the current rolling hour.\nThis warning only affects the activity report.",
             "example": "500000"
           },
           "approval_above_msat": {
