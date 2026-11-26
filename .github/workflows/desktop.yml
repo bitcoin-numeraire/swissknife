@@ -19,14 +19,17 @@ jobs:
         include:
           - platform: macOS
             runner: macos-latest
+            installer: dmg
             bundles: dmg
             flags: --target universal-apple-darwin
           - platform: Windows
             runner: windows-latest
+            installer: nsis
             bundles: nsis
             flags: ''
           - platform: Linux
             runner: ubuntu-24.04
+            installer: deb
             bundles: deb,appimage
             flags: ''
     runs-on: ${{ matrix.runner }}
@@ -55,37 +58,96 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
+      - name: Package a predecessor for the upgrade test
+        shell: bash
+        run: |
+          npm exec --yes --package=@tauri-apps/cli@2.12.6 -- tauri build ${{ matrix.flags }} --config tests/predecessor.json --bundles ${{ matrix.installer }} -- --locked
+          mkdir "$RUNNER_TEMP/predecessor"
+          find target -type f -path '*/bundle/${{ matrix.installer }}/*0.0.1*' -exec mv '{}' "$RUNNER_TEMP/predecessor/" \;
+        env:
+          NO_STRIP: 'true'
       - name: Package application
         run: npm exec --yes --package=@tauri-apps/cli@2.12.6 -- tauri build ${{ matrix.flags }} --bundles ${{ matrix.bundles }} -- --locked
         env:
           NO_STRIP: 'true'
-      - name: Open the packaged Linux wallet
+      - name: Install, reopen, upgrade and remove the Linux wallet
         if: runner.os == 'Linux'
         run: |
-          dpkg-deb --extract target/release/bundle/deb/*.deb "$RUNNER_TEMP/swissknife-deb"
-          xvfb-run -a python3 tests/launch.py "$RUNNER_TEMP/swissknife-deb/usr/bin/swissknife-desktop"
-      - name: Open the packaged macOS wallet
+          packages=("$RUNNER_TEMP"/predecessor/*.deb target/release/bundle/deb/*.deb)
+          executable=/usr/bin/swissknife-desktop
+          test ! -e "$executable"
+          for package in "${packages[@]}"; do
+            name=$(dpkg-deb -f "$package" Package)
+            version=$(dpkg-deb -f "$package" Version)
+            sudo dpkg --install "$package"
+            test "$(dpkg-query -W -f='${Version}' "$name")" = "$version"
+            mode=()
+            if [[ "$package" == "$RUNNER_TEMP"/predecessor/* ]]; then mode=(--initialize); fi
+            xvfb-run -a python3 tests/launch.py "$executable" "${mode[@]}"
+          done
+          xvfb-run -a python3 tests/launch.py "$executable"
+          sudo dpkg --remove "$name"
+          test ! -e "$executable"
+          image=(target/release/bundle/appimage/*.AppImage)
+          APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a python3 tests/launch.py "${image[0]}"
+          cd target/release/bundle
+          sha256sum deb/*.deb appimage/*.AppImage > SHA256SUMS
+          sha256sum --check SHA256SUMS
+      - name: Install, reopen, upgrade and remove the macOS wallet
         if: runner.os == 'macOS'
         run: |
-          image=(target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          images=("$RUNNER_TEMP"/predecessor/*.dmg target/universal-apple-darwin/release/bundle/dmg/*.dmg)
           mount="$RUNNER_TEMP/swissknife-dmg"
-          hdiutil verify "${image[0]}"
-          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "${image[0]}"
-          trap 'hdiutil detach "$mount"' EXIT
-          executable="$mount/SwissKnife.app/Contents/MacOS/swissknife-desktop"
-          architectures=$(lipo -archs "$executable")
-          grep -qw x86_64 <<< "$architectures"
-          grep -qw arm64 <<< "$architectures"
+          app="$RUNNER_TEMP/Applications/SwissKnife.app"
+          mkdir -p "$(dirname "$app")"
+          test ! -e "$app"
+          for image in "${images[@]}"; do
+            hdiutil verify "$image"
+            hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$image"
+            trap 'hdiutil detach "$mount"' EXIT
+            rm -rf "$app"
+            ditto "$mount/SwissKnife.app" "$app"
+            hdiutil detach "$mount"
+            trap - EXIT
+            version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")
+            [[ "$(basename "$image")" == *"_${version}_"* ]]
+            executable="$app/Contents/MacOS/swissknife-desktop"
+            architectures=$(lipo -archs "$executable")
+            grep -qw x86_64 <<< "$architectures"
+            grep -qw arm64 <<< "$architectures"
+            if [[ "$image" == "$RUNNER_TEMP"/predecessor/* ]]; then
+              python3 tests/launch.py "$executable" --initialize
+            else
+              python3 tests/launch.py "$executable"
+            fi
+          done
           python3 tests/launch.py "$executable"
-      - name: Install and open the Windows wallet
+          rm -r "$app"
+          test ! -e "$app"
+      - name: Install, reopen, upgrade and remove the Windows wallet
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $installer = (Get-ChildItem target/release/bundle/nsis/*.exe -ErrorAction Stop).FullName
           $installDir = Join-Path $env:RUNNER_TEMP SwissKnifeDesktop
-          $result = Start-Process -FilePath $installer -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
-          if ($result.ExitCode -ne 0) { throw "NSIS exited with $($result.ExitCode)" }
-          python tests/launch.py (Join-Path $installDir swissknife-desktop.exe)
+          $executable = Join-Path $installDir swissknife-desktop.exe
+          if (Test-Path $installDir) { throw "Expected a clean installation directory" }
+          $installers = @(
+            Get-Item "$env:RUNNER_TEMP/predecessor/*.exe" -ErrorAction Stop
+            Get-Item "target/release/bundle/nsis/*.exe" -ErrorAction Stop
+          )
+          foreach ($installer in $installers) {
+            $result = Start-Process $installer.FullName -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
+            if ($result.ExitCode -ne 0) { throw "NSIS exited with $($result.ExitCode)" }
+            $version = (Get-Item $executable).VersionInfo.ProductVersion
+            if (!$version -or !$installer.Name.Contains("_${version}_")) { throw "Unexpected installed version ($version)" }
+            $mode = if ($installer.Directory.Name -eq "predecessor") { @("--initialize") } else { @() }
+            python tests/launch.py $executable @mode
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          python tests/launch.py $executable
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $result = Start-Process (Join-Path $installDir uninstall.exe) -ArgumentList "/S" -Wait -PassThru
+          if ($result.ExitCode -ne 0 -or (Test-Path $executable)) { throw "Uninstall failed" }
       - name: Upload installable packages
         uses: actions/upload-artifact@v7.0.2
         with:
@@ -96,3 +158,4 @@ jobs:
             desktop/target/**/bundle/nsis/*.exe
             desktop/target/**/bundle/deb/*.deb
             desktop/target/**/bundle/appimage/*.AppImage
+            desktop/target/**/bundle/SHA256SUMS
