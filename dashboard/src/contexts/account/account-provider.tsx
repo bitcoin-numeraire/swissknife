@@ -11,7 +11,7 @@ import { useColorScheme } from '@mui/material/styles';
 import { endpointKeys } from 'src/actions/keys';
 import { getAccount, getAccountWallet, patchAccountPreferences } from 'src/lib/swissknife';
 
-import { defaultSettings, useSettingsContext } from 'src/components/settings';
+import { defaultSettings, SettingsContext, useSettingsContext } from 'src/components/settings';
 
 import { AccountContext } from './account-context';
 import { useAccountEventStream } from './account-event-stream';
@@ -31,13 +31,27 @@ export function AccountProvider({ children }: AccountProviderProps) {
   const [activeWalletId, setActiveWalletId] = useState<string>();
   const hydrated = useRef<{ id: string; settings: unknown } | undefined>(undefined);
   const { setMode } = useColorScheme();
-  const { setState: setSettingsState } = useSettingsContext();
+  const settings = useSettingsContext();
+  const { setState: setSettingsState } = settings;
 
   const accountResult = useSWR<Account>(endpointKeys.account.get, async () => {
     const response = await getAccount<true>();
     return response.data;
   });
   const account = accountResult.data;
+  const stored = account?.preferences?.dashboard_settings;
+  const persistedSettings = useMemo(
+    () => uiSettingsFromDashboardSettings(stored, defaultSettings),
+    [stored]
+  );
+  // The browser can still hold another account's settings when a dashboard opens.
+  const hideBalances = account
+    ? (persistedSettings.hideBalances ?? defaultSettings.hideBalances)
+    : true;
+  const accountSettings = useMemo(
+    () => ({ ...settings, state: { ...settings.state, hideBalances } }),
+    [settings, hideBalances]
+  );
   const wallets = useMemo(() => account?.wallets ?? [], [account?.wallets]);
   const recentClientEvents = useAccountEventStream(account?.id);
   useAccountEventNotifications(account?.id, recentClientEvents, wallets);
@@ -47,14 +61,12 @@ export function AccountProvider({ children }: AccountProviderProps) {
       hydrated.current = undefined;
       return;
     }
-    const stored = account.preferences?.dashboard_settings;
     if (hydrated.current?.id === account.id && hydrated.current.settings === stored) return;
 
-    const persistedSettings = uiSettingsFromDashboardSettings(stored, defaultSettings);
     hydrated.current = { id: account.id, settings: stored };
     setSettingsState(persistedSettings);
     setMode(persistedSettings.mode ?? defaultSettings.mode ?? 'system');
-  }, [account, setMode, setSettingsState]);
+  }, [account, stored, persistedSettings, setMode, setSettingsState]);
 
   useEffect(() => {
     if (accountResult.isLoading) return;
@@ -165,5 +177,9 @@ export function AccountProvider({ children }: AccountProviderProps) {
     ]
   );
 
-  return <AccountContext value={value}>{children}</AccountContext>;
+  return (
+    <AccountContext value={value}>
+      <SettingsContext value={accountSettings}>{children}</SettingsContext>
+    </AccountContext>
+  );
 }
