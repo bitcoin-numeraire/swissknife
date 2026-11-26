@@ -33,6 +33,7 @@ pub struct Model {
     #[sea_orm(unique)]
     pub lnurl_verify_token: Option<Uuid>,
     pub lnurl_preimage: Option<String>,
+    pub internal_btc_address: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

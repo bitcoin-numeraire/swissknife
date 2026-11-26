@@ -75,6 +75,24 @@ it('isolates cancelled, subsequent and other wallets’ sales on replay', () => 
   expect(checkoutSettlement(sale, [previous, foreign], 0).status).toBe('waiting');
   expect(checkoutSettlement(sale, [previous, foreign], sale.expiresAt).status).toBe('expired');
 });
+it('combines an internal Bitcoin receipt with a chain deposit at the same sale address', () => {
+  const local = {
+    ...invoice('internal', Ledger.INTERNAL, InvoiceStatus.SETTLED, 12000),
+    internal_btc_address: sale.address,
+  };
+  const other = { ...local, id: 'other', internal_btc_address: 'bcrt1different' };
+  const foreign = { ...local, id: 'foreign', wallet_id: 'another wallet' };
+  const deposit = invoice('deposit', Ledger.ONCHAIN, InvoiceStatus.SETTLED, 15000, sale.address);
+  expect(checkoutSettlement(sale, [other, foreign, local, local], 0)).toMatchObject({
+    status: 'partial',
+    receivedMsat: 12000,
+  });
+  expect(checkoutSettlement(sale, [deposit, local, local], 0)).toMatchObject({
+    status: 'paid',
+    receivedMsat: 27000,
+    invoiceIds: ['deposit', 'internal'],
+  });
+});
 it('restores only a valid sale for the active wallet', () => {
   expect(restoreMerchantSale(JSON.stringify(sale), sale.walletId)).toEqual(sale);
   expect(restoreMerchantSale(JSON.stringify(sale), 'different')).toBeUndefined();

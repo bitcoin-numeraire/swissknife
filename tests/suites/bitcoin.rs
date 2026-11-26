@@ -630,6 +630,89 @@ mod withdraw {
         );
     }
 
+    #[tokio::test]
+    async fn matches_an_internal_receipt_to_its_checkout_address_and_order() {
+        use swissknife_types::{Invoice, InvoiceStatus};
+
+        let app = app().await;
+        let token = app.admin_token().await;
+        let payer = app.create_account_with_wallet(token, "checkout-customer").await;
+        let merchant = app.create_account_with_wallet(token, "checkout-merchant").await;
+        let api = app.api();
+        let merchant_path = format!("/v1/me/wallets/{}", merchant.wallet.id);
+        let addresses = format!("{merchant_path}/bitcoin/addresses");
+        let sale = api
+            .post(
+                &addresses,
+                Auth::ApiKey(&merchant.key),
+                serde_json::json!({"dedicated": true, "description": "Order 47"}),
+            )
+            .await
+            .parse::<BtcAddress>();
+        let other = api
+            .post(
+                &addresses,
+                Auth::ApiKey(&merchant.key),
+                serde_json::json!({"dedicated": true}),
+            )
+            .await
+            .parse::<BtcAddress>();
+
+        app.fund_onchain(token, payer.wallet.id, 50_000).await;
+        let payment = api
+            .post(
+                &format!("/v1/me/wallets/{}/payments", payer.wallet.id),
+                Auth::ApiKey(&payer.key),
+                SendPaymentRequest {
+                    wallet_id: None,
+                    input: sale.address.clone(),
+                    amount_msat: Some(12_000_000),
+                    comment: Some("Customer note".into()),
+                },
+            )
+            .await;
+        assert_status(&payment, StatusCode::OK);
+        let payment = payment.parse::<Payment>();
+        assert_eq!(payment.ledger, Ledger::Internal);
+        assert_eq!(payment.description.as_deref(), Some("Customer note"));
+        assert_eq!(
+            app.wallet_balance(token, merchant.wallet.id).await.available_msat,
+            12_000_000
+        );
+        assert_eq!(
+            app.wallet_balance(token, payer.wallet.id).await.available_msat,
+            38_000_000
+        );
+
+        for (address, count) in [(&sale.address, 1), (&other.address, 0)] {
+            let receipts = api
+                .get(
+                    &format!("{merchant_path}/invoices?bitcoin_address={address}"),
+                    Auth::ApiKey(&merchant.key),
+                )
+                .await;
+            assert_status(&receipts, StatusCode::OK);
+            let receipts = receipts.parse::<Vec<Invoice>>();
+            assert_eq!(receipts.len(), count);
+            for invoice in receipts {
+                assert_eq!(invoice.wallet_id, merchant.wallet.id);
+                assert_eq!(invoice.internal_btc_address.as_deref(), Some(sale.address.as_str()));
+                assert_eq!(invoice.description.as_deref(), Some("Order 47"));
+                assert_eq!(invoice.amount_received_msat, Some(12_000_000));
+                assert_eq!(invoice.status, InvoiceStatus::Settled);
+                assert!(invoice.bitcoin_output.is_none());
+                assert_eq!(invoice.ledger, Ledger::Internal);
+            }
+        }
+        let denied = api
+            .get(
+                &format!("{merchant_path}/invoices?bitcoin_address={}", sale.address),
+                Auth::ApiKey(&payer.key),
+            )
+            .await;
+        assert_error(&denied, StatusCode::NOT_FOUND);
+    }
+
     /// The ledger reservation guards the balance: an on-chain send beyond it is
     /// rejected (422) before anything is broadcast. Fund the shared node wallet
     /// through one wallet so the transaction can be built, then overdraw a

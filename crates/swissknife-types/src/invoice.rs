@@ -56,6 +56,10 @@ pub struct Invoice {
     #[serde(skip)]
     pub btc_output_id: Option<Uuid>,
 
+    /// Destination Bitcoin address for a transfer settled on the internal ledger.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub internal_btc_address: Option<String>,
+
     /// Bitcoin output details of the invoice
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitcoin_output: Option<BtcOutput>,
@@ -155,7 +159,7 @@ pub struct InvoiceFilter {
     pub ids: Option<Vec<Uuid>>,
     /// Wallet ID. Automatically populated with your ID
     pub wallet_id: Option<Uuid>,
-    /// Match invoices for outputs sent to this exact Bitcoin address.
+    /// Match on-chain deposits and internal transfers received at this exact Bitcoin address.
     pub bitcoin_address: Option<String>,
     /// Status
     pub status: Option<InvoiceStatus>,

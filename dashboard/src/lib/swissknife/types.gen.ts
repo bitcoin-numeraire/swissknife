@@ -589,6 +589,10 @@ export type Invoice = {
    */
   id: string;
   /**
+   * Destination Bitcoin address for a transfer settled on the internal ledger.
+   */
+  internal_btc_address?: string | null;
+  /**
    * Ledger
    */
   ledger: Ledger;
@@ -2764,7 +2768,7 @@ export type DeleteInvoicesData = {
      */
     wallet_id?: string | null;
     /**
-     * Match invoices for outputs sent to this exact Bitcoin address.
+     * Match on-chain deposits and internal transfers received at this exact Bitcoin address.
      */
     bitcoin_address?: string | null;
     /**
@@ -2838,7 +2842,7 @@ export type ListInvoicesData = {
      */
     wallet_id?: string | null;
     /**
-     * Match invoices for outputs sent to this exact Bitcoin address.
+     * Match on-chain deposits and internal transfers received at this exact Bitcoin address.
      */
     bitcoin_address?: string | null;
     /**
@@ -4288,7 +4292,7 @@ export type ListWalletInvoicesData = {
      */
     wallet_id?: string | null;
     /**
-     * Match invoices for outputs sent to this exact Bitcoin address.
+     * Match on-chain deposits and internal transfers received at this exact Bitcoin address.
      */
     bitcoin_address?: string | null;
     /**

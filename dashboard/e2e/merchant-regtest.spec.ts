@@ -1,4 +1,4 @@
-import type { APIRequestContext } from '@playwright/test';
+import type { Page, APIRequestContext } from '@playwright/test';
 
 import { test, expect } from '@playwright/test';
 
@@ -18,10 +18,7 @@ async function bitcoin(request: APIRequestContext, method: string, params: unkno
   return payload.result;
 }
 
-test('a merchant can recover a partial regtest sale, collect the balance and start another', async ({
-  page,
-  request,
-}) => {
+async function openMerchant(page: Page, request: APIRequestContext) {
   test.skip(!api || !dashboard, 'Requires a disposable local SwissKnife instance and dashboard');
   test.setTimeout(90_000);
   for (const url of [api!, dashboard!]) expect(new URL(url).hostname).toBe('127.0.0.1');
@@ -45,6 +42,14 @@ test('a merchant can recover a partial regtest sale, collect the balance and sta
   );
   await page.addInitScript((jwt) => sessionStorage.setItem('jwt_access_token', jwt), token);
   await page.goto(dashboard + '/wallet/pos');
+  return headers;
+}
+
+test('a merchant can recover a partial regtest sale, collect the balance and start another', async ({
+  page,
+  request,
+}) => {
+  const headers = await openMerchant(page, request);
   await page.getByLabel('Amount in sats').fill('25000');
   await page.getByLabel('Description or order reference').fill('Receipt A');
   const address = page.waitForResponse(
@@ -135,4 +140,66 @@ test('a merchant can recover a partial regtest sale, collect the balance and sta
   await page.getByRole('button', { name: 'Stop checkout' }).click();
   await page.reload();
   await expect(page.getByLabel('Amount in sats')).toBeEmpty();
+});
+
+test('a cashier can collect a sale partly from another SwissKnife wallet', async ({
+  page,
+  request,
+}) => {
+  const headers = await openMerchant(page, request);
+  const account = await request.post(api + '/v1/accounts', {
+    headers,
+    data: { display_name: 'Checkout customer', permissions: [] },
+  });
+  expect(account.ok()).toBe(true);
+  const wallet = await request.post(api + '/v1/wallets', {
+    headers,
+    data: { account_id: (await account.json()).id, asset_id: regtestAssetId },
+  });
+  expect(wallet.ok()).toBe(true);
+  const payer = (await wallet.json()).id;
+  const address = await request.post(api + '/v1/bitcoin/addresses', {
+    headers,
+    data: { wallet_id: payer },
+  });
+  expect(address.ok()).toBe(true);
+  await bitcoin(request, 'sendtoaddress', [(await address.json()).address, 0.0005]);
+  const miner = await bitcoin(request, 'getnewaddress', ['pos', 'bech32']);
+  await bitcoin(request, 'generatetoaddress', [6, miner]);
+  await expect
+    .poll(async () => {
+      const funded = await request.get(api + '/v1/wallets/' + payer, { headers });
+      return (await funded.json()).balance.available_msat;
+    })
+    .toBe(50_000_000);
+
+  await page.getByLabel('Amount in sats').fill('25000');
+  await page.getByLabel('Description or order reference').fill('Order 47');
+  const issued = page.waitForResponse(
+    (res) => res.url().endsWith('/bitcoin/addresses') && res.request().method() === 'POST'
+  );
+  await page.getByRole('button', { name: 'Create payment request' }).click();
+  const destination = (await (await issued).json()).address;
+  const paid = await request.post(api + '/v1/payments', {
+    headers,
+    data: {
+      wallet_id: payer,
+      input: destination,
+      amount_msat: 12_000_000,
+      comment: 'Customer note',
+    },
+  });
+  expect(paid.ok()).toBe(true);
+  expect(await paid.json()).toMatchObject({ ledger: 'Internal', description: 'Customer note' });
+  await expect(page.getByRole('heading', { name: 'Partial payment' })).toBeVisible({
+    timeout: 30000,
+  });
+  await page.reload();
+  await expect(page.getByText('On-chain Bitcoin · 13,000 sats')).toBeVisible();
+  await bitcoin(request, 'sendtoaddress', [destination, 0.00013]);
+  await bitcoin(request, 'generatetoaddress', [6, miner]);
+  await expect(page.getByRole('heading', { name: 'Payment received' })).toBeVisible({
+    timeout: 30000,
+  });
+  await expect(page.getByRole('link', { name: 'Open payment details' })).toHaveCount(2);
 });
