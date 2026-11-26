@@ -114,12 +114,17 @@ test('a merchant can recover a partial regtest sale, collect the balance and sta
   await expect(page.getByRole('button', { name: 'Copy', exact: true })).toHaveCount(0);
   const receipts = page.getByRole('link', { name: 'Open payment details' });
   await expect(receipts).toHaveCount(2);
-  const detail = await receipts.first().getAttribute('href');
+  const links = (
+    await receipts.evaluateAll((items) => items.map((item) => item.getAttribute('href')))
+  ).sort();
   await page.getByRole('button', { name: 'Next sale' }).click();
-  await expect(page.getByRole('link', { name: 'Last completed sale' })).toHaveAttribute(
-    'href',
-    detail!
-  );
+  const previous = page.getByRole('link', { name: 'Last completed sale' });
+  await expect(previous).toHaveCount(2);
+  await page.reload();
+  await expect(previous).toHaveCount(2);
+  expect(
+    (await previous.evaluateAll((items) => items.map((item) => item.getAttribute('href')))).sort()
+  ).toEqual(links);
   const historyUrl = new URL(api + '/v1/me/wallets/' + destination.wallet_id + '/invoices');
   historyUrl.searchParams.set('bitcoin_address', destination.address);
   const historyResponse = await request.get(historyUrl.href, { headers });
@@ -129,24 +134,40 @@ test('a merchant can recover a partial regtest sale, collect the balance and sta
     'Receipt A',
     'Receipt A',
   ]);
-  await page.getByRole('link', { name: 'Last completed sale' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Receipt A', exact: true, level: 4 })
-  ).toBeVisible();
-  await page.goto(dashboard + '/wallet/pos');
+  for (const entry of entries) {
+    const link = previous.and(page.locator(`a[href="/wallet/invoices?id=${entry.id}"]`));
+    await link.click();
+    await expect(
+      page.getByRole('heading', { name: 'Receipt A', exact: true, level: 4 })
+    ).toBeVisible();
+    await page.goto(dashboard + '/wallet/pos');
+  }
   await page.getByLabel('Amount in sats').fill('2000');
   await page.getByRole('button', { name: 'Create payment request' }).click();
   await expect(page.getByRole('heading', { name: 'Waiting for payment' })).toBeVisible();
   await page.getByRole('button', { name: 'Stop checkout' }).click();
   await page.reload();
   await expect(page.getByLabel('Amount in sats')).toBeEmpty();
+  await expect(previous).toHaveCount(2);
 });
 
 test('a cashier can collect a sale partly from another SwissKnife wallet', async ({
   page,
   request,
 }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'vibrate', {
+      value: () => {
+        sessionStorage.setItem(
+          'test-vibrations',
+          String(Number(sessionStorage.getItem('test-vibrations')) + 1)
+        );
+        return true;
+      },
+    });
+  });
   const headers = await openMerchant(page, request);
+  await page.getByLabel('Vibration').check();
   const account = await request.post(api + '/v1/accounts', {
     headers,
     data: { display_name: 'Checkout customer', permissions: [] },
@@ -201,5 +222,17 @@ test('a cashier can collect a sale partly from another SwissKnife wallet', async
   await expect(page.getByRole('heading', { name: 'Payment received' })).toBeVisible({
     timeout: 30000,
   });
-  await expect(page.getByRole('link', { name: 'Open payment details' })).toHaveCount(2);
+  const receipts = page.getByRole('link', { name: 'Open payment details' });
+  await expect(receipts).toHaveCount(2);
+  const vibrations = () => page.evaluate(() => sessionStorage.getItem('test-vibrations'));
+  await expect.poll(vibrations).toBe('1');
+
+  // Another receipt can settle after the cashier has already seen success.
+  await bitcoin(request, 'sendtoaddress', [destination, 0.00001]);
+  await bitcoin(request, 'generatetoaddress', [6, miner]);
+  await expect(receipts).toHaveCount(3, { timeout: 30000 });
+  await page.getByRole('button', { name: 'Next sale' }).click();
+  await page.reload();
+  await expect(page.getByRole('link', { name: 'Last completed sale' })).toHaveCount(3);
+  expect(await vibrations()).toBe('1');
 });
