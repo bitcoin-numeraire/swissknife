@@ -16,6 +16,10 @@ async fn scoped_read_reports_live_regtest_peers_channels_and_balances() {
         StatusCode::FORBIDDEN,
     );
 
+    let wallet = app.create_wallet(admin, "node-health-deposit").await;
+    let deposit_sat = 15_000;
+    app.fund_onchain(admin, wallet.id, deposit_sat).await;
+
     let node_reader = app.api_key(admin, vec![Permission::ReadLnNode]).await;
     let response = api.get(path, Auth::ApiKey(&node_reader)).await;
     assert_status(&response, StatusCode::OK);
@@ -33,6 +37,6 @@ async fn scoped_read_reports_live_regtest_peers_channels_and_balances() {
     assert!(peers.iter().any(|peer| peer.connected && peer.id == active.peer_id));
     let liquidity = node.liquidity.unwrap();
     assert!(liquidity.outbound_msat.unwrap() + liquidity.inbound_msat.unwrap() > 0);
-    assert!(node.onchain.unwrap().confirmed_sat > 0);
+    assert!(node.onchain.unwrap().confirmed_sat >= deposit_sat);
     assert!(response.body["liquidity"]["outbound_msat"].is_string());
 }
