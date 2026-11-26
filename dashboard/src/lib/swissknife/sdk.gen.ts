@@ -1549,7 +1549,7 @@ export const getWalletPayment = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Download wallet activity as a CSV statement. The date interval applies to transaction creation.
+ * Download wallet activity as a CSV statement. Choose creation date (default) or recorded payment date for settled activity.
  */
 export const exportAccountWalletStatement = <ThrowOnError extends boolean = false>(
   options: Options<ExportAccountWalletStatementData, ThrowOnError>
@@ -1861,7 +1861,7 @@ export const creditWallet = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Download wallet activity as a CSV statement. The date interval applies to transaction creation.
+ * Download wallet activity as a CSV statement. Choose creation date (default) or recorded payment date for settled activity.
  */
 export const exportWalletStatement = <ThrowOnError extends boolean = false>(
   options: Options<ExportWalletStatementData, ThrowOnError>

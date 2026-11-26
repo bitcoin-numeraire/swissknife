@@ -56,7 +56,7 @@ pub use query::OrderDirection;
 pub use system::{HealthCheck, HealthStatus, SetupInfo, VersionInfo};
 pub use transaction::{AdminInvoiceSummary, AdminPaymentSummary, Currency, Ledger, TransactionWalletDisplay};
 pub use wallet::{
-    Asset, Balance, Contact, CreateWalletRequest, Protocol, Wallet, WalletFilter, WalletOverview,
+    Asset, Balance, Contact, CreateWalletRequest, Protocol, StatementDateBasis, Wallet, WalletFilter, WalletOverview,
     WalletStatementPeriod, NATIVE_ASSET_REF,
 };
 pub use wallet_credit::{CreateWalletCredit, CreditPurpose, WalletCreditReceipt};

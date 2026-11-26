@@ -24,6 +24,9 @@
     "invitation": "You can give one of your wallets an opening balance during setup."
   },
   "statement": {
+    "date_basis": "Date to use",
+    "created": "Creation date",
+    "paid": "Payment date (settled only)",
     "action": "Export statement",
     "title": "Wallet statement",
     "wallet": "Wallet {{wallet}}",

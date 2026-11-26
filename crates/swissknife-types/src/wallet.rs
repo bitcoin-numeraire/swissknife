@@ -189,9 +189,21 @@ pub struct WalletFilter {
     pub order_direction: OrderDirection,
 }
 
-/// Creation-time interval for a wallet activity statement, with an exclusive upper bound.
+/// Timestamp used to select and order wallet statement rows.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum StatementDateBasis {
+    #[default]
+    Created,
+    Paid,
+}
+
+/// UTC wallet statement interval, with an exclusive upper bound.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, IntoParams, ToSchema)]
 pub struct WalletStatementPeriod {
     pub from: DateTime<Utc>,
     pub until: DateTime<Utc>,
+    /// Defaults to creation time. Use paid to include only settled rows with a recorded payment time.
+    #[param(inline)]
+    pub date_basis: Option<StatementDateBasis>,
 }

@@ -68,7 +68,7 @@ async fn credit_wallet(
     Ok(Json(services.wallet.credit(wallet_id, &user, request).await?))
 }
 
-/// Download wallet activity as a CSV statement. The date interval applies to transaction creation.
+/// Download wallet activity as a CSV statement. Choose creation date (default) or recorded payment date for settled activity.
 #[utoipa::path(
     get, path = "/{id}/statement", tag = "Wallets", context_path = CONTEXT_PATH,
     params(("id" = Uuid, Path, description = "Wallet ID"), swissknife_types::WalletStatementPeriod),

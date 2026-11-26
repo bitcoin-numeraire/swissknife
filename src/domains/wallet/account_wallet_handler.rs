@@ -791,7 +791,7 @@ async fn list_wallet_payments(
     Ok(Json(services.payment.list(query_params).await?))
 }
 
-/// Download wallet activity as a CSV statement. The date interval applies to transaction creation.
+/// Download wallet activity as a CSV statement. Choose creation date (default) or recorded payment date for settled activity.
 #[utoipa::path(
     get, path = "/wallets/{wallet_id}/statement", tag = "Me", context_path = CONTEXT_PATH,
     params(("wallet_id" = Uuid, Path, description = "Wallet ID"), swissknife_types::WalletStatementPeriod),

@@ -15,8 +15,8 @@ use crate::{
     domains::{
         payment::PaymentStatus,
         wallet::{
-            Balance, Contact, StatementEntry, Wallet, WalletFilter, WalletOverview, WalletRepository, WalletStatement,
-            WalletStatementPeriod,
+            Balance, Contact, StatementDateBasis, StatementEntry, Wallet, WalletFilter, WalletOverview,
+            WalletRepository, WalletStatement, WalletStatementPeriod,
         },
     },
     infra::database::sea_orm::models::{
@@ -308,24 +308,31 @@ where
             return Ok(None);
         };
 
+        let (date_column, payment_filter) = match period.date_basis.unwrap_or_default() {
+            StatementDateBasis::Created => ("created_at", ""),
+            StatementDateBasis::Paid => ("payment_time", " AND status = 'Settled'"),
+        };
+
         // The UNION reads both directions from a single database snapshot. Positional
         // parameters are shared by PostgreSQL and SQLite and first appear in bind order.
         let query = Statement::from_sql_and_values(
             db.get_database_backend(),
-            r#"
+            format!(
+                r#"
             SELECT id, created_at, payment_time, 'out' AS direction, ledger, status,
                    amount_msat, fee_msat, description, NULL AS credit_purpose
             FROM payment
-            WHERE wallet_id = $1 AND created_at >= $2 AND created_at < $3
+            WHERE wallet_id = $1 AND {date_column} >= $2 AND {date_column} < $3{payment_filter}
             UNION ALL
             SELECT id, created_at, payment_time, 'in' AS direction, ledger,
                    CASE WHEN payment_time IS NOT NULL THEN 'Settled'
                         WHEN expires_at < $4 THEN 'Expired' ELSE 'Pending' END AS status,
                    COALESCE(amount_received_msat, amount_msat) AS amount_msat, fee_msat, description, credit_purpose
             FROM invoice
-            WHERE wallet_id = $1 AND created_at >= $2 AND created_at < $3
-            ORDER BY created_at, id, direction
-        "#,
+            WHERE wallet_id = $1 AND {date_column} >= $2 AND {date_column} < $3
+            ORDER BY {date_column}, id, direction
+        "#
+            ),
             [
                 wallet_id.into(),
                 period.from.naive_utc().into(),

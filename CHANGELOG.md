@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Wallet statements can be downloaded by payment date to reconcile settled receipts and expenses across month boundaries.
+
 - The dashboard supports German, Spanish, Italian and European Portuguese, including localized dates and numbers.
 
 - Operators can review and confirm an opening credit during setup or add credit from a wallet’s administration page.

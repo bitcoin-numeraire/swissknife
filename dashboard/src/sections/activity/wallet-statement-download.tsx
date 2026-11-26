@@ -7,12 +7,17 @@ import { useBoolean } from 'minimal-shared/hooks';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import {
   Stack,
+  Radio,
   Button,
   Dialog,
+  FormLabel,
+  RadioGroup,
   Typography,
+  FormControl,
   DialogTitle,
   DialogActions,
   DialogContent,
+  FormControlLabel,
 } from '@mui/material';
 
 import { handleActionError } from 'src/utils/errors';
@@ -39,6 +44,7 @@ export function WalletStatementDownload({ walletId, admin = false }: Props) {
   const [last, setLast] = useState<Dayjs | null>(() =>
     dayjs(new Date().toISOString().slice(0, 10))
   );
+  const [dateBasis, setDateBasis] = useState<'created' | 'paid'>('created');
   const [downloading, setDownloading] = useState(false);
   const period = statementPeriod(first, last);
 
@@ -46,7 +52,11 @@ export function WalletStatementDownload({ walletId, admin = false }: Props) {
     if (!period || downloading) return;
     setDownloading(true);
     try {
-      const options = { query: period, parseAs: 'text', throwOnError: true } as const;
+      const options = {
+        query: { ...period, date_basis: dateBasis },
+        parseAs: 'text',
+        throwOnError: true,
+      } as const;
       const { data } = admin
         ? await exportWalletStatement({ ...options, path: { id: walletId } })
         : await exportAccountWalletStatement({ ...options, path: { wallet_id: walletId } });
@@ -54,7 +64,7 @@ export function WalletStatementDownload({ walletId, admin = false }: Props) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `wallet-${walletId}-${first!.format('YYYY-MM-DD')}-${last!.format('YYYY-MM-DD')}.csv`;
+      link.download = `wallet-${walletId}-${first!.format('YYYY-MM-DD')}-${last!.format('YYYY-MM-DD')}${dateBasis === 'paid' ? '-paid' : ''}.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -89,6 +99,21 @@ export function WalletStatementDownload({ walletId, admin = false }: Props) {
             <Typography variant="body2" color="text.secondary">
               {t('statement.wallet', { wallet: walletId })}
             </Typography>
+            <FormControl disabled={downloading}>
+              <FormLabel id="statement-date-basis">{t('statement.date_basis')}</FormLabel>
+              <RadioGroup
+                aria-labelledby="statement-date-basis"
+                value={dateBasis}
+                onChange={(_, value) => setDateBasis(value === 'paid' ? 'paid' : 'created')}
+              >
+                <FormControlLabel
+                  value="created"
+                  control={<Radio />}
+                  label={t('statement.created')}
+                />
+                <FormControlLabel value="paid" control={<Radio />} label={t('statement.paid')} />
+              </RadioGroup>
+            </FormControl>
             <DatePicker
               label={t('statement.from')}
               value={first}

@@ -1730,6 +1730,7 @@ export const zExportAccountWalletStatementPath = z.object({
 export const zExportAccountWalletStatementQuery = z.object({
   from: z.iso.datetime(),
   until: z.iso.datetime(),
+  date_basis: z.union([z.literal('created'), z.literal('paid')]).nullish(),
 });
 
 /**
@@ -1931,6 +1932,7 @@ export const zExportWalletStatementPath = z.object({
 export const zExportWalletStatementQuery = z.object({
   from: z.iso.datetime(),
   until: z.iso.datetime(),
+  date_basis: z.union([z.literal('created'), z.literal('paid')]).nullish(),
 });
 
 /**
