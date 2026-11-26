@@ -17,7 +17,7 @@ use tracing::{debug, error, info};
 use crate::application::composition::{AppAdapters, AppServices, RecoveryAdapters, RecoveryServices};
 use crate::infra::{
     app::{ClientEventRetentionWorker, EventListener, Server},
-    cli::Cli,
+    cli::{recover_local_login, Cli, Command},
     config::config_rs::load_config,
     logging::tracing::setup_tracing,
 };
@@ -37,17 +37,25 @@ async fn main() {
             exit(1);
         }
     };
-    if let Some(command) = cli.command {
+    if let Some(Command::RecoverLocalLogin { account_id }) = cli.command {
         let result = async {
             let adapters = RecoveryAdapters::new(&config).await?;
             let services = RecoveryServices::new(config.auth_provider, adapters);
-            command.run(services.login.as_ref()).await
+            recover_local_login(account_id, services.login.as_ref()).await
         }
         .await;
         if let Err(error) = result {
             eprintln!("Local login recovery failed: {error}");
             exit(1);
         }
+        return;
+    }
+    if let Some(Command::CheckLedgerMigrations) = cli.command {
+        if let Err(error) = crate::infra::database::sea_orm::SeaOrmStore::check_migrations(config.database).await {
+            eprintln!("{error}");
+            exit(1);
+        }
+        println!("The ledger migration history matches this SwissKnife binary.");
         return;
     }
     setup_tracing(config.logging.clone());

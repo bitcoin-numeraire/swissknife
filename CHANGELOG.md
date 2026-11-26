@@ -10,7 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
-- Operators can create encrypted ledger snapshots and restore them to a fresh SQLite file or PostgreSQL database.
+- Operators can create encrypted ledger snapshots, restore them to a fresh SQLite file or PostgreSQL database,
+  and check the restored migration history against the installed SwissKnife binary before starting it.
 
 ## [0.3.5] - 2026-11-21
 
