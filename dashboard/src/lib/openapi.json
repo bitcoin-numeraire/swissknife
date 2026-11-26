@@ -65,7 +65,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/.well-known/nostr.json": {
@@ -120,7 +121,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/lnurlp/{token}/verify": {
@@ -264,7 +266,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/v1/accounts": {
@@ -1971,12 +1974,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "jwt": []
-          }
-        ]
+        }
       }
     },
     "/v1/auth/reset-password": {
@@ -2040,7 +2038,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/v1/auth/sign-in": {
@@ -2114,7 +2113,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/v1/auth/sign-up": {
@@ -2199,7 +2199,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/v1/bitcoin/addresses": {
@@ -9165,7 +9166,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/v1/system/mark-welcome-complete": {
@@ -9191,7 +9193,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/v1/system/ready": {
@@ -9206,7 +9209,8 @@
           "204": {
             "description": "No Content on success"
           }
-        }
+        },
+        "security": []
       }
     },
     "/v1/system/setup": {
@@ -9239,7 +9243,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/v1/system/version": {
@@ -9261,7 +9266,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/v1/wallets": {
@@ -12582,6 +12588,9 @@
   "security": [
     {
       "jwt": []
+    },
+    {
+      "api_key": []
     }
   ],
   "tags": [

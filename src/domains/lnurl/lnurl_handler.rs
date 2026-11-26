@@ -47,6 +47,7 @@ pub fn router() -> Router<Arc<AppServices>> {
     path = "/{username}",
     tag = "LNURL",
     context_path = "/.well-known/lnurlp",
+    security(),
     responses(
         (status = 200, description = "Found", body = LnURLPayRequest),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
@@ -71,6 +72,7 @@ pub async fn well_known(
     tag = "LNURL",
     context_path = "/lnurlp",
     params(LNUrlpInvoiceQueryParams),
+    security(),
     responses(
         (status = 200, description = "Found", body = LnUrlCallback),
         (status = 400, description = "Bad Request", body = ErrorResponse, example = json!(BAD_REQUEST_EXAMPLE)),

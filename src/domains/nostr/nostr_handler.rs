@@ -33,6 +33,7 @@ pub struct NostrHandler;
     tag = "Nostr",
     context_path = "/.well-known",
     params(NostrNIP05QueryParams),
+    security(),
     responses(
         (status = 200, description = "Found", body = NostrNIP05Response),
         (status = 404, description = "Not Found", body = ErrorResponse, example = json!(NOT_FOUND_EXAMPLE)),
