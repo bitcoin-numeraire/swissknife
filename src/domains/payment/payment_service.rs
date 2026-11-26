@@ -1010,6 +1010,7 @@ mod tests {
             address: "bcrt1qrecipient".to_string(),
             used: false,
             dedicated: false,
+            description: None,
             address_type: BtcAddressType::P2wpkh,
             created_at: Utc::now(),
             updated_at: None,

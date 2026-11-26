@@ -1016,7 +1016,7 @@ async fn onchain_deposit_emits_pending_then_paid_once() {
     let conn = connect().await;
     let receiver = seed_wallet(&conn, 0).await;
     let address = SeaOrmBitcoinAddressRepository::new(conn.clone())
-        .insert(receiver, "bcrt1qeventdeposit", BtcAddressType::P2wpkh, false)
+        .insert(receiver, "bcrt1qeventdeposit", BtcAddressType::P2wpkh, false, None)
         .await
         .expect("insert deposit address");
     let projection = SeaOrmEventProjectionUnitOfWork::new(conn.clone());

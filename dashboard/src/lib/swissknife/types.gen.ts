@@ -222,6 +222,10 @@ export type BtcAddress = {
    */
   dedicated?: boolean;
   /**
+   * Optional description recorded on invoices for deposits to this address.
+   */
+  description?: string | null;
+  /**
    * Internal ID
    */
   id: string;
@@ -911,6 +915,10 @@ export type NewBtcAddressRequest = {
    * Derive a fresh address for this request and exclude it from future address reuse.
    */
   dedicated?: boolean;
+  /**
+   * Optional receipt description for a dedicated address.
+   */
+  description?: string | null;
   type?: BtcAddressType | null;
   /**
    * Wallet ID to receive into. Required by admin endpoints; derived from the path on wallet-scoped endpoints.

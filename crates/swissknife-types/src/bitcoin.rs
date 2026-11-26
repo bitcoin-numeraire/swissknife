@@ -21,6 +21,9 @@ pub struct BtcAddress {
     /// Issued for one receive request and excluded from the reusable address pool.
     #[serde(default)]
     pub dedicated: bool,
+    /// Optional description recorded on invoices for deposits to this address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     /// Address type
     pub address_type: BtcAddressType,
     /// Date of creation in database
@@ -104,6 +107,9 @@ pub struct NewBtcAddressRequest {
     /// Derive a fresh address for this request and exclude it from future address reuse.
     #[serde(default)]
     pub dedicated: bool,
+    /// Optional receipt description for a dedicated address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 /// Bitcoin address query filter.

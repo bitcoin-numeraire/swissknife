@@ -173,16 +173,20 @@ function Checkout({ wallet }: { wallet: Wallet }) {
     if (sound) unlockSound();
     try {
       const path = { wallet_id: wallet.id };
+      const memo = description.trim();
       const [lightning, onchain] = await Promise.allSettled([
         newWalletInvoice<true>({
           path,
           body: {
             amount_msat: amountSats * 1000,
-            description: description.trim(),
+            description: memo,
             expiry: saleDuration,
           },
         }),
-        newWalletBtcAddress<true>({ path, body: { dedicated: true } }),
+        newWalletBtcAddress<true>({
+          path,
+          body: { dedicated: true, description: memo || undefined },
+        }),
       ]);
       const bill = lightning.status === 'fulfilled' ? lightning.value.data : undefined;
       const output = onchain.status === 'fulfilled' ? onchain.value.data : undefined;
@@ -196,7 +200,7 @@ function Checkout({ wallet }: { wallet: Wallet }) {
       const next = {
         walletId: wallet.id,
         amountSats,
-        description: description.trim(),
+        description: memo,
         address,
         bolt11: bolt11 || undefined,
         invoiceId: bolt11 ? bill?.id : undefined,

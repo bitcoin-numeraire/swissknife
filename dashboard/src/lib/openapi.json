@@ -8685,6 +8685,13 @@
             "type": "boolean",
             "description": "Issued for one receive request and excluded from the reusable address pool."
           },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional description recorded on invoices for deposits to this address."
+          },
           "id": {
             "type": "string",
             "format": "uuid",
@@ -9691,6 +9698,13 @@
           "dedicated": {
             "type": "boolean",
             "description": "Derive a fresh address for this request and exclude it from future address reuse."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional receipt description for a dedicated address."
           },
           "type": {
             "oneOf": [

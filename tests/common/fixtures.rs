@@ -99,6 +99,7 @@ impl TestApp {
                 Auth::Bearer(token),
                 NewBtcAddressRequest {
                     dedicated: false,
+                    description: None,
                     wallet_id: Some(wallet_id),
                     address_type: None,
                 },

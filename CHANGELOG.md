@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Bitcoin receipts from merchant checkout retain the order reference entered by the cashier.
+
 - A merchant can collect the remaining sats on a partially paid checkout using the original sale address.
 
 - Merchants can present one Lightning and Bitcoin checkout QR and reopen the sale to recover settlement.

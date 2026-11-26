@@ -88,6 +88,7 @@ mod get_wallet {
                 Auth::Bearer(admin_token),
                 NewBtcAddressRequest {
                     dedicated: false,
+                    description: None,
                     wallet_id: Some(wallet.id),
                     address_type: Some(BtcAddressType::P2tr),
                 },

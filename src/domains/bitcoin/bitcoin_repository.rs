@@ -22,6 +22,7 @@ pub trait BtcAddressRepository: Send + Sync {
         address: &str,
         address_type: BtcAddressType,
         dedicated: bool,
+        description: Option<String>,
     ) -> Result<BtcAddress, DatabaseError>;
     async fn mark_used(&self, id: Uuid) -> Result<(), DatabaseError>;
     async fn delete_many(&self, filter: BtcAddressFilter) -> Result<u64, DatabaseError>;

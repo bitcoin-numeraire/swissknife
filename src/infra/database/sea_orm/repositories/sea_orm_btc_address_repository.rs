@@ -96,6 +96,7 @@ where
         address: &str,
         address_type: BtcAddressType,
         dedicated: bool,
+        description: Option<String>,
     ) -> Result<BtcAddress, DatabaseError> {
         let model = ActiveModel {
             id: Set(Uuid::new_v4()),
@@ -104,6 +105,7 @@ where
             address_type: Set(address_type.to_string()),
             used: Set(false),
             dedicated: Set(dedicated),
+            description: Set(description),
             ..Default::default()
         };
 
