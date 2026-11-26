@@ -62,8 +62,17 @@ jobs:
         shell: bash
         run: |
           npm exec --yes --package=@tauri-apps/cli@2.12.6 -- tauri build ${{ matrix.flags }} --config tests/predecessor.json --bundles ${{ matrix.installer }} -- --locked
-          mkdir "$RUNNER_TEMP/predecessor"
-          find target -type f -path '*/bundle/${{ matrix.installer }}/*0.0.1*' -exec mv '{}' "$RUNNER_TEMP/predecessor/" \;
+          python - <<'PYTHON'
+          import os
+          import shutil
+          from pathlib import Path
+          bundle = "${{ matrix.installer }}"
+          extension = "exe" if bundle == "nsis" else bundle
+          package, = Path("target").glob(f"**/bundle/{bundle}/*_0.0.1_*.{extension}")
+          destination = Path(os.environ["RUNNER_TEMP"]) / "predecessor"
+          destination.mkdir()
+          shutil.move(package, destination / package.name)
+          PYTHON
         env:
           NO_STRIP: 'true'
       - name: Package application
@@ -131,17 +140,20 @@ jobs:
           $installDir = Join-Path $env:RUNNER_TEMP SwissKnifeDesktop
           $executable = Join-Path $installDir swissknife-desktop.exe
           if (Test-Path $installDir) { throw "Expected a clean installation directory" }
-          $installers = @(
-            Get-Item "$env:RUNNER_TEMP/predecessor/*.exe" -ErrorAction Stop
-            Get-Item "target/release/bundle/nsis/*.exe" -ErrorAction Stop
-          )
-          foreach ($installer in $installers) {
-            $result = Start-Process $installer.FullName -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
+          $release = (Get-Content tauri.conf.json -Raw | ConvertFrom-Json).version
+          foreach ($version in @("0.0.1", $release)) {
+            $directory = if ($version -eq "0.0.1") { Join-Path $env:RUNNER_TEMP predecessor } else { "target/release/bundle/nsis" }
+            $installers = @(Get-ChildItem -LiteralPath $directory -Filter "*_${version}_*-setup.exe")
+            if ($installers.Count -ne 1) { throw "Expected one installer for $version in $directory" }
+            $result = Start-Process -FilePath ($installers[0].FullName) -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
             if ($result.ExitCode -ne 0) { throw "NSIS exited with $($result.ExitCode)" }
-            $version = (Get-Item $executable).VersionInfo.ProductVersion
-            if (!$version -or !$installer.Name.Contains("_${version}_")) { throw "Unexpected installed version ($version)" }
-            $mode = if ($installer.Directory.Name -eq "predecessor") { @("--initialize") } else { @() }
-            python tests/launch.py $executable @mode
+            $installed = (Get-Item $executable).VersionInfo.ProductVersion
+            if ($installed -ne $version) { throw "Expected $version, found $installed" }
+            if ($version -eq "0.0.1") {
+              python tests/launch.py $executable --initialize
+            } else {
+              python tests/launch.py $executable
+            }
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           python tests/launch.py $executable
