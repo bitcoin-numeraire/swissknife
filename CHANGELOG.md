@@ -10,7 +10,7 @@ release notes when a tag is published.
 
 ### Added
 
-- Connect to hosted and self-hosted SwissKnife dashboards from a native macOS, Windows or Linux client.
+- Connect to hosted and self-hosted SwissKnife dashboards from a native macOS, Windows or Linux client. The launcher follows the system language and offers English, French, German, Spanish, Italian and Portuguese.
 
 - Expose individual wallet-owned BOLT12 offers and their current state for publication integrations.
 
