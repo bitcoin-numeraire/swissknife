@@ -2,6 +2,9 @@
 * { box-sizing: border-box; }
 body { margin: 0; }
 main { max-width: 30rem; margin: auto; padding: 2.5rem 2rem; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+header label { margin-bottom: .2rem; }
+select { max-width: 100%; font: inherit; font-size: .875rem; color: inherit; background-color: transparent; border: 1px solid #919eab; border-radius: .5rem; padding: .4rem; }
 h1 { margin: 1rem 0 1.5rem; font-size: 1.65rem; line-height: 1.25; }
 label { display: block; font-size: .875rem; font-weight: 600; margin-bottom: .4rem; }
 input, button { width: 100%; font: inherit; border-radius: .5rem; padding: .7rem .85rem; }

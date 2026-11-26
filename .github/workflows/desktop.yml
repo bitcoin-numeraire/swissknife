@@ -44,6 +44,7 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: '24.22.3'
+      - run: node --test tests/languages.test.mjs
       - name: Install Linux packaging dependencies
         if: runner.os == 'Linux'
         run: |
