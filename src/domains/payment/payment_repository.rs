@@ -9,6 +9,12 @@ use super::{Payment, PaymentFilter, PaymentStatus};
 #[async_trait]
 pub trait PaymentRepository: Send + Sync {
     async fn find(&self, id: Uuid) -> Result<Option<Payment>, DatabaseError>;
+    /// Read pending Lightning payments in ID order, excluding commands awaiting their first dispatch.
+    async fn pending_lightning_hashes(
+        &self,
+        after: Option<Uuid>,
+        limit: u64,
+    ) -> Result<Vec<(Uuid, Option<String>)>, DatabaseError>;
     async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Payment>, DatabaseError>;
     async fn find_many(&self, filter: PaymentFilter) -> Result<Vec<Payment>, DatabaseError>;
     async fn insert(&self, payment: Payment) -> Result<Payment, DatabaseError>;

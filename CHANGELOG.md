@@ -21,6 +21,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Pending Lightning payments are checked against the provider in the background. A confirmed failure releases the wallet reservation, and a confirmed settlement records the final fee.
+
 - Reject monetary values outside the supported storage range and prevent wallet
   balance arithmetic from overflowing.
 

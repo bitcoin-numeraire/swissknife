@@ -43,6 +43,33 @@ where
         Ok(model.map(Into::into))
     }
 
+    async fn pending_lightning_hashes(
+        &self,
+        after: Option<Uuid>,
+        limit: u64,
+    ) -> Result<Vec<(Uuid, Option<String>)>, DatabaseError> {
+        use crate::infra::database::sea_orm::models::payment_command as command;
+        PaymentEntity::find()
+            .left_join(command::Entity)
+            .select_only()
+            .column(Column::Id)
+            .column(Column::PaymentHash)
+            .filter(Column::Status.eq(PaymentStatus::Pending.to_string()))
+            .filter(Column::Ledger.eq(swissknife_types::Ledger::Lightning.to_string()))
+            .filter(
+                sea_orm::Condition::any()
+                    .add(command::Column::Id.is_null())
+                    .add(command::Column::DispatchedAt.is_not_null()),
+            )
+            .apply_if(after, |q, id| q.filter(Column::Id.gt(id)))
+            .order_by_asc(Column::Id)
+            .limit(limit)
+            .into_tuple()
+            .all(self.db.connection())
+            .await
+            .map_err(|error| DatabaseError::FindMany(error.to_string()))
+    }
+
     async fn find_by_payment_hash(&self, payment_hash: &str) -> Result<Option<Payment>, DatabaseError> {
         let model = PaymentEntity::find()
             .filter(Column::PaymentHash.eq(payment_hash))

@@ -1175,10 +1175,21 @@ async fn payment_commands_reserve_once_claim_once_and_retain_deleted_keys() {
     assert_eq!(first.id, b.unwrap().payment.id);
     assert_eq!(balance(&conn, wallet).await, (69_000, 31_000));
 
+    let payments = SeaOrmPaymentRepository::new(conn.clone());
+    assert!(payments.pending_lightning_hashes(None, 1).await.unwrap().is_empty());
     let (a, b) = tokio::join!(uow.claim(), uow.claim());
     let claimed: Vec<_> = [a.unwrap(), b.unwrap()].into_iter().flatten().collect();
     assert_eq!(claimed.len(), 1);
     assert_eq!(claimed[0].payment.id, first.id);
+    assert_eq!(
+        payments.pending_lightning_hashes(None, 1).await.unwrap(),
+        vec![(first.id, first.lightning.as_ref().map(|ln| ln.payment_hash.clone()))]
+    );
+    assert!(payments
+        .pending_lightning_hashes(Some(first.id), 1)
+        .await
+        .unwrap()
+        .is_empty());
     let events = SeaOrmClientEventRepository::new(conn.clone())
         .find_after(account_id(&conn, wallet).await, 0, 10)
         .await
