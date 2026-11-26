@@ -30,7 +30,7 @@ runs:
         if [[ "$COLLECT_COVERAGE" == true ]]; then
           cargo llvm-cov clean --workspace
           make "$TARGET" CARGO_TEST='cargo llvm-cov test --no-report'
-          cargo llvm-cov report --lcov --output-path "$RUNNER_TEMP/coverage.info"
+          cargo llvm-cov report --package '*' --lcov --output-path "$RUNNER_TEMP/coverage.info"
         else
           make "$TARGET"
         fi
