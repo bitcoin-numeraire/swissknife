@@ -2,6 +2,8 @@ import type { Invoice } from 'src/lib/swissknife';
 
 import { z } from 'zod';
 
+import { composeBip21 } from 'src/utils/bitcoin-request';
+
 import { Ledger, InvoiceStatus } from 'src/lib/swissknife';
 
 const saleSchema = z
@@ -72,4 +74,32 @@ export function checkoutSettlement(sale: MerchantSale, invoices: Invoice[], now:
             ? 'expired'
             : 'waiting';
   return { status, receivedMsat, pendingMsat, invoiceIds: Array.from(confirmed.keys()) };
+}
+
+export function checkoutPaymentRequest(
+  sale: MerchantSale,
+  settlement: ReturnType<typeof checkoutSettlement>,
+  now: number
+) {
+  if (now >= sale.expiresAt) return undefined;
+  if (settlement.status === 'waiting') {
+    return {
+      uri: composeBip21(sale.address, sale.bolt11, sale.amountSats),
+      method:
+        sale.address && sale.bolt11
+          ? 'pos.unified'
+          : sale.address
+            ? 'pos.onchain'
+            : 'pos.lightning',
+      amountSats: sale.amountSats,
+    };
+  }
+  if (settlement.status !== 'partial' || !sale.address) return undefined;
+  const remainingSats = (sale.amountSats * 1000 - settlement.receivedMsat) / 1000;
+  if (!Number.isSafeInteger(remainingSats) || remainingSats <= 0) return undefined;
+  return {
+    uri: composeBip21(sale.address, undefined, remainingSats),
+    method: 'pos.onchain',
+    amountSats: remainingSats,
+  };
 }
