@@ -11,7 +11,8 @@
     "payments_other": "{{count}} Zahlungen",
     "empty": "In den letzten zwei Stunden wurden keine delegierten Zahlungen erfasst.",
     "back": "Zurück",
-    "next": "Weiter"
+    "next": "Weiter",
+    "above_warning": "Stündliche Warnschwelle überschritten"
   },
   "payment_review": {
     "title": "Zahlungsfreigaben",
@@ -1290,7 +1291,9 @@
     "input_help": "Beträge in Sats mit bis zu drei Nachkommastellen eingeben. Ein leeres Feld lässt Ausgaben im jeweiligen Zeitraum unbegrenzt zu. Null sperrt Ausgaben.",
     "cancel": "Abbrechen",
     "save": "Limits speichern",
-    "disable_help": "Ausgehende Zahlungen unterliegen diesen Limits dann nicht mehr. Bereits angerechnete Ausgaben bleiben erhalten."
+    "disable_help": "Ausgehende Zahlungen unterliegen diesen Limits dann nicht mehr. Bereits angerechnete Ausgaben bleiben erhalten.",
+    "agent_hourly_warning_msat": "Stündliche Warnschwelle pro Agent",
+    "warning_help": "Zeigt eine Warnung an, wenn ein Zugangsschlüssel innerhalb von 60 Minuten mehr als diesen Betrag ausgibt. Weitere Zahlungen sind möglich."
   },
   "spending_report": {
     "title": "Ausgabenbericht",

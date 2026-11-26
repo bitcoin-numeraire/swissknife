@@ -11,7 +11,8 @@
     "payments_other": "{{count}} pagos",
     "empty": "No se registraron pagos delegados en las últimas dos horas.",
     "back": "Anterior",
-    "next": "Siguiente"
+    "next": "Siguiente",
+    "above_warning": "Se ha superado el umbral de aviso por hora"
   },
   "payment_review": {
     "title": "Aprobaciones de pagos",
@@ -1290,7 +1291,9 @@
     "input_help": "Introduce importes en sats con hasta tres decimales. Deja un campo vacío para permitir gastos ilimitados en ese período. Cero bloquea los gastos.",
     "cancel": "Cancelar",
     "save": "Guardar límites",
-    "disable_help": "Se permitirán pagos salientes sin estos límites. Se conservarán los gastos ya contabilizados."
+    "disable_help": "Se permitirán pagos salientes sin estos límites. Se conservarán los gastos ya contabilizados.",
+    "agent_hourly_warning_msat": "Umbral de aviso por hora y por agente",
+    "warning_help": "Muestra un aviso cuando una credencial gasta más de este importe en 60 minutos. Los pagos pueden continuar."
   },
   "spending_report": {
     "title": "Informe de gastos",
