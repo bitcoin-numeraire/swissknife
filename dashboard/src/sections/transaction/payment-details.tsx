@@ -21,6 +21,7 @@ import { useTranslate } from 'src/locales';
 
 import { CopyButton } from 'src/components/copy';
 import { SatsWithIcon } from 'src/components/bitcoin';
+import { useSettingsContext } from 'src/components/settings';
 
 import { TransactionType } from 'src/types/transaction';
 
@@ -54,8 +55,9 @@ export function PaymentDetails({ payment, isAdmin }: Props) {
   const amountSent = payment.amount_msat || 0;
   const feeAmount = payment.fee_msat || 0;
   const totalAmount = amountSent + feeAmount;
+  const { state } = useSettingsContext();
   const feeHelper =
-    feeAmount % 1000 !== 0
+    !state.hideBalances && feeAmount % 1000 !== 0
       ? t('payment_details.exact_msats', { amount: fSats(feeAmount) })
       : undefined;
   const methodLabel = getLedgerLabel(payment.ledger, t);

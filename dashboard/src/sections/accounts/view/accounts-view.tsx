@@ -50,6 +50,7 @@ import { Iconify } from 'src/components/iconify';
 import { SatsWithIcon } from 'src/components/bitcoin';
 import { ErrorView } from 'src/components/error/error-view';
 import { EmptyContent } from 'src/components/empty-content';
+import { useSettingsContext } from 'src/components/settings';
 import { RegisterWalletDrawer } from 'src/components/wallet';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -120,6 +121,7 @@ function WalletAssetIcon({ wallet }: { wallet: Wallet }) {
 }
 
 function WalletBalance({ wallet }: { wallet: Wallet }) {
+  const { state } = useSettingsContext();
   if (!wallet.asset || wallet.asset.protocol === 'bitcoin') {
     return (
       <SatsWithIcon
@@ -135,7 +137,9 @@ function WalletBalance({ wallet }: { wallet: Wallet }) {
 
   return (
     <Typography variant="h4" sx={{ fontWeight: 400 }}>
-      {fSats(amount, { maximumFractionDigits: Math.min(wallet.asset.decimals, 8) })}{' '}
+      {state.hideBalances
+        ? '••••'
+        : fSats(amount, { maximumFractionDigits: Math.min(wallet.asset.decimals, 8) })}{' '}
       <Typography component="span" variant="subtitle2" color="text.secondary">
         {wallet.asset.display_ticker}
       </Typography>
