@@ -166,6 +166,28 @@ mod stream {
     use super::*;
 
     #[tokio::test]
+    async fn graceful_shutdown_finishes_an_open_account_event_stream() {
+        let app = TestApp::isolated(&unique("event-shutdown"), &[]).await;
+        let mut response = app
+            .api()
+            .event_stream("/v1/me/events", Auth::Bearer(app.admin_token().await), None)
+            .await;
+        assert_stream_headers(&response);
+
+        app.request_shutdown();
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while response
+                .chunk()
+                .await
+                .expect("read event stream during shutdown")
+                .is_some()
+            {}
+        })
+        .await
+        .expect("subscribed client should receive EOF during graceful shutdown");
+    }
+
+    #[tokio::test]
     async fn closes_an_open_stream_after_its_api_key_is_revoked() {
         let app = app().await;
         let admin = app.admin_token().await;

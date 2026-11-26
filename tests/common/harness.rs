@@ -198,6 +198,16 @@ impl TestApp {
         }
     }
 
+    /// Ask this instance to drain its HTTP connections as it would during a deployment.
+    pub fn request_shutdown(&self) {
+        let status = std::process::Command::new("kill")
+            .arg("-TERM")
+            .arg(self.process_id.to_string())
+            .status()
+            .expect("signal SwissKnife process");
+        assert!(status.success(), "SwissKnife should receive SIGTERM");
+    }
+
     /// Stop this process without removing its database, for recovery scenarios.
     pub fn stop(&self) {
         let child = {
