@@ -22,6 +22,10 @@ release notes when a tag is published.
 
 - Receive requests can allocate a dedicated Bitcoin deposit address that ordinary receive flows will never reuse.
 
+### Fixed
+
+- Keep the current checkout open while its receipts refresh so the next sale retains both Lightning and Bitcoin payment details.
+
 ## [0.3.5] - 2026-11-21
 
 ### Fixed
