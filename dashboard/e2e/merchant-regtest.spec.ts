@@ -320,12 +320,16 @@ test('a reopened Lightning sale retains the Bitcoin receipt that loads last', as
     await requested;
     await expect(page.getByRole('heading', { name: 'Payment received' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Open payment details' })).toHaveCount(1);
+    await expect(page.getByText(/over the order total/)).toHaveCount(0);
     await expect(nextSale).toBeDisabled();
   } finally {
     release();
     await page.unrouteAll({ behavior: 'wait' });
   }
   await expect(page.getByRole('link', { name: 'Open payment details' })).toHaveCount(2);
+  await expect(
+    page.getByRole('alert').filter({ hasText: '1,000 sats over the order total' })
+  ).toBeVisible();
   await nextSale.click();
   await page.reload();
   const previous = page.getByRole('link', { name: 'Last completed sale' });

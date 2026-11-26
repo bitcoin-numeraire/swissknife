@@ -6,6 +6,7 @@ import { Ledger, InvoiceStatus } from 'src/lib/swissknife';
 
 import {
   checkoutAmount,
+  formatCheckoutSats,
   checkoutSettlement,
   restoreMerchantSale,
   checkoutPaymentRequest,
@@ -43,7 +44,7 @@ it.each([Ledger.INTERNAL, Ledger.LIGHTNING])(
     const paid = invoice('ln', ledger, InvoiceStatus.SETTLED, 27000);
     expect(checkoutSettlement(sale, [paid, paid], 0)).toMatchObject({
       status: 'paid',
-      receivedMsat: 27000,
+      receivedMsat: BigInt(27000),
       invoiceIds: ['ln'],
     });
   }
@@ -54,17 +55,17 @@ it('tracks pending outputs and combines distinct settled outputs only once', () 
   const rest = { ...confirmed, id: 'second', amount_msat: 12000 };
   expect(checkoutSettlement(sale, [pending], 1235)).toMatchObject({
     status: 'incoming',
-    pendingMsat: 15000,
-    receivedMsat: 0,
+    pendingMsat: BigInt(15000),
+    receivedMsat: BigInt(0),
   });
   expect(checkoutSettlement(sale, [confirmed, pending], 1235)).toMatchObject({
     status: 'partial',
-    pendingMsat: 0,
-    receivedMsat: 15000,
+    pendingMsat: BigInt(0),
+    receivedMsat: BigInt(15000),
   });
   expect(checkoutSettlement(sale, [confirmed, rest, confirmed], 1235)).toMatchObject({
     status: 'paid',
-    receivedMsat: 27000,
+    receivedMsat: BigInt(27000),
   });
 });
 it('isolates cancelled, subsequent and other wallets’ sales on replay', () => {
@@ -86,11 +87,11 @@ it('combines an internal Bitcoin receipt with a chain deposit at the same sale a
   const deposit = invoice('deposit', Ledger.ONCHAIN, InvoiceStatus.SETTLED, 15000, sale.address);
   expect(checkoutSettlement(sale, [other, foreign, local, local], 0)).toMatchObject({
     status: 'partial',
-    receivedMsat: 12000,
+    receivedMsat: BigInt(12000),
   });
   expect(checkoutSettlement(sale, [deposit, local, local], 0)).toMatchObject({
     status: 'paid',
-    receivedMsat: 27000,
+    receivedMsat: BigInt(27000),
     invoiceIds: ['deposit', 'internal'],
   });
 });
@@ -151,4 +152,31 @@ it('restores split receipts and previous single-receipt sessions', () => {
   for (const invalid of [null, '', '{', '[]', '["invalid"]', '42']) {
     expect(restoreCheckoutReceipts(invalid)).toEqual([]);
   }
+});
+
+it('reports only confirmed excess, including a fraction of a sat, across replay', () => {
+  const bill = invoice('ln', Ledger.LIGHTNING, InvoiceStatus.SETTLED, 27000);
+  const deposit = invoice('extra', Ledger.ONCHAIN, InvoiceStatus.PENDING, 1000, sale.address);
+  const settled = { ...deposit, status: InvoiceStatus.SETTLED };
+  expect(checkoutSettlement(sale, [bill, deposit], 0).excessMsat).toBe(BigInt(0));
+  const extra = checkoutSettlement(
+    sale,
+    [{ ...bill, amount_received_msat: 27001 }, settled, settled],
+    0
+  );
+  expect(extra.excessMsat).toBe(BigInt(1001));
+  expect(formatCheckoutSats(extra.excessMsat, 'fr-FR')).toBe('1,001');
+});
+
+it('keeps the exact excess when individually safe receipts sum above the JavaScript integer limit', () => {
+  const bill = invoice('ln', Ledger.LIGHTNING, InvoiceStatus.SETTLED, Number.MAX_SAFE_INTEGER);
+  const deposit = invoice(
+    'extra',
+    Ledger.ONCHAIN,
+    InvoiceStatus.SETTLED,
+    Number.MAX_SAFE_INTEGER,
+    sale.address
+  );
+  const result = checkoutSettlement(sale, [bill, deposit], 0);
+  expect(formatCheckoutSats(result.excessMsat, 'en-US')).toBe('18,014,398,509,454.982');
 });

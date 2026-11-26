@@ -36,6 +36,7 @@ import { LoadingScreen } from 'src/components/loading-screen';
 
 import {
   checkoutAmount,
+  formatCheckoutSats,
   checkoutSettlement,
   restoreMerchantSale,
   checkoutPaymentRequest,
@@ -45,7 +46,7 @@ import {
 const saleDuration = 15 * 60;
 
 function Checkout({ wallet }: { wallet: Wallet }) {
-  const { t } = useTranslate();
+  const { t, currentLang } = useTranslate();
   const sessionKey = 'swissknife.pos.' + wallet.id;
   const feedbackKey = 'swissknife.pos.feedback.' + wallet.account_id;
   const [ready, setReady] = useState(false);
@@ -337,15 +338,33 @@ function Checkout({ wallet }: { wallet: Wallet }) {
               )}
               {settlement?.status === 'incoming' && (
                 <Typography>
-                  {t('pos.pending_amount', { amount: fSats(settlement.pendingMsat / 1000) })}
+                  {t('pos.pending_amount', {
+                    amount: formatCheckoutSats(
+                      settlement.pendingMsat,
+                      currentLang.numberFormat.code
+                    ),
+                  })}
                 </Typography>
               )}
               {settlement && settlement.receivedMsat > 0 && (
                 <Typography>
                   {t('pos.received', {
-                    amount: fSats(settlement.receivedMsat / 1000, { maximumFractionDigits: 3 }),
+                    amount: formatCheckoutSats(
+                      settlement.receivedMsat,
+                      currentLang.numberFormat.code
+                    ),
                   })}
                 </Typography>
+              )}
+              {settlement && settlement.excessMsat > 0 && (
+                <Alert severity="warning">
+                  {t('pos.excess', {
+                    amount: formatCheckoutSats(
+                      settlement.excessMsat,
+                      currentLang.numberFormat.code
+                    ),
+                  })}
+                </Alert>
               )}
               {paymentRequest && (
                 <>
