@@ -1,4 +1,4 @@
-use super::models::{spending_entry as entry, wallet_agent_key as key};
+use super::models::{spending_entry as entry, spending_policy as policy, wallet_agent_key as key};
 use crate::application::errors::DatabaseError;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use futures_util::TryStreamExt;
@@ -18,11 +18,14 @@ pub(super) async fn page(
     let end = as_of.naive_utc();
     let hour = Duration::hours(1);
     let mut query = entry::Entity::find()
+        .inner_join(policy::Entity)
         .select_only()
         .column(entry::Column::AgentKeyId)
         .column(entry::Column::WalletId)
         .column(entry::Column::AdmittedAt)
         .column(entry::Column::ChargedMsat)
+        .column(policy::Column::Enabled)
+        .column(policy::Column::AgentHourlyWarningMsat)
         .filter(entry::Column::AccountId.eq(account))
         .filter(entry::Column::AgentKeyId.is_not_null())
         .filter(entry::Column::AdmittedAt.gt(end - hour * 2))
@@ -31,11 +34,11 @@ pub(super) async fn page(
     if let Some(after) = after {
         query = query.filter(entry::Column::AgentKeyId.gt(after));
     }
-    let selector = query.into_tuple::<(Uuid, Option<Uuid>, NaiveDateTime, i64)>();
+    let selector = query.into_tuple::<(Uuid, Option<Uuid>, NaiveDateTime, i64, bool, Option<i64>)>();
     let mut rows = selector.stream(db).await.map_err(fail)?;
     let mut agents = BTreeMap::new();
     let mut next_after = None;
-    while let Some((id, wallet_id, at, charge)) = rows.try_next().await.map_err(fail)? {
+    while let Some((id, wallet_id, at, charge, enabled, warning)) = rows.try_next().await.map_err(fail)? {
         if agents.len() == limit as usize && !agents.contains_key(&id) {
             next_after = agents.last_key_value().map(|(id, _)| *id);
             break;
@@ -46,6 +49,7 @@ pub(super) async fn page(
             name: None,
             current_hour: Default::default(),
             previous_hour: Default::default(),
+            above_hourly_warning: false,
         });
         let bucket = if at > end - hour {
             &mut row.current_hour
@@ -55,6 +59,8 @@ pub(super) async fn page(
         bucket.payments += 1;
         bucket.charged_msat +=
             u128::try_from(charge).map_err(|_| DatabaseError::FindMany("Negative agent spending charge".into()))?;
+        row.above_hourly_warning =
+            enabled && warning.is_some_and(|limit| row.current_hour.charged_msat > u128::from(limit as u64));
     }
     // SQLite can use a single connection. Release the stream before querying labels.
     drop(rows);

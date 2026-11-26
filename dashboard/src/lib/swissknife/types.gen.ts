@@ -105,6 +105,10 @@ export type AgentKey = {
 };
 
 export type AgentSpendingActivity = {
+  /**
+   * The credential's current-hour charges exceed the active policy's warning threshold.
+   */
+  above_hourly_warning?: boolean;
   agent_key_id: string;
   current_hour: AgentActivityHour;
   /**
@@ -1471,13 +1475,18 @@ export type SpendingInterval = (typeof SpendingInterval)[keyof typeof SpendingIn
 
 /**
  * Account-wide limits, including fees. Amounts are decimal millisatoshi strings.
- * Omitted limits are unrestricted. Zero blocks positive payments.
+ * Omitted rules are inactive. A zero cap blocks positive payments.
  */
 export type SpendingLimits = {
   /**
    * Maximum charged to each delegated credential over a rolling hour, including fees.
    */
   agent_hourly_msat?: string | null;
+  /**
+   * Flag credentials whose charges exceed this amount in the current rolling hour.
+   * This warning only affects the activity report.
+   */
+  agent_hourly_warning_msat?: string | null;
   /**
    * Delegated payments above this fee-inclusive threshold require operator approval.
    */

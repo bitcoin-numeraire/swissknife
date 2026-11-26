@@ -3,7 +3,7 @@ use serde_with::{serde_as, DisplayFromStr};
 use utoipa::ToSchema;
 
 /// Account-wide limits, including fees. Amounts are decimal millisatoshi strings.
-/// Omitted limits are unrestricted. Zero blocks positive payments.
+/// Omitted rules are inactive. A zero cap blocks positive payments.
 #[serde_as]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -24,6 +24,12 @@ pub struct SpendingLimits {
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = Option<String>, example = "500000")]
     pub agent_hourly_msat: Option<u64>,
+    /// Flag credentials whose charges exceed this amount in the current rolling hour.
+    /// This warning only affects the activity report.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = Option<String>, example = "500000")]
+    pub agent_hourly_warning_msat: Option<u64>,
     /// Delegated payments above this fee-inclusive threshold require operator approval.
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = Option<String>)]
@@ -115,6 +121,9 @@ pub struct AgentSpendingActivity {
     pub name: Option<String>,
     pub current_hour: AgentActivityHour,
     pub previous_hour: AgentActivityHour,
+    /// The credential's current-hour charges exceed the active policy's warning threshold.
+    #[serde(default)]
+    pub above_hourly_warning: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]

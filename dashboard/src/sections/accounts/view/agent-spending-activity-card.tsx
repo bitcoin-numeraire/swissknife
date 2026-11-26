@@ -25,6 +25,8 @@ import { useTranslate } from 'src/locales';
 import { endpointKeys } from 'src/actions/keys';
 import { getAgentSpendingActivity } from 'src/lib/swissknife';
 
+import { Label } from 'src/components/label';
+
 import { satsFromMsat } from './spending-limits';
 
 export function AgentSpendingActivityCard({ accountId }: { accountId: string }) {
@@ -91,6 +93,13 @@ export function AgentSpendingActivityCard({ accountId }: { accountId: string }) 
                           <Typography variant="caption" color="text.secondary">
                             {t('agent_activity.payments', { count: hour.payments })}
                           </Typography>
+                          {index === 0 && row.above_hourly_warning && (
+                            <Box>
+                              <Label color="warning" variant="soft">
+                                {t('agent_activity.above_warning')}
+                              </Label>
+                            </Box>
+                          )}
                         </TableCell>
                       ))}
                     </TableRow>

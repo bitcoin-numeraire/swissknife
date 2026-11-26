@@ -4,6 +4,7 @@ export const periods = ['daily_msat', 'weekly_msat', 'monthly_msat'] as const;
 export const limitFields = [
   'per_payment_msat',
   'agent_hourly_msat',
+  'agent_hourly_warning_msat',
   'approval_above_msat',
   ...periods,
 ] as const;
@@ -44,7 +45,7 @@ export const policyTemplates = [
   },
 ] as const satisfies ReadonlyArray<{
   name: string;
-  limits: Omit<LimitsForm, 'approval_above_msat'>;
+  limits: Omit<LimitsForm, 'approval_above_msat' | 'agent_hourly_warning_msat'>;
 }>;
 
 export function satsFromMsat(msat: string): string {

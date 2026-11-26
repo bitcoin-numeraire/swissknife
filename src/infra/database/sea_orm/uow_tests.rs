@@ -1786,7 +1786,7 @@ async fn agent_activity_separates_adjacent_rolling_hours_and_sums_large_reservat
     repo.replace(
         account,
         swissknife_types::SpendingLimits {
-            per_payment_msat: Some(100),
+            agent_hourly_warning_msat: Some(i64::MAX as u64),
             ..Default::default()
         },
     )
@@ -1825,4 +1825,13 @@ async fn agent_activity_separates_adjacent_rolling_hours_and_sums_large_reservat
         (row.current_hour.payments, row.current_hour.charged_msat),
         (3, 3 * i64::MAX as u128)
     );
+    assert!(row.above_hourly_warning);
+    let later = repo
+        .activity(account, at + chrono::Duration::hours(1), None, 1)
+        .await
+        .unwrap();
+    let row = &later.items[0];
+    assert_eq!(row.current_hour.charged_msat, 11);
+    assert_eq!(row.previous_hour.charged_msat, 3 * i64::MAX as u128);
+    assert!(!row.above_hourly_warning);
 }

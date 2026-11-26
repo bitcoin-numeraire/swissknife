@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Operators can flag credentials that spend above an hourly warning threshold while payments continue under the account’s usual limits.
+
 - Operators can compare the current and previous hour of delegated spending per credential, including outstanding reservations and retained activity after revocation.
 
 - Require an operator decision before a delegated wallet payment above an account threshold can be admitted.
