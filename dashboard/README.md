@@ -26,6 +26,14 @@ yarn dev
 The development server listens on <http://localhost:8080>. Point it at a backend
 with `NEXT_PUBLIC_SERVER_URL`, for example `http://localhost:3000`.
 
+## Dashboard icons
+
+`yarn dev` and `yarn build` prepare the Iconify collections and country flags under
+`public/assets/dashboard-icons/`. Use a complete icon name such as `solar:eye-bold`
+in the dashboard source. Restart the dev server after adding an icon name. To add
+a collection, pin its `@iconify-json` package, include its prefix in
+`prepare-assets.mjs` and update [the icon credits](public/licenses/dashboard-icons.txt).
+
 ## Production configuration
 
 The checked-in `.env.production` is the Numeraire hosted Auth0 profile. Set its

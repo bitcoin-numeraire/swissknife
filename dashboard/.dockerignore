@@ -58,3 +58,4 @@ docker-compose.yml
 
 # Build scripts and configurations
 scripts/
+public/assets/dashboard-icons

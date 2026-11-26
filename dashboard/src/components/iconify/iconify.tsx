@@ -4,8 +4,8 @@ import type { IconProps } from '@iconify/react';
 import type { Theme, SxProps } from '@mui/material/styles';
 
 import { forwardRef } from 'react';
-import { Icon } from '@iconify/react';
 import { mergeClasses } from 'minimal-shared/utils';
+import { Icon, addAPIProvider } from '@iconify/react';
 
 import NoSsr from '@mui/material/NoSsr';
 import { styled } from '@mui/material/styles';
@@ -13,6 +13,12 @@ import { styled } from '@mui/material/styles';
 import { iconifyClasses } from './classes';
 
 // ----------------------------------------------------------------------
+
+// Iconify requests a collection by prefix. Both dashboard builds serve these locally.
+addAPIProvider('', {
+  resources: [''],
+  path: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/assets/dashboard-icons/`,
+});
 
 export type IconifyProps = React.ComponentProps<typeof IconRoot> & IconProps;
 

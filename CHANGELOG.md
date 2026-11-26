@@ -10,6 +10,7 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Self-hosted dashboards serve wallet icons and country flags locally.
 - The all-in-one image opens its local wallet and API by default.
 
 ## [0.3.5] - 2026-11-21
