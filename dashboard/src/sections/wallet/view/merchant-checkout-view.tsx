@@ -21,7 +21,6 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import { paths } from 'src/routes/paths';
 
 import { fSats } from 'src/utils/format-number';
-import { composeBip21 } from 'src/utils/bitcoin-request';
 
 import { CONFIG } from 'src/global-config';
 import { useTranslate } from 'src/locales';
@@ -35,7 +34,12 @@ import {
 import { CopyButton } from 'src/components/copy';
 import { LoadingScreen } from 'src/components/loading-screen';
 
-import { checkoutAmount, checkoutSettlement, restoreMerchantSale } from '../merchant-checkout';
+import {
+  checkoutAmount,
+  checkoutSettlement,
+  restoreMerchantSale,
+  checkoutPaymentRequest,
+} from '../merchant-checkout';
 
 const saleDuration = 15 * 60;
 
@@ -87,7 +91,10 @@ function Checkout({ wallet }: { wallet: Wallet }) {
     };
   }, [sale]);
 
-  const { invoice, invoiceError } = useGetWalletInvoice(sale?.invoiceId ?? '', wallet.id);
+  const { invoice, invoiceError, invoiceValidating } = useGetWalletInvoice(
+    sale?.invoiceId ?? '',
+    wallet.id
+  );
   const deposits = useListWalletInvoices(
     { bitcoin_address: sale?.address },
     wallet.id,
@@ -211,10 +218,12 @@ function Checkout({ wallet }: { wallet: Wallet }) {
   };
 
   if (!ready) return <LoadingScreen />;
-  const qr =
-    sale && settlement?.status === 'waiting'
-      ? composeBip21(sale.address, sale.bolt11, sale.amountSats)
-      : undefined;
+  const receiptsReady =
+    (!sale?.invoiceId || (invoice?.id === sale.invoiceId && !invoiceError && !invoiceValidating)) &&
+    (!sale?.address ||
+      (deposits.invoices && !deposits.invoicesError && !deposits.invoicesValidating));
+  const paymentRequest =
+    sale && settlement && receiptsReady ? checkoutPaymentRequest(sale, settlement, now) : undefined;
   return (
     <Stack spacing={3} sx={{ width: '100%', maxWidth: 480, mx: 'auto', px: 2.5, pb: 4 }}>
       <Typography variant="overline" color="text.secondary">
@@ -315,7 +324,7 @@ function Checkout({ wallet }: { wallet: Wallet }) {
                   })}
                 </Typography>
               )}
-              {qr && (
+              {paymentRequest && (
                 <>
                   <Box
                     sx={{
@@ -330,19 +339,15 @@ function Checkout({ wallet }: { wallet: Wallet }) {
                       },
                     }}
                   >
-                    <QRCode value={qr} size={384} quietZone={12} />
+                    <QRCode value={paymentRequest.uri} size={384} quietZone={12} />
                   </Box>
                   <Stack direction="row" sx={{ alignItems: 'center' }}>
                     <Typography variant="body2">
-                      {t(
-                        sale.address && sale.bolt11
-                          ? 'pos.unified'
-                          : sale.address
-                            ? 'pos.onchain'
-                            : 'pos.lightning'
-                      )}
+                      {t(paymentRequest.method)}
+                      {settlement?.status === 'partial' &&
+                        ` · ${fSats(paymentRequest.amountSats)} sats`}
                     </Typography>
-                    <CopyButton value={qr} title={t('copy')} />
+                    <CopyButton value={paymentRequest.uri} title={t('copy')} />
                   </Stack>
                 </>
               )}

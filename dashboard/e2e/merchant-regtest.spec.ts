@@ -18,7 +18,7 @@ async function bitcoin(request: APIRequestContext, method: string, params: unkno
   return payload.result;
 }
 
-test('a merchant can recover a paid regtest sale and immediately start another', async ({
+test('a merchant can recover a partial regtest sale, collect the balance and start another', async ({
   page,
   request,
 }) => {
@@ -54,25 +54,61 @@ test('a merchant can recover a paid regtest sale and immediately start another',
   await expect(page.getByText('Bitcoin or Lightning', { exact: true })).toBeVisible();
   const destination = await (await address).json();
   expect(destination.dedicated).toBe(true);
-  await bitcoin(request, 'sendtoaddress', [destination.address, 0.00025]);
+  await bitcoin(request, 'sendtoaddress', [destination.address, 0.0001]);
   if (process.env.SWISSKNIFE_ITEST_PROVIDER?.startsWith('lnd')) {
     await expect(page.getByRole('heading', { name: 'Payment detected' })).toBeVisible({
       timeout: 20000,
     });
   }
-  // The tab misses settlement entirely and must recover from durable invoice state.
+  // Credit the first transfer while the checkout is suspended.
   await page.goto('about:blank');
-  await bitcoin(request, 'generatetoaddress', [
-    6,
-    await bitcoin(request, 'getnewaddress', ['pos', 'bech32']),
+  const miningAddress = await bitcoin(request, 'getnewaddress', ['pos', 'bech32']);
+  await bitcoin(request, 'generatetoaddress', [6, miningAddress]);
+  const history = (url: URL) =>
+    url.pathname.endsWith('/invoices') &&
+    url.searchParams.get('bitcoin_address') === destination.address;
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(history, async (route) => {
+    await held;
+    await route.continue();
+  });
+  const requested = page.waitForRequest((req) => history(new URL(req.url())));
+  try {
+    await page.goto(dashboard + '/wallet/pos', { waitUntil: 'domcontentloaded' });
+    await requested;
+    await expect(page.getByRole('heading', { name: 'Waiting for payment' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Copy', exact: true })).toHaveCount(0);
+    await expect(page.locator('canvas')).toHaveCount(0);
+  } finally {
+    release();
+    await page.unrouteAll({ behavior: 'wait' });
+  }
+  await expect(page.getByRole('heading', { name: 'Partial payment' })).toBeVisible({
+    timeout: 30000,
+  });
+  await expect(page.getByText('On-chain Bitcoin · 15,000 sats')).toBeVisible();
+  await page
+    .context()
+    .grantPermissions(['clipboard-read', 'clipboard-write'], { origin: dashboard! });
+  await page.getByRole('button', { name: 'Copy', exact: true }).click();
+  const remaining = await page.evaluate(() => navigator.clipboard.readText());
+  expect(remaining).toBe(`bitcoin:${destination.address}?amount=0.00015`);
+  const payment = new URL(remaining);
+  await bitcoin(request, 'sendtoaddress', [
+    payment.pathname,
+    Number(payment.searchParams.get('amount')),
   ]);
-  await page.goto(dashboard + '/wallet/pos');
+  await bitcoin(request, 'generatetoaddress', [6, miningAddress]);
   await expect(page.getByRole('heading', { name: 'Payment received' })).toBeVisible({
     timeout: 30000,
   });
-  const detail = await page
-    .getByRole('link', { name: 'Open payment details' })
-    .getAttribute('href');
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toHaveCount(0);
+  const receipts = page.getByRole('link', { name: 'Open payment details' });
+  await expect(receipts).toHaveCount(2);
+  const detail = await receipts.first().getAttribute('href');
   await page.getByRole('button', { name: 'Next sale' }).click();
   await expect(page.getByRole('link', { name: 'Last completed sale' })).toHaveAttribute(
     'href',

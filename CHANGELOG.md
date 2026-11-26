@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- A merchant can collect the remaining sats on a partially paid checkout using the original sale address.
+
 - Merchants can present one Lightning and Bitcoin checkout QR and reopen the sale to recover settlement.
 
 - Receive requests can allocate a dedicated Bitcoin deposit address that ordinary receive flows will never reuse.

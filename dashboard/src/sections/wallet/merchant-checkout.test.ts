@@ -4,7 +4,12 @@ import { it, expect } from 'vitest';
 
 import { Ledger, InvoiceStatus } from 'src/lib/swissknife';
 
-import { checkoutAmount, checkoutSettlement, restoreMerchantSale } from './merchant-checkout';
+import {
+  checkoutAmount,
+  checkoutSettlement,
+  restoreMerchantSale,
+  checkoutPaymentRequest,
+} from './merchant-checkout';
 
 const sale = {
   walletId: 'merchant',
@@ -82,4 +87,39 @@ it('requires whole positive sats representable in millisatoshis', () => {
   expect(checkoutAmount('123')).toBe(123);
   for (const invalid of ['0', '2.5', '-3', '', '1e3', '9007199254741'])
     expect(checkoutAmount(invalid)).toBeUndefined();
+});
+
+it('offers only the unpaid whole-sat balance after a confirmed deposit', () => {
+  const pending = invoice('part', Ledger.ONCHAIN, InvoiceStatus.PENDING, 15000, sale.address);
+  const confirmed = { ...pending, status: InvoiceStatus.SETTLED };
+  const request = (invoices: Invoice[], now = 1) =>
+    checkoutPaymentRequest(sale, checkoutSettlement(sale, invoices, now), now);
+
+  expect(request([])?.uri).toBe('bitcoin:bcrt1sale?amount=0.00000027&lightning=lnbcrt');
+  expect(request([pending])).toBeUndefined();
+  expect(request([confirmed, pending, confirmed])).toEqual({
+    uri: 'bitcoin:bcrt1sale?amount=0.00000012',
+    method: 'pos.onchain',
+    amountSats: 12,
+  });
+  const rest = { ...pending, id: 'rest', amount_msat: 12000 };
+  expect(request([confirmed, rest])).toBeUndefined();
+  expect(request([confirmed, { ...rest, status: InvoiceStatus.SETTLED }])).toBeUndefined();
+  expect(request([confirmed], sale.expiresAt)).toBeUndefined();
+  expect(request([{ ...confirmed, amount_msat: 15001 }])).toBeUndefined();
+});
+
+it('retains the original rail for an unpaid single-method sale', () => {
+  const onchain = { ...sale, bolt11: undefined, invoiceId: undefined };
+  const lightning = { ...sale, address: undefined };
+  expect(checkoutPaymentRequest(onchain, checkoutSettlement(onchain, [], 1), 1)).toEqual({
+    uri: 'bitcoin:bcrt1sale?amount=0.00000027',
+    method: 'pos.onchain',
+    amountSats: 27,
+  });
+  expect(checkoutPaymentRequest(lightning, checkoutSettlement(lightning, [], 1), 1)).toEqual({
+    uri: 'lnbcrt',
+    method: 'pos.lightning',
+    amountSats: 27,
+  });
 });
