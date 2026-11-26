@@ -1,5 +1,5 @@
 use reqwest::StatusCode;
-use swissknife_types::{NodeOverview, Permission};
+use swissknife_types::{NodeAlert, NodeOverview, Permission};
 
 use crate::common::{app, assert_status, Auth};
 
@@ -16,12 +16,20 @@ async fn scoped_read_reports_live_regtest_peers_channels_and_balances() {
         StatusCode::FORBIDDEN,
     );
 
+    let wallet = app.create_wallet(admin, "node-health-deposit").await;
+    let deposit_sat = 15_000;
+    app.fund_onchain(admin, wallet.id, deposit_sat).await;
+
     let node_reader = app.api_key(admin, vec![Permission::ReadLnNode]).await;
     let response = api.get(path, Auth::ApiKey(&node_reader)).await;
     assert_status(&response, StatusCode::OK);
     let node = response.parse::<NodeOverview>();
-    assert!(node.alerts.is_empty(), "{node:?}");
     let info = node.info.unwrap();
+    if info.synced_to_chain {
+        assert!(node.alerts.is_empty(), "{:?}", node.alerts);
+    } else {
+        assert_eq!(node.alerts, [NodeAlert::ChainNotSynced]);
+    }
     assert_eq!(info.network, "regtest");
     assert!(info.block_height > 0);
     let peers = node.peers.unwrap();
@@ -33,6 +41,6 @@ async fn scoped_read_reports_live_regtest_peers_channels_and_balances() {
     assert!(peers.iter().any(|peer| peer.connected && peer.id == active.peer_id));
     let liquidity = node.liquidity.unwrap();
     assert!(liquidity.outbound_msat.unwrap() + liquidity.inbound_msat.unwrap() > 0);
-    assert!(node.onchain.unwrap().confirmed_sat > 0);
+    assert!(node.onchain.unwrap().confirmed_sat >= deposit_sat);
     assert!(response.body["liquidity"]["outbound_msat"].is_string());
 }
