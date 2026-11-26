@@ -1197,6 +1197,7 @@
     "expired": "Zahlungsanfrage abgelaufen",
     "paid": "Zahlung erhalten",
     "pending_amount": "{{amount}} Sats warten auf Bestätigung",
+    "excess": "{{amount}} Sats mehr als der Rechnungsbetrag",
     "received": "{{amount}} Sats erhalten",
     "unified": "Bitcoin oder Lightning",
     "onchain": "Bitcoin on-chain",
