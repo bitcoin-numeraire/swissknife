@@ -64,6 +64,62 @@ mod receive {
         assert_eq!(persisted.amount_received_msat, Some(amount_msat));
     }
 
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn cln_grpc_catches_up_multiple_invoice_settlements_without_restarting() {
+        if matrix_cell().1 != "cln_grpc" {
+            return;
+        }
+        let app = TestApp::isolated("cln-invoice-updates", &[]).await;
+        let token = app.admin_token().await;
+        let wallet = app.create_wallet(token, "cln-invoice-updates").await;
+        let payer = Counterparty::for_provider(&app.provider);
+        let mut invoices = Vec::new();
+        let mut total = 0;
+        for value in [15_000, 16_000, 17_000, 18_000] {
+            let response = app
+                .api()
+                .post(
+                    "/v1/invoices",
+                    Auth::Bearer(token),
+                    NewInvoiceRequest {
+                        wallet_id: Some(wallet.id),
+                        amount_msat: value,
+                        description: Some("listener catch-up".into()),
+                        expiry: None,
+                    },
+                )
+                .await;
+            assert_status(&response, StatusCode::OK);
+            invoices.push(response.parse::<Invoice>());
+            total += value as i64;
+        }
+
+        // Keep the listener connection open so the supervisor's startup replay cannot
+        // credit these payments on its behalf. CLN can coalesce the wake-ups.
+        app.with_process_suspended(|| {
+            for invoice in &invoices {
+                payer.pay(&invoice.ln_invoice.as_ref().unwrap().bolt11);
+            }
+        });
+        wait_until(
+            Duration::from_secs(45),
+            "all CLN invoice settlements credited",
+            || async { app.wallet_balance(token, wallet.id).await.available_msat == total },
+        )
+        .await;
+        for invoice in invoices {
+            let response = app
+                .api()
+                .get(&format!("/v1/invoices/{}", invoice.id), Auth::Bearer(token))
+                .await;
+            assert_status(&response, StatusCode::OK);
+            assert_eq!(response.parse::<Invoice>().status, InvoiceStatus::Settled);
+        }
+        let restarted = app.restart("cln-invoice-updates-restarted", &[]).await;
+        assert_eq!(restarted.wallet_balance(token, wallet.id).await.available_msat, total);
+    }
+
     #[tokio::test]
     async fn a_counterparty_payment_credits_the_wallet() {
         let app = app().await;

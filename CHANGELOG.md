@@ -8,6 +8,10 @@ release notes when a tag is published.
 
 ## [Unreleased]
 
+### Fixed
+
+- Credit every CLN gRPC invoice settlement when multiple updates arrive between listener reads.
+
 ## [0.3.5] - 2026-11-21
 
 ### Fixed
