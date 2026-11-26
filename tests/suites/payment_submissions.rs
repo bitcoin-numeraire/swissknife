@@ -177,6 +177,55 @@ async fn accepted_held_payment_completes_after_client_and_server_restart() {
 }
 
 #[tokio::test]
+async fn cancelled_hold_invoice_releases_the_reservation_without_restarting_or_resending() {
+    if !crate::common::harness::matrix_cell().1.starts_with("cln_") {
+        return;
+    }
+    let app = TestApp::isolated("command-cancelled-htlc", &[]).await;
+    let admin = app.admin_token().await;
+    let owner = app.create_account_with_wallet(admin, "cancelled-command").await;
+    app.fund_onchain(admin, owner.wallet.id, 10_000).await;
+    let before = app.wallet_balance(admin, owner.wallet.id).await;
+    let held = Counterparty::for_provider(&app.provider).hold_invoice(500_000);
+    let request = json!({"idempotency_key":Uuid::new_v4(),"input":held.bolt11,"maximum_fee_msat":1000});
+    let path = format!("/v1/me/wallets/{}/payments/submissions", owner.wallet.id);
+    let auth = Auth::ApiKey(&owner.key);
+    let api = app.api();
+    let response = api.post(&path, auth, &request).await;
+    assert_status(&response, StatusCode::ACCEPTED);
+    let receipt = response.parse::<PaymentSubmission>();
+    wait_until(Duration::from_secs(30), "receiver holds the payment", || async {
+        held.accepted()
+    })
+    .await;
+    assert_eq!(app.wallet_balance(admin, owner.wallet.id).await.reserved_msat, 501_000);
+
+    // Dropping a held invoice asks the real recipient to cancel the HTLC.
+    drop(held);
+    wait_until(
+        Duration::from_secs(75),
+        "confirmed cancellation releases funds",
+        || async {
+            api.get(&receipt.status_url, auth)
+                .await
+                .parse::<PaymentSubmission>()
+                .state
+                == PaymentExecutionState::Failed
+        },
+    )
+    .await;
+    let replay = api.post(&path, auth, &request).await.parse::<PaymentSubmission>();
+    assert_eq!(replay.payment.id, receipt.payment.id);
+    assert_eq!(replay.state, PaymentExecutionState::Failed);
+    let after = app.wallet_balance(admin, owner.wallet.id).await;
+    assert_eq!(
+        (after.available_msat, after.reserved_msat),
+        (before.available_msat, before.reserved_msat)
+    );
+    app.stop();
+}
+
+#[tokio::test]
 async fn an_unroutable_submission_preserves_the_provider_outcome_and_wallet_invariant() {
     let app = TestApp::isolated("command-unroutable", &[]).await;
     let admin = app.admin_token().await;

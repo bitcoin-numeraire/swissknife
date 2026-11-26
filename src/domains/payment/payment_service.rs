@@ -1042,35 +1042,34 @@ impl PaymentsUseCases for PaymentService {
     async fn sync(&self) -> Result<u32, ApplicationError> {
         trace!("Synchronizing pending payments...");
 
-        let pending_payments = self
-            .store
-            .payment
-            .find_many(PaymentFilter {
-                status: Some(PaymentStatus::Pending),
-                ledger: Some(Ledger::Lightning),
-                ..Default::default()
-            })
-            .await?;
-
+        const BATCH_SIZE: u64 = 100;
+        let mut after = None;
         let mut synced = 0;
-
-        for payment in pending_payments {
-            let Some(lightning) = payment.lightning.as_ref() else {
-                return Err(DataError::Inconsistency(format!(
-                    "Missing lightning metadata on lightning payment with id: {}",
-                    payment.id
-                ))
-                .into());
-            };
-            let payment_hash = lightning.payment_hash.clone();
-
-            if self.sync_lightning_payment(payment_hash).await? {
-                synced += 1;
+        let mut first_error = None;
+        loop {
+            let batch = self.store.payment.pending_lightning_hashes(after, BATCH_SIZE).await?;
+            let full_page = batch.len() == BATCH_SIZE as usize;
+            for (id, hash) in batch {
+                after = Some(id);
+                let result = match hash {
+                    Some(hash) => self.sync_lightning_payment(hash).await,
+                    None => Err(DataError::Inconsistency(format!("Missing Lightning payment hash for {id}")).into()),
+                };
+                match result {
+                    Ok(true) => synced += 1,
+                    Ok(false) => {}
+                    Err(error) => {
+                        warn!(payment_id = %id, %error, "Unable to reconcile pending Lightning payment");
+                        first_error.get_or_insert(error);
+                    }
+                }
+            }
+            if !full_page {
+                break;
             }
         }
-
-        debug!(synced, "Pending payments synchronized successfully");
-        Ok(synced)
+        debug!(synced, "Pending Lightning payment reconciliation finished");
+        first_error.map_or(Ok(synced), Err)
     }
 }
 
@@ -3214,19 +3213,6 @@ mod tests {
     mod sync {
         use super::*;
 
-        fn pending_lightning_payment() -> Payment {
-            Payment {
-                id: Uuid::new_v4(),
-                status: PaymentStatus::Pending,
-                ledger: Ledger::Lightning,
-                lightning: Some(LnPayment {
-                    payment_hash: "ph".to_string(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }
-        }
-
         mod when_node_reports_settled {
             use super::*;
 
@@ -3235,9 +3221,9 @@ mod tests {
                 let mut store = MockAppStoreBuilder::new();
                 store
                     .payment
-                    .expect_find_many()
+                    .expect_pending_lightning_hashes()
                     .times(1)
-                    .returning(|_| Ok(vec![pending_lightning_payment()]));
+                    .returning(|_, _| Ok(vec![(Uuid::new_v4(), Some("ph".to_string()))]));
 
                 let mut ln_client = MockLnClient::new();
                 ln_client.expect_payment_by_hash().times(1).returning(|_| {
@@ -3273,21 +3259,18 @@ mod tests {
             #[tokio::test]
             async fn returns_inconsistency_error() {
                 let mut store = MockAppStoreBuilder::new();
-                store.payment.expect_find_many().times(1).returning(|_| {
-                    Ok(vec![Payment {
-                        status: PaymentStatus::Pending,
-                        ledger: Ledger::Lightning,
-                        lightning: None,
-                        ..Default::default()
-                    }])
-                });
+                store
+                    .payment
+                    .expect_pending_lightning_hashes()
+                    .times(1)
+                    .returning(|_, _| Ok(vec![(Uuid::new_v4(), None), (Uuid::new_v4(), Some("later".to_owned()))]));
+                let mut node = MockLnClient::new();
+                node.expect_payment_by_hash()
+                    .withf(|hash| hash == "later")
+                    .once()
+                    .returning(|_| Ok(None));
 
-                let service = service(
-                    store,
-                    MockLnClient::new(),
-                    MockBitcoinWallet::new(),
-                    MockEventUseCases::new(),
-                );
+                let service = service(store, node, MockBitcoinWallet::new(), MockEventUseCases::new());
 
                 let err = service.sync().await.unwrap_err();
 
@@ -3301,7 +3284,11 @@ mod tests {
             #[tokio::test]
             async fn returns_zero() {
                 let mut store = MockAppStoreBuilder::new();
-                store.payment.expect_find_many().times(1).returning(|_| Ok(vec![]));
+                store
+                    .payment
+                    .expect_pending_lightning_hashes()
+                    .times(1)
+                    .returning(|_, _| Ok(vec![]));
 
                 let service = service(
                     store,
