@@ -374,7 +374,8 @@ mod stream {
                 &format!("/v1/me/wallets/{}/bitcoin/addresses", account.wallet.id),
                 Auth::ApiKey(&account.key),
                 NewBtcAddressRequest {
-                    dedicated: false,
+                    dedicated: true,
+                    description: Some("Order 2048".to_owned()),
                     wallet_id: None,
                     address_type: None,
                 },
@@ -401,6 +402,7 @@ mod stream {
             assert_eq!(pending.payload.wallet_id, account.wallet.id);
             let pending_invoice =
                 serde_json::from_value::<Invoice>(pending.payload.data).expect("pending invoice snapshot");
+            assert_eq!(pending_invoice.description.as_deref(), Some("Order 2048"));
             assert_eq!(pending_invoice.status, InvoiceStatus::Pending);
             assert_eq!(pending_invoice.ledger, Ledger::Onchain);
             assert_eq!(pending_invoice.amount_msat, Some(100_000_000));
@@ -423,6 +425,7 @@ mod stream {
             assert_eq!(paid.payload.resource_id, resource_id);
         }
         let paid_invoice = serde_json::from_value::<Invoice>(paid.payload.data).expect("paid invoice snapshot");
+        assert_eq!(paid_invoice.description.as_deref(), Some("Order 2048"));
         assert_eq!(paid_invoice.status, InvoiceStatus::Settled);
         assert_eq!(paid_invoice.ledger, Ledger::Onchain);
         assert_eq!(paid_invoice.amount_received_msat, Some(100_000_000));

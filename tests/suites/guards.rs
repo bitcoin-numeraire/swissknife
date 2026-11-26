@@ -141,6 +141,7 @@ async fn every_admin_endpoint_enforces_its_permission() {
         id,
         body(NewBtcAddressRequest {
             dedicated: false,
+            description: None,
             wallet_id: Some(uuid::Uuid::new_v4()),
             address_type: None,
         }),

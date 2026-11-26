@@ -191,6 +191,7 @@ mod bitcoin {
                 Auth::ApiKey(&account.key),
                 NewBtcAddressRequest {
                     dedicated: false,
+                    description: None,
                     wallet_id: None,
                     address_type: None,
                 },
@@ -228,6 +229,7 @@ mod bitcoin {
                 Auth::ApiKey(&alice.key),
                 NewBtcAddressRequest {
                     dedicated: false,
+                    description: None,
                     wallet_id: None,
                     address_type: None,
                 },

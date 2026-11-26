@@ -183,7 +183,13 @@ impl EventUseCases for EventService {
         let now = Utc::now();
         let deposit_invoice = Invoice {
             wallet_id: btc_address.wallet_id,
-            description: Some(DEFAULT_DEPOSIT_DESCRIPTION.to_string()),
+            description: Some(
+                btc_address
+                    .description
+                    .as_deref()
+                    .unwrap_or(DEFAULT_DEPOSIT_DESCRIPTION)
+                    .to_owned(),
+            ),
             amount_msat: Some(amount_msat),
             amount_received_msat: is_confirmed.then_some(amount_msat),
             timestamp: now,
@@ -260,6 +266,7 @@ mod tests {
             address: "bc1qknown".to_string(),
             used,
             dedicated: false,
+            description: None,
             address_type: crate::domains::bitcoin::BtcAddressType::P2wpkh,
             created_at: Utc::now(),
             updated_at: None,

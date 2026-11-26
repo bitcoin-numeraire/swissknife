@@ -51,7 +51,12 @@ impl BitcoinUseCases for BitcoinService {
         wallet_id: Uuid,
         address_type: Option<BtcAddressType>,
         dedicated: bool,
+        description: Option<String>,
     ) -> Result<BtcAddress, ApplicationError> {
+        let description = description.filter(|value| !value.trim().is_empty());
+        if !dedicated && description.is_some() {
+            return Err(DataError::Validation("A deposit description requires a dedicated address.".into()).into());
+        }
         let address_type = address_type.unwrap_or(self.address_type);
 
         trace!(%wallet_id, %address_type, "Fetching current bitcoin deposit address");
@@ -72,7 +77,7 @@ impl BitcoinUseCases for BitcoinService {
         let btc_address = self
             .store
             .btc_address
-            .insert(wallet_id, &address, address_type, dedicated)
+            .insert(wallet_id, &address, address_type, dedicated, description)
             .await?;
 
         info!(%wallet_id, address = %btc_address.address, "New bitcoin deposit address issued");
@@ -207,6 +212,7 @@ mod tests {
             address: address.to_string(),
             used: false,
             dedicated: false,
+            description: None,
             address_type: BtcAddressType::P2wpkh,
             created_at: Utc::now(),
             updated_at: None,
@@ -239,7 +245,7 @@ mod tests {
                     MockSystemUseCases::new(),
                 );
 
-                let address = service.new_deposit_address(wallet_id, None, false).await.unwrap();
+                let address = service.new_deposit_address(wallet_id, None, false, None).await.unwrap();
 
                 assert_eq!(address.address, "bc1qreused");
             }
@@ -261,9 +267,11 @@ mod tests {
                 store
                     .btc_address
                     .expect_insert()
-                    .withf(|_, address, _, dedicated| address == "bc1qfresh" && !dedicated)
+                    .withf(|_, address, _, dedicated, description| {
+                        address == "bc1qfresh" && !dedicated && description.is_none()
+                    })
                     .times(1)
-                    .returning(|wallet_id, address, _, _| Ok(btc_address(wallet_id, address)));
+                    .returning(|wallet_id, address, _, _, _| Ok(btc_address(wallet_id, address)));
 
                 let mut wallet = MockBitcoinWallet::new();
                 wallet
@@ -273,7 +281,7 @@ mod tests {
 
                 let service = service(store, wallet, MockEventUseCases::new(), MockSystemUseCases::new());
 
-                let address = service.new_deposit_address(wallet_id, None, false).await.unwrap();
+                let address = service.new_deposit_address(wallet_id, None, false, None).await.unwrap();
 
                 assert_eq!(address.address, "bc1qfresh");
             }

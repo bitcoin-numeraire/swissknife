@@ -54,6 +54,7 @@ test('a merchant can recover a partial regtest sale, collect the balance and sta
   await expect(page.getByText('Bitcoin or Lightning', { exact: true })).toBeVisible();
   const destination = await (await address).json();
   expect(destination.dedicated).toBe(true);
+  expect(destination.description).toBe('Receipt A');
   await bitcoin(request, 'sendtoaddress', [destination.address, 0.0001]);
   if (process.env.SWISSKNIFE_ITEST_PROVIDER?.startsWith('lnd')) {
     await expect(page.getByRole('heading', { name: 'Payment detected' })).toBeVisible({
@@ -114,6 +115,20 @@ test('a merchant can recover a partial regtest sale, collect the balance and sta
     'href',
     detail!
   );
+  const historyUrl = new URL(api + '/v1/me/wallets/' + destination.wallet_id + '/invoices');
+  historyUrl.searchParams.set('bitcoin_address', destination.address);
+  const historyResponse = await request.get(historyUrl.href, { headers });
+  expect(historyResponse.ok()).toBe(true);
+  const entries = await historyResponse.json();
+  expect(entries.map((entry: { description: string }) => entry.description)).toEqual([
+    'Receipt A',
+    'Receipt A',
+  ]);
+  await page.getByRole('link', { name: 'Last completed sale' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Receipt A', exact: true, level: 4 })
+  ).toBeVisible();
+  await page.goto(dashboard + '/wallet/pos');
   await page.getByLabel('Amount in sats').fill('2000');
   await page.getByRole('button', { name: 'Create payment request' }).click();
   await expect(page.getByRole('heading', { name: 'Waiting for payment' })).toBeVisible();

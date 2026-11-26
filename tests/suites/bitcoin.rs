@@ -25,6 +25,7 @@ async fn post_address(
             Auth::Bearer(token),
             NewBtcAddressRequest {
                 dedicated: false,
+                description: None,
                 wallet_id: Some(wallet_id),
                 address_type,
             },
@@ -44,8 +45,10 @@ mod generate {
         let path = format!("/v1/me/wallets/{}/bitcoin/addresses", account.wallet.id);
         let api = app.api();
         let body = serde_json::json!({"dedicated": true, "type":"p2tr"});
+        let reference = "Commande R-2047 – café";
+        let sale = serde_json::json!({"dedicated": true, "type": "p2tr", "description": reference});
         let (first, second) = tokio::join!(
-            api.post(&path, Auth::ApiKey(&account.key), &body),
+            api.post(&path, Auth::ApiKey(&account.key), &sale),
             api.post(&path, Auth::ApiKey(&account.key), &body),
         );
         assert_status(&first, StatusCode::OK);
@@ -54,6 +57,8 @@ mod generate {
         let second = second.parse::<BtcAddress>();
         assert!(first.dedicated && second.dedicated);
         assert_ne!(first.address, second.address);
+        assert_eq!(first.description.as_deref(), Some(reference));
+        assert!(second.description.is_none());
         let ordinary = api
             .post(&path, Auth::ApiKey(&account.key), serde_json::json!({"type":"p2tr"}))
             .await;
@@ -66,7 +71,16 @@ mod generate {
             .post(&path, Auth::ApiKey(&account.key), serde_json::json!({"type":"p2tr"}))
             .await;
         assert_eq!(repeated.parse::<BtcAddress>().id, ordinary.id);
-        send_to_address(&first.address, 25_000).await;
+        let invalid = api
+            .post(
+                &path,
+                Auth::ApiKey(&account.key),
+                serde_json::json!({"description": reference}),
+            )
+            .await;
+        assert_error(&invalid, StatusCode::UNPROCESSABLE_ENTITY);
+        send_to_address(&first.address, 10_000).await;
+        send_to_address(&first.address, 15_000).await;
         mine(6).await;
         wait_until(Duration::from_secs(30), "dedicated address settled", || async {
             app.wallet_balance(admin, account.wallet.id).await.available_msat == 25_000_000
@@ -84,7 +98,7 @@ mod generate {
         assert_status(&excluded, StatusCode::OK);
         assert_eq!(excluded.parse::<u64>(), 0);
         let invoices_path = format!("/v1/me/wallets/{}/invoices", account.wallet.id);
-        for (address, count) in [(&first.address, 1), (&second.address, 0), (&ordinary.address, 0)] {
+        for (address, count) in [(&first.address, 2), (&second.address, 0), (&ordinary.address, 0)] {
             let res = api
                 .get(
                     &format!("{invoices_path}?bitcoin_address={address}"),
@@ -94,7 +108,8 @@ mod generate {
             assert_status(&res, StatusCode::OK);
             let invoices = res.parse::<Vec<Invoice>>();
             assert_eq!(invoices.len(), count);
-            if let Some(invoice) = invoices.first() {
+            for invoice in invoices {
+                assert_eq!(invoice.description.as_deref(), Some(reference));
                 assert_eq!(invoice.bitcoin_output.as_ref().unwrap().address, *address);
                 assert_eq!(invoice.status, InvoiceStatus::Settled);
             }
@@ -162,6 +177,7 @@ mod generate {
                 Auth::None,
                 NewBtcAddressRequest {
                     dedicated: false,
+                    description: None,
                     wallet_id: Some(uuid::Uuid::new_v4()),
                     address_type: None,
                 },
@@ -438,6 +454,18 @@ mod deposit {
             app.wallet_balance(token, wallet.id).await.available_msat >= target
         })
         .await;
+
+        let receipts = app
+            .api()
+            .get(
+                &format!("/v1/invoices?wallet_id={}&bitcoin_address={}", wallet.id, addr.address),
+                Auth::Bearer(token),
+            )
+            .await;
+        assert_status(&receipts, StatusCode::OK);
+        let receipts = receipts.parse::<Vec<Invoice>>();
+        assert_eq!(receipts.len(), 1);
+        assert_eq!(receipts[0].description.as_deref(), Some("Bitcoin On-chain deposit"));
 
         // The deposit projection marks the receiving address used in the same
         // transaction that credits the balance.

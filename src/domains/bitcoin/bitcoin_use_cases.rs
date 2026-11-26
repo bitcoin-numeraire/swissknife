@@ -16,6 +16,7 @@ pub trait BitcoinUseCases: Send + Sync {
         wallet_id: Uuid,
         address_type: Option<BtcAddressType>,
         dedicated: bool,
+        description: Option<String>,
     ) -> Result<BtcAddress, ApplicationError>;
     async fn get_address(&self, id: Uuid) -> Result<BtcAddress, ApplicationError>;
     async fn list_addresses(&self, filter: BtcAddressFilter) -> Result<Vec<BtcAddress>, ApplicationError>;
