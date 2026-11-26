@@ -1464,6 +1464,7 @@ mod tests {
                     State(Arc::new(services.build())),
                     caller,
                     Query(ClientEventStreamQuery { after: None }),
+                    Some(Extension(CancellationToken::new())),
                     HeaderMap::new(),
                 )
                 .await;
@@ -1490,6 +1491,7 @@ mod tests {
                     State(Arc::new(services.build())),
                     caller,
                     Query(ClientEventStreamQuery { after: Some(42) }),
+                    None,
                     HeaderMap::new(),
                 )
                 .await;
