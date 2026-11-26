@@ -11,7 +11,8 @@
     "payments_other": "{{count}} pagamenti",
     "empty": "Nelle ultime due ore non sono stati registrati pagamenti delegati.",
     "back": "Precedente",
-    "next": "Successiva"
+    "next": "Successiva",
+    "above_warning": "Soglia di avviso oraria superata"
   },
   "payment_review": {
     "title": "Approvazioni dei pagamenti",
@@ -1290,7 +1291,9 @@
     "input_help": "Inserisci gli importi in sats con un massimo di tre decimali. Lascia vuoto il campo per consentire spese illimitate nel periodo. Zero blocca le spese.",
     "cancel": "Annulla",
     "save": "Salva limiti",
-    "disable_help": "I pagamenti in uscita saranno consentiti senza questi limiti. Le spese già contabilizzate saranno conservate."
+    "disable_help": "I pagamenti in uscita saranno consentiti senza questi limiti. Le spese già contabilizzate saranno conservate.",
+    "agent_hourly_warning_msat": "Soglia di avviso oraria per agente",
+    "warning_help": "Mostra un avviso quando una credenziale spende più di questo importo in 60 minuti. I pagamenti possono proseguire."
   },
   "spending_report": {
     "title": "Rendiconto delle spese",
