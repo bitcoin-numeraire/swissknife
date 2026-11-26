@@ -5093,7 +5093,9 @@ dependencies = [
  "rmcp",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "subtle",
+ "swissknife-types",
  "tokio",
  "uuid",
 ]
@@ -5104,6 +5106,7 @@ version = "0.3.5"
 dependencies = [
  "chrono",
  "nostr",
+ "schemars 1.2.3",
  "serde",
  "serde_json",
  "serde_with",

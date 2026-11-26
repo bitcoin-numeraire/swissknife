@@ -8,6 +8,8 @@ publish = false
 description = "Wallet-scoped SwissKnife Model Context Protocol server"
 
 [dependencies]
+swissknife-types = { path = "../swissknife-types", features = ["mcp-schema"] }
+serde_urlencoded = "0.7"
 anyhow = "1"
 axum = "0.8.9"
 hex = "0.4.3"

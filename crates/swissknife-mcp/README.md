@@ -21,6 +21,10 @@ Host-side prompts and descriptions help users review transactions. A credential 
 
 For a remote MCP client, use `--http-listen` on loopback and set a separate `SWISSKNIFE_MCP_HTTP_TOKEN` for the client connection. The HTTP transport supports resource subscriptions. See the [Compose and local npm examples](../../examples/mcp/README.md) for stdio clients.
 
+## Filter outgoing payments
+
+The read-only `list_payments` tool accepts `status` (`Pending`, `Settled`, `Failed`) and `ledger` (`Lightning`, `Internal`, `Onchain`). For example, `{"status":"Failed","ledger":"Lightning","limit":10}` returns up to ten failed Lightning payments from the selected wallet, newest first. The API applies both filters before `offset` and `limit`. Omit the filters to see outgoing payments on every ledger.
+
 ## Receive from a withdrawal service
 
 Set `--withdraw-origin https://issuer.example` on the bridge to enable the voucher tools. Repeat the flag if the issuer uses a separate callback origin. A local service can use HTTP on an explicit loopback IP and port. The wallet key goes only to the wallet API.

@@ -40,7 +40,7 @@ impl WalletResource {
     pub(super) async fn read(self, wallet: &WalletClient) -> Result<Value, ErrorData> {
         match self {
             Self::Balance => wallet.get("balance").await,
-            Self::RecentPayments => wallet.recent(20, 0).await,
+            Self::RecentPayments => wallet.recent(Default::default()).await,
         }
         .map_err(|e| ErrorData::internal_error(e.to_string(), None))
     }

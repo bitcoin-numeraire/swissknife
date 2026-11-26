@@ -130,6 +130,7 @@ pub struct InternalPayment {
 
 /// Lifecycle status of a payment.
 #[derive(Clone, Debug, EnumString, Display, Deserialize, Serialize, PartialEq, Eq, Default, ToSchema)]
+#[cfg_attr(feature = "mcp-schema", derive(schemars::JsonSchema))]
 pub enum PaymentStatus {
     #[default]
     Pending,

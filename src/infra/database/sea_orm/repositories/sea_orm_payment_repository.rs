@@ -66,6 +66,7 @@ where
                 q.filter(Column::BtcAddress.is_in(btc_addresses))
             })
             .order_by(Column::CreatedAt, sea_order(&filter.order_direction))
+            .order_by(Column::Id, sea_order(&filter.order_direction))
             .offset(filter.offset)
             .limit(filter.limit)
             .all(self.db.connection())
