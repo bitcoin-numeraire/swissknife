@@ -90,6 +90,10 @@ When using separated deployment:
 
 All images support both `linux/amd64` and `linux/arm64` architectures.
 
+## Ledger recovery
+
+From a trusted operator host, use `python3 scripts/ledger-backup.py backup --help` to create an encrypted SQLite or PostgreSQL snapshot. Restore into a fresh destination with `python3 scripts/ledger-backup.py restore --help`. Point the release binary at the restored database and run `swissknife check-ledger-migrations` to verify the recorded migrations before starting the server. The [operator guide](https://docs.numeraire.tech/swissknife/deployment/ledger-recovery) covers key custody, database checks and reconciling provider payments after the snapshot.
+
 ## Documentation
 
 Extended documentation is available [here](https://docs.numeraire.tech/swissknife)

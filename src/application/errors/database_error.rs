@@ -8,6 +8,9 @@ pub enum DatabaseError {
     #[error("Failed to connect to database: {0}")]
     Connect(String),
 
+    #[error("Ledger migration check failed: {0}")]
+    CheckMigrations(String),
+
     #[error("Failed to execute migrations: {0}")]
     Migrations(String),
 

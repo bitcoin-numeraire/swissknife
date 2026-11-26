@@ -1,0 +1,33 @@
+name: Ledger backup
+on:
+  pull_request:
+    paths:
+      - scripts/ledger-backup.py
+      - scripts/test-ledger-backup.py
+      - .github/workflows/ledger-backup.yml
+permissions:
+  contents: read
+jobs:
+  restore:
+    runs-on: ubuntu-24.04
+    container: postgres:18.7@sha256:e754b839f447639b7004895f4d8a4bfcb4e9dbe3a1bc035f27f646562a16fd61
+    services:
+      postgres:
+        image: postgres:18.7@sha256:e754b839f447639b7004895f4d8a4bfcb4e9dbe3a1bc035f27f646562a16fd61
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready --health-interval 2s
+          --health-timeout 5s --health-retries 15
+    env:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      SWISSKNIFE_BACKUP_TEST_POSTGRES: 1
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install snapshot utilities
+        run: apt-get update && apt-get install -y --no-install-recommends age python3
+      - name: Exercise encrypted database recovery
+        run: python3 scripts/test-ledger-backup.py

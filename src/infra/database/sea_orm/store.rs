@@ -26,6 +26,29 @@ use super::{
 pub struct SeaOrmStore;
 
 impl SeaOrmStore {
+    /// Compare the restored ledger with the compiled migrations without starting the writable store.
+    pub async fn check_migrations(config: SeaOrmConfig) -> Result<(), DatabaseError> {
+        let mut options = ConnectOptions::new(config.url);
+        options
+            .max_connections(1)
+            .connect_timeout(config.connect_timeout)
+            .acquire_timeout(config.acquire_timeout)
+            .sqlx_logging(false)
+            .map_sqlx_sqlite_opts(|opts| opts.read_only(true).create_if_missing(false))
+            .map_sqlx_postgres_opts(|opts| opts.options([("default_transaction_read_only", "on")]));
+        let db = Database::connect(options)
+            .await
+            .map_err(|e| DatabaseError::Connect(e.to_string()))?;
+        let pending = Migrator::get_pending_migrations_read_only(&db)
+            .await
+            .map_err(|e| DatabaseError::CheckMigrations(e.to_string()))?;
+        if !pending.is_empty() {
+            let names = pending.iter().map(|m| m.name()).collect::<Vec<_>>().join(", ");
+            return Err(DatabaseError::CheckMigrations(format!("Unapplied migrations: {names}")));
+        }
+        Ok(())
+    }
+
     pub async fn connect(config: SeaOrmConfig) -> Result<AppStore, DatabaseError> {
         let db_conn = Self::connect_database(config).await?;
         Ok(Self::from_connection(db_conn))

@@ -19,21 +19,20 @@ pub enum Command {
         /// Account UUID whose existing login should be recovered.
         account_id: Uuid,
     },
+    /// Check that the ledger migration history matches this binary before starting the server.
+    CheckLedgerMigrations,
 }
 
-impl Command {
-    pub async fn run(self, recovery: &dyn LoginRecoveryUseCases) -> Result<(), ApplicationError> {
-        match self {
-            Self::RecoverLocalLogin { account_id } => {
-                let grant = recovery.recover(account_id).await?;
-                println!("Local login enabled. Existing sessions and password revoked.");
-                println!(
-                    "Use this one-time code on this instance's /reset-password page before {}:",
-                    grant.expires_at
-                );
-                println!("{}", grant.code);
-                Ok(())
-            }
-        }
-    }
+pub async fn recover_local_login(
+    account_id: Uuid,
+    recovery: &dyn LoginRecoveryUseCases,
+) -> Result<(), ApplicationError> {
+    let grant = recovery.recover(account_id).await?;
+    println!("Local login enabled. Existing sessions and password revoked.");
+    println!(
+        "Use this one-time code on this instance's /reset-password page before {}:",
+        grant.expires_at
+    );
+    println!("{}", grant.code);
+    Ok(())
 }
