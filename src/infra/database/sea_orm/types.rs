@@ -138,6 +138,7 @@ impl From<InvoiceModel> for Invoice {
             updated_at: model.updated_at.map(|t| t.and_utc()),
             ln_invoice,
             btc_output_id: model.btc_output_id,
+            internal_btc_address: model.internal_btc_address,
             bitcoin_output: None,
             lnurl: model
                 .lnurl_verify_token

@@ -291,6 +291,7 @@ export const zInvoice = z.object({
     })
     .nullish(),
   id: z.uuid(),
+  internal_btc_address: z.string().nullish(),
   ledger: zLedger,
   ln_address_id: z.uuid().nullish(),
   ln_invoice: zLnInvoice.nullish(),

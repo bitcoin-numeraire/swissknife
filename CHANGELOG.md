@@ -10,6 +10,8 @@ release notes when a tag is published.
 
 ### Added
 
+- Merchant checkout recognizes payments to its Bitcoin address from another SwissKnife wallet on the same instance.
+
 - Bitcoin receipts from merchant checkout retain the order reference entered by the cashier.
 
 - A merchant can collect the remaining sats on a partially paid checkout using the original sale address.

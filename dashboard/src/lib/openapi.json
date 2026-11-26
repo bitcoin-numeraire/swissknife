@@ -2876,7 +2876,7 @@
           {
             "name": "bitcoin_address",
             "in": "query",
-            "description": "Match invoices for outputs sent to this exact Bitcoin address.",
+            "description": "Match on-chain deposits and internal transfers received at this exact Bitcoin address.",
             "required": false,
             "schema": {
               "type": [
@@ -3149,7 +3149,7 @@
           {
             "name": "bitcoin_address",
             "in": "query",
-            "description": "Match invoices for outputs sent to this exact Bitcoin address.",
+            "description": "Match on-chain deposits and internal transfers received at this exact Bitcoin address.",
             "required": false,
             "schema": {
               "type": [
@@ -5989,7 +5989,7 @@
           {
             "name": "bitcoin_address",
             "in": "query",
-            "description": "Match invoices for outputs sent to this exact Bitcoin address.",
+            "description": "Match on-chain deposits and internal transfers received at this exact Bitcoin address.",
             "required": false,
             "schema": {
               "type": [
@@ -9188,6 +9188,13 @@
             "type": "string",
             "format": "uuid",
             "description": "Internal ID"
+          },
+          "internal_btc_address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Destination Bitcoin address for a transfer settled on the internal ledger."
           },
           "ledger": {
             "$ref": "#/components/schemas/Ledger",

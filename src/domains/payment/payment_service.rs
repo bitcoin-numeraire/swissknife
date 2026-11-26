@@ -231,8 +231,8 @@ impl PaymentService {
 
                 let invoice = Invoice {
                     wallet_id: recipient_address.wallet_id,
-                    ln_address_id: None,
-                    description: description.clone(),
+                    internal_btc_address: Some(data.address.clone()),
+                    description: recipient_address.description.or_else(|| description.clone()),
                     amount_msat: Some(amount_msat),
                     amount_received_msat: Some(amount_msat),
                     timestamp,
@@ -249,7 +249,7 @@ impl PaymentService {
                     amount_msat,
                     status: PaymentStatus::Settled,
                     ledger: Ledger::Internal,
-                    description: description.clone(),
+                    description,
                     internal: Some(InternalPayment {
                         ln_address: None,
                         btc_address: Some(data.address),

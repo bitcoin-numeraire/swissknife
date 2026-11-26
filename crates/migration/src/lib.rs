@@ -36,6 +36,7 @@ mod m20261105_223341_widen_btc_output_indexes;
 mod m20261118_154958_add_lnurl_invoice_verification;
 mod m20261125_150419_dedicated_deposit_addresses;
 mod m20261126_005039_checkout_deposit_description;
+mod m20261126_005842_internal_invoice_bitcoin_address;
 
 pub struct Migrator;
 
@@ -79,6 +80,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261118_154958_add_lnurl_invoice_verification::Migration),
             Box::new(m20261125_150419_dedicated_deposit_addresses::Migration),
             Box::new(m20261126_005039_checkout_deposit_description::Migration),
+            Box::new(m20261126_005842_internal_invoice_bitcoin_address::Migration),
         ]
     }
 }

@@ -47,8 +47,8 @@ export function checkoutSettlement(sale: MerchantSale, invoices: Invoice[], now:
     if (invoice.wallet_id !== sale.walletId) continue;
     const matchesAddress = Boolean(
       sale.address &&
-      invoice.bitcoin_output?.address === sale.address &&
-      invoice.ledger === Ledger.ONCHAIN
+      ((invoice.ledger === Ledger.ONCHAIN && invoice.bitcoin_output?.address === sale.address) ||
+        (invoice.ledger === Ledger.INTERNAL && invoice.internal_btc_address === sale.address))
     );
     if (!matchesAddress && invoice.id !== sale.invoiceId) continue;
     const amount = invoice.amount_received_msat ?? invoice.amount_msat ?? 0;

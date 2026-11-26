@@ -18,6 +18,20 @@ use uuid::Uuid;
 use super::SeaOrmConnection;
 use crate::infra::database::sea_orm::{amount_to_db, sea_order};
 
+fn bitcoin_address_filter(address: String) -> Condition {
+    Condition::any()
+        .add(Column::InternalBtcAddress.eq(address.clone()))
+        .add(
+            Column::BtcOutputId.in_subquery(
+                BtcOutput::find()
+                    .select_only()
+                    .column(BtcOutputColumn::Id)
+                    .filter(BtcOutputColumn::Address.eq(address))
+                    .into_query(),
+            ),
+        )
+}
+
 #[derive(Clone)]
 pub struct SeaOrmInvoiceRepository<C = DatabaseConnection> {
     db: C,
@@ -89,7 +103,7 @@ where
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.bitcoin_address, |q, address| {
-                q.filter(BtcOutputColumn::Address.eq(address))
+                q.filter(bitcoin_address_filter(address))
             })
             .apply_if(filter.lnurl_verify_token, |q, token| {
                 q.filter(Column::LnurlVerifyToken.eq(token))
@@ -136,6 +150,7 @@ where
         let mut model = ActiveModel {
             id: Set(id),
             wallet_id: Set(invoice.wallet_id),
+            internal_btc_address: Set(invoice.internal_btc_address),
             ln_address_id: Set(invoice.ln_address_id),
             description: Set(invoice.description),
             amount_msat: Set(invoice.amount_msat.map(amount_to_db).transpose()?),
@@ -224,15 +239,7 @@ where
             .apply_if(filter.wallet_id, |q, wallet| q.filter(Column::WalletId.eq(wallet)))
             .apply_if(filter.ids, |q, ids| q.filter(Column::Id.is_in(ids)))
             .apply_if(filter.bitcoin_address, |q, address| {
-                q.filter(
-                    Column::BtcOutputId.in_subquery(
-                        BtcOutput::find()
-                            .select_only()
-                            .column(BtcOutputColumn::Id)
-                            .filter(BtcOutputColumn::Address.eq(address))
-                            .into_query(),
-                    ),
-                )
+                q.filter(bitcoin_address_filter(address))
             })
             .apply_if(filter.lnurl_verify_token, |q, token| {
                 q.filter(Column::LnurlVerifyToken.eq(token))
