@@ -101,6 +101,9 @@
     "invitation": "Puoi assegnare un saldo iniziale a uno dei tuoi portafogli durante la configurazione."
   },
   "statement": {
+    "date_basis": "Data di riferimento",
+    "created": "Data di creazione",
+    "paid": "Data di pagamento (solo operazioni regolate)",
     "action": "Esporta estratto conto",
     "title": "Estratto conto del portafoglio",
     "wallet": "Portafoglio {{wallet}}",

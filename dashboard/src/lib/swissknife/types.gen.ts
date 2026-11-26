@@ -4746,6 +4746,10 @@ export type ExportAccountWalletStatementData = {
   query: {
     from: Date;
     until: Date;
+    /**
+     * Defaults to creation time. Use paid to include only settled rows with a recorded payment time.
+     */
+    date_basis?: 'created' | 'paid' | null;
   };
   url: '/v1/me/wallets/{wallet_id}/statement';
 };
@@ -5530,6 +5534,10 @@ export type ExportWalletStatementData = {
   query: {
     from: Date;
     until: Date;
+    /**
+     * Defaults to creation time. Use paid to include only settled rows with a recorded payment time.
+     */
+    date_basis?: 'created' | 'paid' | null;
   };
   url: '/v1/wallets/{id}/statement';
 };

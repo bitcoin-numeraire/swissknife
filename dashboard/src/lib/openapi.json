@@ -6942,7 +6942,7 @@
         "tags": [
           "Me"
         ],
-        "summary": "Download wallet activity as a CSV statement. The date interval applies to transaction creation.",
+        "summary": "Download wallet activity as a CSV statement. Choose creation date (default) or recorded payment date for settled activity.",
         "operationId": "export_account_wallet_statement",
         "parameters": [
           {
@@ -6971,6 +6971,27 @@
             "schema": {
               "type": "string",
               "format": "date-time"
+            }
+          },
+          {
+            "name": "date_basis",
+            "in": "query",
+            "description": "Defaults to creation time. Use paid to include only settled rows with a recorded payment time.",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Timestamp used to select and order wallet statement rows.",
+                  "enum": [
+                    "created",
+                    "paid"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         ],
@@ -8536,7 +8557,7 @@
         "tags": [
           "Wallets"
         ],
-        "summary": "Download wallet activity as a CSV statement. The date interval applies to transaction creation.",
+        "summary": "Download wallet activity as a CSV statement. Choose creation date (default) or recorded payment date for settled activity.",
         "operationId": "export_wallet_statement",
         "parameters": [
           {
@@ -8565,6 +8586,27 @@
             "schema": {
               "type": "string",
               "format": "date-time"
+            }
+          },
+          {
+            "name": "date_basis",
+            "in": "query",
+            "description": "Defaults to creation time. Use paid to include only settled rows with a recorded payment time.",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Timestamp used to select and order wallet statement rows.",
+                  "enum": [
+                    "created",
+                    "paid"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         ],

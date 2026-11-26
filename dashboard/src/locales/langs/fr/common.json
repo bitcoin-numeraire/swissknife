@@ -24,6 +24,9 @@
     "invitation": "Vous pouvez attribuer un solde initial à l’un de vos portefeuilles lors de la configuration."
   },
   "statement": {
+    "date_basis": "Date à utiliser",
+    "created": "Date de création",
+    "paid": "Date de paiement (transactions réglées)",
     "action": "Exporter le relevé",
     "title": "Relevé du portefeuille",
     "wallet": "Portefeuille {{wallet}}",

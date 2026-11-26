@@ -11,7 +11,9 @@ mod wallet_statement_response;
 mod wallet_use_cases;
 
 pub use account_wallet_handler::*;
-pub use swissknife_types::{Balance, Contact, Wallet, WalletFilter, WalletOverview, WalletStatementPeriod};
+pub use swissknife_types::{
+    Balance, Contact, StatementDateBasis, Wallet, WalletFilter, WalletOverview, WalletStatementPeriod,
+};
 pub use wallet_handler::*;
 pub use wallet_repository::*;
 pub use wallet_service::*;

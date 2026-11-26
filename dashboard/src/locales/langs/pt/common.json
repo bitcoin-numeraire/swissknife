@@ -101,6 +101,9 @@
     "invitation": "Pode atribuir um saldo inicial a uma das suas carteiras durante a configuração."
   },
   "statement": {
+    "date_basis": "Data de referência",
+    "created": "Data de criação",
+    "paid": "Data de pagamento (apenas transações liquidadas)",
     "action": "Exportar extrato",
     "title": "Extrato da carteira",
     "wallet": "Carteira {{wallet}}",

@@ -101,6 +101,9 @@
     "invitation": "Sie können einem Ihrer Wallets während der Einrichtung eine Anfangsgutschrift vergeben."
   },
   "statement": {
+    "date_basis": "Datumsgrundlage",
+    "created": "Erstellungsdatum",
+    "paid": "Zahlungsdatum (nur abgeschlossene Zahlungen)",
     "action": "Statement exportieren",
     "title": "Wallet-Statement",
     "wallet": "Wallet {{wallet}}",

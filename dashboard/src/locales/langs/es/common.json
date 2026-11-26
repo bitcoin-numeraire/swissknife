@@ -101,6 +101,9 @@
     "invitation": "Puedes dar a una de tus carteras un saldo inicial durante la configuración."
   },
   "statement": {
+    "date_basis": "Fecha de referencia",
+    "created": "Fecha de creación",
+    "paid": "Fecha de pago (solo operaciones liquidadas)",
     "action": "Exportar estado de cuenta",
     "title": "Estado de cuenta de la cartera",
     "wallet": "Cartera {{wallet}}",
