@@ -477,3 +477,140 @@ async fn rolling_velocity_is_atomic_per_credential_and_does_not_limit_owner_paym
         .is_empty());
     app.stop();
 }
+
+#[tokio::test]
+async fn revoking_a_key_preserves_its_in_flight_charge_against_the_shared_budget() {
+    if !crate::common::harness::matrix_cell().1.starts_with("cln_") {
+        return;
+    }
+    let app = TestApp::isolated("revoked-agent-charge", &[]).await;
+    let admin = app.admin_token().await;
+    let owner = app.create_account_with_wallet(admin, "shared-budget").await;
+    let api = app.api();
+    let operator = Auth::Bearer(admin);
+    let owner_auth = Auth::ApiKey(&owner.key);
+    let wallet = format!("/v1/me/wallets/{}", owner.wallet.id);
+    let keys = format!("{wallet}/agent-keys");
+    let submissions = format!("{wallet}/payments/submissions");
+    let policy = format!("/v1/accounts/{}/spending-policy", owner.account.id);
+    let limits = json!({"daily_msat":"520000","agent_hourly_warning_msat":"502000"});
+    assert_status(&api.put(&policy, operator, limits).await, StatusCode::NO_CONTENT);
+    let issue = |name| {
+        json!({"name":name,"capabilities":{"read":true,"spend":true},
+        "expires_at":chrono::Utc::now()+chrono::Duration::hours(1)})
+    };
+    let first = api
+        .post(&keys, owner_auth, issue("purchasing"))
+        .await
+        .parse::<IssuedAgentKey>();
+    let second = api
+        .post(&keys, owner_auth, issue("inventory"))
+        .await
+        .parse::<IssuedAgentKey>();
+    let first_auth = Auth::WalletKey(&first.key);
+    let second_auth = Auth::WalletKey(&second.key);
+    let input = Counterparty::for_provider(&app.provider).invoice(20_000, &unique("remaining-allowance"));
+    let sibling_request = json!({"input":input,"idempotency_key":Uuid::new_v4(),"maximum_fee_msat":0});
+    let unfunded = api.post(&submissions, second_auth, &sibling_request).await;
+    assert_error(&unfunded, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(unfunded.body["reason"].as_str().unwrap().contains("Insufficient funds"));
+    assert_eq!(
+        api.get(&policy, operator)
+            .await
+            .parse::<SpendingPolicy>()
+            .usage
+            .daily_msat,
+        0
+    );
+    app.fund_onchain(admin, owner.wallet.id, 50_000).await;
+    let mut held = Counterparty::for_provider(&app.provider).hold_invoice(500_000);
+    let request = json!({"input":held.bolt11,"idempotency_key":Uuid::new_v4(),"maximum_fee_msat":4000});
+    let accepted = api.post(&submissions, first_auth, &request).await;
+    assert_status(&accepted, StatusCode::ACCEPTED);
+    let pending = accepted.parse::<PaymentSubmission>();
+    wait_until(
+        Duration::from_secs(30),
+        "recipient holds the delegated payment",
+        || async { held.accepted() },
+    )
+    .await;
+    let replay = api
+        .post(&submissions, first_auth, &request)
+        .await
+        .parse::<PaymentSubmission>();
+    assert_eq!(replay.payment.id, pending.payment.id);
+    assert_status(
+        &api.delete(&format!("{keys}/{}", first.metadata.id), owner_auth).await,
+        StatusCode::NO_CONTENT,
+    );
+    assert_error(
+        &api.post(&submissions, first_auth, &request).await,
+        StatusCode::UNAUTHORIZED,
+    );
+    assert_eq!(app.wallet_balance(admin, owner.wallet.id).await.reserved_msat, 504_000);
+
+    let blocked = api.post(&submissions, second_auth, &sibling_request).await;
+    assert_error(&blocked, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(
+        blocked.body.to_string().contains("daily spending limit"),
+        "{}",
+        blocked.body
+    );
+    let activity = format!("/v1/accounts/{}/agent-spending-activity", owner.account.id);
+    let agents = api
+        .get(&activity, operator)
+        .await
+        .parse::<swissknife_types::AgentActivityPage>();
+    let revoked = agents
+        .items
+        .iter()
+        .find(|agent| agent.agent_key_id == first.metadata.id)
+        .unwrap();
+    assert!(revoked.name.is_none() && revoked.above_hourly_warning);
+    assert_eq!(revoked.current_hour.charged_msat, 504_000);
+
+    held.settle();
+    wait_until(Duration::from_secs(45), "revoked agent payment settles", || async {
+        api.get(&pending.status_url, owner_auth)
+            .await
+            .parse::<PaymentSubmission>()
+            .state
+            == PaymentExecutionState::Settled
+    })
+    .await;
+    assert_eq!(app.wallet_balance(admin, owner.wallet.id).await.reserved_msat, 0);
+    let agents = api
+        .get(&activity, operator)
+        .await
+        .parse::<swissknife_types::AgentActivityPage>();
+    let revoked = agents
+        .items
+        .iter()
+        .find(|agent| agent.agent_key_id == first.metadata.id)
+        .unwrap();
+    assert_eq!(revoked.current_hour.charged_msat, 500_000);
+    assert!(!revoked.above_hourly_warning);
+    let allowed = api.post(&submissions, second_auth, &sibling_request).await;
+    assert_status(&allowed, StatusCode::ACCEPTED);
+    let sibling = allowed.parse::<PaymentSubmission>();
+    wait_until(
+        Duration::from_secs(45),
+        "sibling uses the released fee allowance",
+        || async {
+            api.get(&sibling.status_url, second_auth)
+                .await
+                .parse::<PaymentSubmission>()
+                .state
+                == PaymentExecutionState::Settled
+        },
+    )
+    .await;
+    assert_eq!(
+        api.get(&policy, operator)
+            .await
+            .parse::<SpendingPolicy>()
+            .usage
+            .daily_msat,
+        520_000
+    );
+}
