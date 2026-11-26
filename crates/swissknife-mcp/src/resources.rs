@@ -14,6 +14,8 @@ use tokio::{sync::watch, task::JoinHandle};
 
 use crate::wallet::WalletClient;
 
+const POLL_INTERVAL: Duration = Duration::from_secs(3);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum WalletResource {
     Balance,
@@ -37,12 +39,22 @@ impl WalletResource {
             .ok_or_else(|| ErrorData::resource_not_found("Unknown wallet resource", None))
     }
 
-    pub(super) async fn read(self, wallet: &WalletClient) -> Result<Value, ErrorData> {
+    pub(super) async fn read(self, wallet: &WalletClient) -> anyhow::Result<Value> {
         match self {
             Self::Balance => wallet.get("balance").await,
             Self::RecentPayments => wallet.recent(Default::default()).await,
         }
-        .map_err(|e| ErrorData::internal_error(e.to_string(), None))
+    }
+}
+
+fn retryable_read(error: &anyhow::Error) -> bool {
+    let Some(http) = error.downcast_ref::<reqwest::Error>() else {
+        return false;
+    };
+    match http.status() {
+        Some(status) => status.is_server_error() || matches!(status.as_u16(), 408 | 429),
+        // reqwest classifies interrupted response frames from Response::chunk as decode errors.
+        None => http.is_timeout() || http.is_connect() || http.is_request() || http.is_body() || http.is_decode(),
     }
 }
 
@@ -65,7 +77,10 @@ impl Updates {
 
 impl ResourceFeeds {
     async fn watch(&self, resource: WalletResource, wallet: &WalletClient) -> Result<Updates, ErrorData> {
-        let mut previous = resource.read(wallet).await?;
+        let mut previous = resource
+            .read(wallet)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         let mut active = self.active.lock().expect("resource feeds lock");
         let existing = active
             .get(&resource)
@@ -77,14 +92,24 @@ impl ResourceFeeds {
             active.insert(resource, Arc::downgrade(&rx));
             let wallet = wallet.clone();
             tokio::spawn(async move {
+                let mut delay = POLL_INTERVAL;
                 loop {
                     tokio::select! {
                         _ = tx.closed() => return,
-                        _ = tokio::time::sleep(Duration::from_secs(3)) => {}
+                        _ = tokio::time::sleep(delay) => {}
                     }
-                    let Ok(current) = resource.read(&wallet).await else {
-                        return;
+                    let current = tokio::select! {
+                        _ = tx.closed() => return,
+                        result = resource.read(&wallet) => match result {
+                            Ok(current) => current,
+                            Err(error) if retryable_read(&error) => {
+                                delay = (delay * 2).min(Duration::from_secs(30));
+                                continue;
+                            }
+                            Err(_) => return,
+                        }
                     };
+                    delay = POLL_INTERVAL;
                     if current != previous {
                         previous = current;
                         if tx.send(()).is_err() {

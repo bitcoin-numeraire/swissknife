@@ -19,7 +19,7 @@ The resources `wallet://balance` and `wallet://payments/recent` return current w
 
 Host-side prompts and descriptions help users review transactions. A credential with spend permission can submit against the wallet’s available balance directly. Fund the selected wallet according to the intended use and apply the spending limits supported by your SwissKnife deployment.
 
-For a remote MCP client, use `--http-listen` on loopback and set a separate `SWISSKNIFE_MCP_HTTP_TOKEN` for the client connection. The HTTP transport supports resource subscriptions. See the [Compose and local npm examples](../../examples/mcp/README.md) for stdio clients.
+For a remote MCP client, use `--http-listen` on loopback and set a separate `SWISSKNIFE_MCP_HTTP_TOKEN` for the client connection. Balance and recent-payment subscriptions on both transports retry temporary wallet API failures with increasing delays up to 30 seconds. After recovery the client receives an update if the wallet data changed since the last successful read. Revoking the credential stops the feed. See the [Compose and local npm examples](../../examples/mcp/README.md) for stdio clients.
 
 ## Filter outgoing payments
 
