@@ -126,7 +126,7 @@ test:
 	@$(CARGO_TEST) --workspace --all-targets
 
 test-unit:
-	@cargo test --workspace --bins $(TEST) -- $(TESTARGS)
+	@$(CARGO_TEST) --workspace --lib --bins $(TEST) -- $(TESTARGS)
 
 # Run the integration suite for one (database, provider) cell. Brings
 # the regtest stack up first (idempotent); override the cell via
@@ -167,10 +167,10 @@ itest-logs:
 
 # Unit-test coverage via cargo-llvm-cov (install with `make install-tools`).
 coverage:
-	@cargo llvm-cov --workspace --bins
+	@cargo llvm-cov --workspace --lib --bins
 
 coverage-html:
-	@cargo llvm-cov --workspace --bins --html
+	@cargo llvm-cov --workspace --lib --bins --html
 	@echo "HTML coverage report generated at target/llvm-cov/html/index.html"
 
 # Combined unit + integration coverage for ONE cell -> lcov.info. Requires the
@@ -179,9 +179,9 @@ coverage-html:
 # (ITEST_DATABASE, ITEST_PROVIDER) cell, including the spawned binary's coverage.
 coverage-lcov: itest-up
 	@cargo llvm-cov clean --workspace
-	@cargo llvm-cov --no-report --workspace --features itest --bins
+	@cargo llvm-cov --no-report --workspace --features itest --lib --bins
 	@$(ITEST_ENV) cargo llvm-cov --no-report --features itest --test api
-	@cargo llvm-cov report --lcov --output-path lcov.info
+	@cargo llvm-cov report --package '*' --lcov --output-path lcov.info
 
 # Full-matrix merged coverage: unit + UoW (both DBs) + the integration API suite
 # across every cell in COVERAGE_CELLS, merged into one report. This is the true
@@ -191,7 +191,7 @@ coverage-lcov: itest-up
 COVERAGE_CELLS ?= sqlite:lnd_grpc sqlite:lnd_rest sqlite:cln_grpc sqlite:cln_rest postgres:lnd_grpc
 coverage-matrix: itest-up
 	@cargo llvm-cov clean --workspace
-	@cargo llvm-cov --no-report --workspace --features itest --bins
+	@cargo llvm-cov --no-report --workspace --features itest --lib --bins
 	@SWISSKNIFE_ITEST_DATABASE=postgres cargo llvm-cov --no-report --features itest --bins -- uow_tests
 	@for cell in $(COVERAGE_CELLS); do \
 		db=$${cell%%:*}; provider=$${cell##*:}; \
@@ -199,8 +199,8 @@ coverage-matrix: itest-up
 		SWISSKNIFE_ITEST_COMPOSE_PROJECT=$(ITEST_PROJECT) SWISSKNIFE_ITEST_DATABASE=$$db SWISSKNIFE_ITEST_PROVIDER=$$provider \
 			cargo llvm-cov --no-report --features itest --test api -- --test-threads=1 || exit 1; \
 	done
-	@cargo llvm-cov report --lcov --output-path lcov.info
-	@cargo llvm-cov report
+	@cargo llvm-cov report --package '*' --lcov --output-path lcov.info
+	@cargo llvm-cov report --package '*'
 
 # Remove build artifacts, coverage output, and integration runtime/artifacts.
 clean:

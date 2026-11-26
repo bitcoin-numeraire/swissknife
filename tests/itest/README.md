@@ -128,6 +128,10 @@ rejects invoice/payment operations through incompatible network wallets.
 make coverage-lcov     # merged unit + integration coverage -> lcov.info
 ```
 
+`make test-unit` runs binary and library unit tests across the workspace. Pass
+`TEST=<name>` to run matching tests. LCOV reports include workspace library
+sources alongside the SwissKnife executable.
+
 ## Artifacts
 
 SwissKnife stdout/stderr per cell is written under `target/itest/`. On CI
