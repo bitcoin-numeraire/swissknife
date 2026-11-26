@@ -1197,6 +1197,7 @@
     "expired": "Pedido expirado",
     "paid": "Pagamento recebido",
     "pending_amount": "{{amount}} sats a aguardar confirmação",
+    "excess": "{{amount}} sats acima do total do pedido",
     "received": "{{amount}} sats recebidos",
     "unified": "Bitcoin ou Lightning",
     "onchain": "Bitcoin on-chain",
