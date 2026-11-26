@@ -49,6 +49,8 @@ release notes when a tag is published.
 
 ### Fixed
 
+- Wallet MCP subscriptions resume balance and recent payment updates when the wallet API recovers from a temporary outage.
+
 - Keep wallet and account ownership intact until the original node has disabled each receive offer and SwissKnife has replayed its accepted payments.
 
 - Existing pending LND withdrawals are reconciled against confirmed transactions using their original unsigned PSBT IDs.

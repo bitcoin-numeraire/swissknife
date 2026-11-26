@@ -583,7 +583,10 @@ impl ServerHandler for WalletServer {
         request: ReadResourceRequestParams,
         _: RequestContext<RoleServer>,
     ) -> Result<ReadResourceResponse, ErrorData> {
-        let value = WalletResource::parse(&request.uri)?.read(&self.wallet).await?;
+        let value = WalletResource::parse(&request.uri)?
+            .read(&self.wallet)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         Ok(ReadResourceResult::new(vec![
             ResourceContents::text(value.to_string(), request.uri).with_mime_type("application/json")
         ])

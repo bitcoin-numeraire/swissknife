@@ -109,7 +109,11 @@ impl WalletClient {
         let mut value = serde_json::from_slice::<Value>(&bytes).unwrap_or(Value::Null);
         if !status.is_success() {
             let reason = value["reason"].as_str().unwrap_or("Request rejected");
-            bail!("SwissKnife {}: {}", status.as_u16(), reason);
+            let message = format!("SwissKnife {}: {}", status.as_u16(), reason);
+            if let Err(error) = response.error_for_status_ref() {
+                return Err(anyhow::Error::new(error.without_url()).context(message));
+            }
+            bail!(message);
         }
         ensure!(!value.is_null(), "SwissKnife returned an empty or invalid response");
         exact_amounts(&mut value);

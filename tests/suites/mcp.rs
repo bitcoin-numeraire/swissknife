@@ -20,12 +20,12 @@ struct StdioWallet {
 }
 impl StdioWallet {
     async fn start(app: &TestApp, wallet: Uuid, secret: &str) -> Self {
-        Self::start_with_options(app, wallet, secret, &[]).await
+        Self::start_with_options(&app.base_url, wallet, secret, &[]).await
     }
 
-    async fn start_with_options(app: &TestApp, wallet: Uuid, secret: &str, options: &[&str]) -> Self {
+    async fn start_with_options(origin: &str, wallet: Uuid, secret: &str, options: &[&str]) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_swissknife"))
-            .args(["mcp", "--server", &app.base_url, "--wallet", &wallet.to_string()])
+            .args(["mcp", "--server", origin, "--wallet", &wallet.to_string()])
             .args(options)
             .env("SWISSKNIFE_MCP_WALLET_KEY", secret)
             .stdin(Stdio::piped())
@@ -80,7 +80,7 @@ impl StdioWallet {
     }
 
     async fn next_update(&mut self, uri: &str) -> Value {
-        timeout(Duration::from_secs(8), async {
+        timeout(Duration::from_secs(15), async {
             loop {
                 if let Some(index) = self
                     .notifications
@@ -412,6 +412,54 @@ async fn stdio_invoice_receipt_confirms_payment_only_for_the_authorized_wallet()
 }
 
 #[tokio::test]
+async fn stdio_balance_subscription_recovers_from_an_outage_and_stops_after_revocation() {
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+    use tokio::sync::Notify;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, Request, ResponseTemplate,
+    };
+
+    let api = MockServer::start().await;
+    let wallet = Uuid::new_v4();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let denied = Arc::new(Notify::new());
+    let observed = calls.clone();
+    let revocation = denied.clone();
+    Mock::given(method("GET"))
+        .and(path(format!("/v1/me/wallets/{wallet}/balance")))
+        .respond_with(move |_: &Request| match observed.fetch_add(1, Ordering::SeqCst) {
+            0 => ResponseTemplate::new(200).set_body_json(json!({"available_msat":100})),
+            1 => ResponseTemplate::new(503),
+            2 => ResponseTemplate::new(200).set_body_json(json!({"available_msat":200})),
+            _ => {
+                revocation.notify_one();
+                ResponseTemplate::new(401)
+            }
+        })
+        .mount(&api)
+        .await;
+
+    let key = format!("swka_{}", hex::encode([31; 32]));
+    let mut mcp = StdioWallet::start_with_options(&api.uri(), wallet, &key, &[]).await;
+    let uri = "wallet://balance";
+    mcp.request("resources/subscribe", json!({"uri":uri})).await;
+    mcp.next_update(uri).await;
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
+
+    timeout(Duration::from_secs(8), denied.notified())
+        .await
+        .expect("poll after recovery");
+    // A retry after the first failed poll would happen within six seconds.
+    assert!(timeout(Duration::from_secs(8), denied.notified()).await.is_err());
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
+    mcp.close().await;
+}
+
+#[tokio::test]
 async fn stdio_resource_subscription_tracks_only_the_selected_wallet_until_unsubscribe() {
     let app = TestApp::isolated("mcp-subscriptions", &[]).await;
     let admin = app.admin_token().await;
@@ -674,8 +722,13 @@ async fn withdraw_voucher_uses_the_selected_invoice_and_reconciles_callback_outc
         .mount(&service)
         .await;
 
-    let mut mcp =
-        StdioWallet::start_with_options(&app, owner.wallet.id, &issued.key, &["--withdraw-origin", &origin]).await;
+    let mut mcp = StdioWallet::start_with_options(
+        &app.base_url,
+        owner.wallet.id,
+        &issued.key,
+        &["--withdraw-origin", &origin],
+    )
+    .await;
     let names = mcp.request("tools/list", json!({})).await;
     for name in ["lnurl_withdraw", "inspect_lnurl_withdraw"] {
         assert!(names["tools"]
@@ -818,7 +871,7 @@ async fn cached_l402_pass_inspection_keeps_payment_credentials_local() {
 
     let secret = format!("swka_{}", hex::encode([31; 32]));
     let mut mcp = StdioWallet::start_with_options(
-        &app,
+        &app.base_url,
         Uuid::new_v4(),
         &secret,
         &[
