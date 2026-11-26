@@ -425,20 +425,14 @@ async fn stdio_balance_subscription_recovers_from_an_outage_and_stops_after_revo
 
     let api = MockServer::start().await;
     let wallet = Uuid::new_v4();
-    let calls = Arc::new(AtomicUsize::new(0));
-    let denied = Arc::new(Notify::new());
-    let observed = calls.clone();
-    let revocation = denied.clone();
+    let route = format!("/v1/me/wallets/{wallet}/balance");
+    let calls = AtomicUsize::new(0);
     Mock::given(method("GET"))
-        .and(path(format!("/v1/me/wallets/{wallet}/balance")))
-        .respond_with(move |_: &Request| match observed.fetch_add(1, Ordering::SeqCst) {
+        .and(path(route.clone()))
+        .respond_with(move |_: &Request| match calls.fetch_add(1, Ordering::Relaxed) {
             0 => ResponseTemplate::new(200).set_body_json(json!({"available_msat":100})),
             1 => ResponseTemplate::new(503),
-            2 => ResponseTemplate::new(200).set_body_json(json!({"available_msat":200})),
-            _ => {
-                revocation.notify_one();
-                ResponseTemplate::new(401)
-            }
+            _ => ResponseTemplate::new(200).set_body_json(json!({"available_msat":200})),
         })
         .mount(&api)
         .await;
@@ -448,14 +442,27 @@ async fn stdio_balance_subscription_recovers_from_an_outage_and_stops_after_revo
     let uri = "wallet://balance";
     mcp.request("resources/subscribe", json!({"uri":uri})).await;
     mcp.next_update(uri).await;
-    assert_eq!(calls.load(Ordering::SeqCst), 3);
+    let read = mcp.request("resources/read", json!({"uri":uri})).await;
+    let snapshot: Value = serde_json::from_str(read["contents"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(snapshot["available_msat"], "200");
 
+    let denied = Arc::new(Notify::new());
+    let revocation = denied.clone();
+    Mock::given(method("GET"))
+        .and(path(route))
+        .respond_with(move |_: &Request| {
+            revocation.notify_one();
+            ResponseTemplate::new(401)
+        })
+        .with_priority(1)
+        .expect(1)
+        .mount(&api)
+        .await;
     timeout(Duration::from_secs(8), denied.notified())
         .await
         .expect("poll after recovery");
     // A retry after the first failed poll would happen within six seconds.
     assert!(timeout(Duration::from_secs(8), denied.notified()).await.is_err());
-    assert_eq!(calls.load(Ordering::SeqCst), 4);
     mcp.close().await;
 }
 
