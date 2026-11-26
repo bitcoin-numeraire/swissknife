@@ -35,6 +35,7 @@ mod m20260904_192903_local_jwt_credentials;
 mod m20261105_223341_widen_btc_output_indexes;
 mod m20261118_154958_add_lnurl_invoice_verification;
 mod m20261125_161119_wallet_credit;
+mod m20261126_213933_index_paid_wallet_statements;
 
 pub struct Migrator;
 
@@ -77,6 +78,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261105_223341_widen_btc_output_indexes::Migration),
             Box::new(m20261118_154958_add_lnurl_invoice_verification::Migration),
             Box::new(m20261125_161119_wallet_credit::Migration),
+            Box::new(m20261126_213933_index_paid_wallet_statements::Migration),
         ]
     }
 }
